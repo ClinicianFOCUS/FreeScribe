@@ -1,6 +1,15 @@
-# Copyright (c) 2023 Braedon Hendy
-# This software is released under the GNU General Public License v3.0
-# Contributors: Kevin Lai
+"""
+This software is released under the AGPL-3.0 license
+Copyright (c) 2023-2024 Braedon Hendy
+
+Further updates and packaging added in 2024 through the ClinicianFOCUS initiative, 
+a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied 
+Learning and Technology as part of the CNERG+ applied research project, 
+Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform". 
+Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner), 
+and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and Naitik Patel.
+
+"""
 
 import tkinter as tk
 from tkinter import scrolledtext, ttk, filedialog
@@ -24,11 +33,12 @@ import re
 import speech_recognition as sr # python package is named speechrecognition
 import time
 import queue
-import ApplicationSettings_client as settings
+import UI.SettingsWindow as settings
 from ContainerManager import ContainerManager
 import atexit
 import asyncio
 from UI.MainWindow import MainWindow
+from UI.SettingsWindowUI import SettingsWindowUI
 
 
 # GUI Setup
@@ -670,7 +680,9 @@ toggle_button.grid(row=1, column=5, pady=5, sticky='nsew')
 gpt_button = tk.Button(root, text="KoboldCpp", command=toggle_gpt_button, height=2, width=13)
 gpt_button.grid(row=1, column=6, pady=5, sticky='nsew')
 
-settings_button = tk.Button(root, text="Settings", command=app_settings.open_settings_window, height=2, width=10)
+settings_window = SettingsWindowUI(app_settings)
+
+settings_button = tk.Button(root, text="Settings", command= settings_window.open_settings_window, height=2, width=10)
 settings_button.grid(row=1, column=7, pady=5, sticky='nsew')
 
 upload_button = tk.Button(root, text="Upload File", command=upload_file, height=2, width=10)
