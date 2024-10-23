@@ -8,11 +8,11 @@ of a settings window using Tkinter.
 This software is released under the AGPL-3.0 license
 Copyright (c) 2023-2024 Braedon Hendy
 
-Further updates and packaging added in 2024 through the ClinicianFOCUS initiative, 
-a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied 
-Learning and Technology as part of the CNERG+ applied research project, 
-Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform". 
-Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner), 
+Further updates and packaging added in 2024 through the ClinicianFOCUS initiative,
+a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied
+Learning and Technology as part of the CNERG+ applied research project,
+Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform".
+Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner),
 and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and Naitik Patel.
 
 Classes:
@@ -63,7 +63,6 @@ class SettingsWindowUI:
         self.docker_settings_frame = None
         self.basic_settings_frame = None
         self.advanced_settings_frame = None
-        
 
     def open_settings_window(self):
         """
@@ -91,8 +90,10 @@ class SettingsWindowUI:
         self.notebook.add(self.advanced_frame, text="Advanced Settings")
         self.notebook.add(self.docker_settings_frame, text="Docker Settings")
 
-        self.basic_settings_frame = self.add_scrollbar_to_frame(self.basic_frame)
-        self.advanced_settings_frame = self.add_scrollbar_to_frame(self.advanced_frame)
+        self.basic_settings_frame = self.add_scrollbar_to_frame(
+            self.basic_frame)
+        self.advanced_settings_frame = self.add_scrollbar_to_frame(
+            self.advanced_frame)
 
         self.create_basic_settings()
         self.create_advanced_settings()
@@ -110,7 +111,8 @@ class SettingsWindowUI:
             tk.Frame: The scrollable frame.
         """
         canvas = tk.Canvas(frame)
-        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        scrollbar = ttk.Scrollbar(
+            frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
 
         scrollable_frame.bind(
@@ -137,60 +139,157 @@ class SettingsWindowUI:
         row_idx = 0
 
         # create a settings preset dropdown
-        tk.Label(self.basic_settings_frame, text="Settings Preset:").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        settings_preset_options = ["JanAI", "ChatGPT", "ClinicianFocus Toolbox","Custom"]
-        self.settings_preset_dropdown = ttk.Combobox(self.basic_settings_frame, values=settings_preset_options, width=15, state="readonly")
-        self.settings_preset_dropdown.current(settings_preset_options.index(self.settings.editable_settings["Preset"]))
-        self.settings_preset_dropdown.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
+        tk.Label(
+            self.basic_settings_frame,
+            text="Settings Preset:").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
+        settings_preset_options = [
+            "JanAI",
+            "ChatGPT",
+            "ClinicianFocus Toolbox",
+            "Custom"]
+        self.settings_preset_dropdown = ttk.Combobox(
+            self.basic_settings_frame,
+            values=settings_preset_options,
+            width=15,
+            state="readonly")
+        self.settings_preset_dropdown.current(
+            settings_preset_options.index(
+                self.settings.editable_settings["Preset"]))
+        self.settings_preset_dropdown.grid(
+            row=row_idx, column=1, padx=0, pady=5, sticky="w")
 
-        load_preset_btn = ttk.Button(self.basic_settings_frame, text="Load", width=5, command=lambda: self.settings.load_settings_preset(self.settings_preset_dropdown.get(), self))
+        load_preset_btn = ttk.Button(
+            self.basic_settings_frame,
+            text="Load",
+            width=5,
+            command=lambda: self.settings.load_settings_preset(
+                self.settings_preset_dropdown.get(),
+                self))
         load_preset_btn.grid(row=row_idx, column=2, padx=0, pady=5, sticky="w")
 
         row_idx += 1
 
-        tk.Label(self.basic_settings_frame, text="OpenAI API Key:").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        self.openai_api_key_entry = tk.Entry(self.basic_settings_frame, width=25)
+        tk.Label(
+            self.basic_settings_frame,
+            text="OpenAI API Key:").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
+        self.openai_api_key_entry = tk.Entry(
+            self.basic_settings_frame, width=25)
         self.openai_api_key_entry.insert(0, self.settings.OPENAI_API_KEY)
-        self.openai_api_key_entry.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
+        self.openai_api_key_entry.grid(
+            row=row_idx, column=1, padx=0, pady=5, sticky="w")
 
         row_idx += 1
 
-        tk.Label(self.basic_settings_frame, text="API Style:").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
+        tk.Label(
+            self.basic_settings_frame,
+            text="API Style:").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
         api_options = ["OpenAI", "KoboldCpp"]
-        self.api_dropdown = ttk.Combobox(self.basic_settings_frame, values=api_options, width=15, state="readonly")
+        self.api_dropdown = ttk.Combobox(
+            self.basic_settings_frame,
+            values=api_options,
+            width=15,
+            state="readonly")
         self.api_dropdown.current(api_options.index(self.settings.API_STYLE))
-        self.api_dropdown.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
+        self.api_dropdown.grid(
+            row=row_idx,
+            column=1,
+            padx=0,
+            pady=5,
+            sticky="w")
 
         row_idx += 1
 
         self.ssl_enable_var = tk.IntVar(value=int(self.settings.SSL_ENABLE))
-        tk.Label(self.basic_settings_frame, text="Enable SSL:").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        self.ssl_enable_checkbox = tk.Checkbutton(self.basic_settings_frame, variable=self.ssl_enable_var)
-        self.ssl_enable_checkbox.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
+        tk.Label(
+            self.basic_settings_frame,
+            text="Enable SSL:").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
+        self.ssl_enable_checkbox = tk.Checkbutton(
+            self.basic_settings_frame, variable=self.ssl_enable_var)
+        self.ssl_enable_checkbox.grid(
+            row=row_idx, column=1, padx=0, pady=5, sticky="w")
 
         row_idx += 1
 
-        self.ssl_selfcert_var = tk.IntVar(value=int(self.settings.SSL_SELFCERT))
-        tk.Label(self.basic_settings_frame, text="Self-Signed Cert:").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        self.ssl_selfcert_checkbox = tk.Checkbutton(self.basic_settings_frame, variable=self.ssl_selfcert_var)
-        self.ssl_selfcert_checkbox.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
+        self.ssl_selfcert_var = tk.IntVar(
+            value=int(self.settings.SSL_SELFCERT))
+        tk.Label(self.basic_settings_frame,
+                 text="Self-Signed Cert:").grid(row=row_idx,
+                                                column=0,
+                                                padx=0,
+                                                pady=5,
+                                                sticky="w")
+        self.ssl_selfcert_checkbox = tk.Checkbutton(
+            self.basic_settings_frame, variable=self.ssl_selfcert_var)
+        self.ssl_selfcert_checkbox.grid(
+            row=row_idx, column=1, padx=0, pady=5, sticky="w")
 
         row_idx += 1
 
-        tk.Label(self.basic_settings_frame, text="Models").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        models_drop_down_options = self.settings.get_available_models() or ["No models available"]
+        tk.Label(
+            self.basic_settings_frame,
+            text="Models").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
+        models_drop_down_options = self.settings.get_available_models() or [
+            "No models available"]
 
-        self.models_drop_down = ttk.Combobox(self.basic_settings_frame, values=models_drop_down_options, width=15, state="readonly")
-        self.models_drop_down.current(api_options.index(self.settings.API_STYLE))
-        self.models_drop_down.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
-        
-        refresh_button = ttk.Button(self.basic_settings_frame, text="↻", command=lambda: (self.save_settings(False), self.settings.update_models_dropdown(self.models_drop_down)), width=4)
-        refresh_button.grid(row=row_idx, column=2, columnspan=1, padx=0, pady=5, sticky="w")
+        self.models_drop_down = ttk.Combobox(
+            self.basic_settings_frame,
+            values=models_drop_down_options,
+            width=15,
+            state="readonly")
+        self.models_drop_down.current(
+            api_options.index(
+                self.settings.API_STYLE))
+        self.models_drop_down.grid(
+            row=row_idx, column=1, padx=0, pady=5, sticky="w")
+
+        refresh_button = ttk.Button(
+            self.basic_settings_frame,
+            text="↻",
+            command=lambda: (
+                self.save_settings(False),
+                self.settings.update_models_dropdown(
+                    self.models_drop_down)),
+            width=4)
+        refresh_button.grid(
+            row=row_idx,
+            column=2,
+            columnspan=1,
+            padx=0,
+            pady=5,
+            sticky="w")
         tt.Tooltip(refresh_button, text="Refresh the list of available models")
 
         row_idx += 1
 
-        self.create_editable_settings(self.basic_settings_frame, self.settings.basic_settings, start_row=row_idx)
+        self.create_editable_settings(
+            self.basic_settings_frame,
+            self.settings.basic_settings,
+            start_row=row_idx)
 
     def create_advanced_settings(self):
         """
@@ -199,29 +298,77 @@ class SettingsWindowUI:
         This method creates and places UI elements for advanced settings such as
         editable settings, pre-prompting, and post-prompting text areas.
         """
-        self.create_editable_settings(self.advanced_settings_frame, self.settings.advanced_settings)
+        self.create_editable_settings(
+            self.advanced_settings_frame,
+            self.settings.advanced_settings)
 
         row_idx = len(self.settings.advanced_settings)
 
-        tk.Label(self.advanced_settings_frame, text="Whisper Audio Cutoff").grid(row=row_idx, column=0, padx=0, pady=0, sticky="w")
+        tk.Label(
+            self.advanced_settings_frame,
+            text="Whisper Audio Cutoff").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=0,
+            sticky="w")
 
-        # Create audio meter for silence cut-off, used for setting microphone cutoff in Whisper
-        self.cutoff_slider = AudioMeter(self.advanced_settings_frame, width=150, height=50, threshold=self.settings.editable_settings["Silence cut-off"] * 32768)
-        self.cutoff_slider.grid(row=row_idx, column=1, padx=0, pady=0, sticky="w")
+        # Create audio meter for silence cut-off, used for setting microphone
+        # cutoff in Whisper
+        self.cutoff_slider = AudioMeter(
+            self.advanced_settings_frame,
+            width=150,
+            height=50,
+            threshold=self.settings.editable_settings["Silence cut-off"] *
+            32768)
+        self.cutoff_slider.grid(
+            row=row_idx,
+            column=1,
+            padx=0,
+            pady=0,
+            sticky="w")
 
         row_idx += 1
 
-        tk.Label(self.advanced_settings_frame, text="Pre Prompting").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        self.aiscribe_text = tk.Text(self.advanced_settings_frame, height=10, width=25)
+        tk.Label(
+            self.advanced_settings_frame,
+            text="Pre Prompting").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
+        self.aiscribe_text = tk.Text(
+            self.advanced_settings_frame, height=10, width=25)
         self.aiscribe_text.insert(tk.END, self.settings.AISCRIBE)
-        self.aiscribe_text.grid(row=row_idx, column=1, columnspan=2, padx=0, pady=5, sticky="w")
+        self.aiscribe_text.grid(
+            row=row_idx,
+            column=1,
+            columnspan=2,
+            padx=0,
+            pady=5,
+            sticky="w")
 
         row_idx += 1
 
-        tk.Label(self.advanced_settings_frame, text="Post Prompting").grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        self.aiscribe2_text = tk.Text(self.advanced_settings_frame, height=10, width=25)
+        tk.Label(
+            self.advanced_settings_frame,
+            text="Post Prompting").grid(
+            row=row_idx,
+            column=0,
+            padx=0,
+            pady=5,
+            sticky="w")
+        self.aiscribe2_text = tk.Text(
+            self.advanced_settings_frame, height=10, width=25)
         self.aiscribe2_text.insert(tk.END, self.settings.AISCRIBE2)
-        self.aiscribe2_text.grid(row=row_idx, column=1, columnspan=2, padx=0, pady=5, sticky="w")
+        self.aiscribe2_text.grid(
+            row=row_idx,
+            column=1,
+            columnspan=2,
+            padx=0,
+            pady=5,
+            sticky="w")
 
     def create_docker_settings(self):
         """
@@ -229,7 +376,9 @@ class SettingsWindowUI:
 
         This method creates and places UI elements for Docker settings.
         """
-        self.create_editable_settings(self.docker_settings_frame, self.settings.docker_settings)
+        self.create_editable_settings(
+            self.docker_settings_frame,
+            self.settings.docker_settings)
 
     def create_editable_settings(self, frame, settings_set, start_row=0):
         """
@@ -241,18 +390,35 @@ class SettingsWindowUI:
             start_row (int): The starting row for placing the settings.
         """
         for i, setting in enumerate(settings_set):
-            tk.Label(frame, text=f"{setting}:").grid(row=start_row+i, column=0, padx=0, pady=5, sticky="w")
-            
+            tk.Label(
+                frame,
+                text=f"{setting}:").grid(
+                row=start_row + i,
+                column=0,
+                padx=0,
+                pady=5,
+                sticky="w")
+
             value = self.settings.editable_settings[setting]
             if value in [True, False]:
                 var = tk.IntVar(value=int(value))
                 checkbox = tk.Checkbutton(frame, variable=var)
-                checkbox.grid(row=start_row+i, column=1, padx=0, pady=5, sticky="w")
+                checkbox.grid(
+                    row=start_row + i,
+                    column=1,
+                    padx=0,
+                    pady=5,
+                    sticky="w")
                 self.settings.editable_settings_entries[setting] = var
             else:
                 entry = tk.Entry(frame)
                 entry.insert(0, str(value))
-                entry.grid(row=start_row+i, column=1, padx=0, pady=5, sticky="w")
+                entry.grid(
+                    row=start_row + i,
+                    column=1,
+                    padx=0,
+                    pady=5,
+                    sticky="w")
                 self.settings.editable_settings_entries[setting] = entry
 
     def create_buttons(self):
@@ -262,9 +428,30 @@ class SettingsWindowUI:
         This method creates and places buttons for saving settings, resetting to default,
         and closing the settings window.
         """
-        tk.Button(self.main_frame, text="Save", command=self.save_settings, width=10).pack(side="right", padx=2, pady=5)
-        tk.Button(self.main_frame, text="Default", width=10, command=self.reset_to_default).pack(side="right", padx=2, pady=5)
-        tk.Button(self.main_frame, text="Close", width=10, command=self.settings_window.destroy).pack(side="right", padx=2, pady=5)
+        tk.Button(
+            self.main_frame,
+            text="Save",
+            command=self.save_settings,
+            width=10).pack(
+            side="right",
+            padx=2,
+            pady=5)
+        tk.Button(
+            self.main_frame,
+            text="Default",
+            width=10,
+            command=self.reset_to_default).pack(
+            side="right",
+            padx=2,
+            pady=5)
+        tk.Button(
+            self.main_frame,
+            text="Close",
+            width=10,
+            command=self.settings_window.destroy).pack(
+            side="right",
+            padx=2,
+            pady=5)
 
     def save_settings(self, close_window=True):
         """
@@ -301,4 +488,3 @@ class SettingsWindowUI:
         to reset the settings to their default values.
         """
         self.settings.clear_settings_file(self.settings_window)
-

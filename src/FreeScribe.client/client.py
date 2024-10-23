@@ -2,11 +2,11 @@
 This software is released under the AGPL-3.0 license
 Copyright (c) 2023-2024 Braedon Hendy
 
-Further updates and packaging added in 2024 through the ClinicianFOCUS initiative, 
-a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied 
-Learning and Technology as part of the CNERG+ applied research project, 
-Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform". 
-Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner), 
+Further updates and packaging added in 2024 through the ClinicianFOCUS initiative,
+a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied
+Learning and Technology as part of the CNERG+ applied research project,
+Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform".
+Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner),
 and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and Naitik Patel.
 
 """
@@ -26,11 +26,11 @@ import tkinter.messagebox as messagebox
 import datetime
 import functools
 import os
-import whisper # python package is named openai-whisper
+import whisper  # python package is named openai-whisper
 from openai import OpenAI
 import scrubadub
 import re
-import speech_recognition as sr # python package is named speechrecognition
+import speech_recognition as sr  # python package is named speechrecognition
 import time
 import queue
 from ContainerManager import ContainerManager
@@ -110,22 +110,27 @@ def get_prompt(formatted_message):
         "frmtrmblln": app_settings.editable_settings["frmtrmblln"]
     }
 
+
 def threaded_toggle_recording():
     thread = threading.Thread(target=toggle_recording)
     thread.start()
+
 
 def threaded_realtime_text():
     thread = threading.Thread(target=realtime_text)
     thread.start()
 
+
 def threaded_handle_message(formatted_message):
-    thread = threading.Thread(target=show_edit_transcription_popup, args=(formatted_message,))
+    thread = threading.Thread(
+        target=show_edit_transcription_popup, args=(
+            formatted_message,))
     thread.start()
+
 
 def threaded_send_audio_to_server():
     thread = threading.Thread(target=send_audio_to_server)
     thread.start()
-
 
 
 def toggle_pause():
@@ -137,31 +142,47 @@ def toggle_pause():
     else:
         pause_button.config(text="Pause", bg="gray85")
 
+
 def record_audio():
     global is_paused, frames, audio_queue
-    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK, input_device_index=1)
+    stream = p.open(
+        format=FORMAT,
+        channels=CHANNELS,
+        rate=RATE,
+        input=True,
+        frames_per_buffer=CHUNK,
+        input_device_index=1)
     current_chunk = []
     silent_duration = 0
-    minimum_silent_duration = int(app_settings.editable_settings["Real Time Silence Length"])
-    minimum_audio_duration = int(app_settings.editable_settings["Real Time Audio Length"])
+    minimum_silent_duration = int(
+        app_settings.editable_settings["Real Time Silence Length"])
+    minimum_audio_duration = int(
+        app_settings.editable_settings["Real Time Audio Length"])
     print("Recording...")
     while is_recording:
         if not is_paused:
             data = stream.read(CHUNK, exception_on_overflow=False)
             frames.append(data)
             # Check for silence
-            audio_buffer = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768
-            if is_silent(audio_buffer, app_settings.editable_settings["Silence cut-off"]):
+            audio_buffer = np.frombuffer(
+                data, dtype=np.int16).astype(
+                np.float32) / 32768
+            if is_silent(
+                    audio_buffer,
+                    app_settings.editable_settings["Silence cut-off"]):
                 silent_duration += CHUNK / RATE
             else:
                 current_chunk.append(data)
                 silent_duration = 0
-            # If the current_chunk has at least 5 seconds of audio and 1 second of silence at the end
+            # If the current_chunk has at least 5 seconds of audio and 1 second
+            # of silence at the end
             if len(current_chunk) >= minimum_audio_duration * RATE // CHUNK:
                 print("Audio Chunk Ready")
                 # Check if the last 1 second of the current_chunk is silent
                 last_second_data = b''.join(current_chunk[-RATE // CHUNK:])
-                last_second_buffer = np.frombuffer(last_second_data, dtype=np.int16).astype(np.float32) / 32768
+                last_second_buffer = np.frombuffer(
+                    last_second_data, dtype=np.int16).astype(
+                    np.float32) / 32768
                 if app_settings.editable_settings["Real Time"]:
                     print("Audio Chunk Sent")
                     audio_queue.put(b''.join(current_chunk))
@@ -178,6 +199,7 @@ def is_silent(data, threshold=0.01):
     max_value = max(abs(data_array))
     return max_value < threshold
 
+
 def realtime_text():
     global frames, is_realtimeactive, audio_queue
     if not is_realtimeactive:
@@ -185,20 +207,24 @@ def realtime_text():
         model = None
         if app_settings.editable_settings["Real Time"]:
             try:
-                model_name = app_settings.editable_settings["Whisper Model"].strip()
+                model_name = app_settings.editable_settings["Whisper Model"].strip(
+                )
                 model = whisper.load_model(model_name)
             except Exception as e:
-                messagebox.showerror("Model Error", f"Error loading model: {e}")
-                
+                messagebox.showerror(
+                    "Model Error", f"Error loading model: {e}")
+
         while True:
             audio_data = audio_queue.get()
             if audio_data is None:
                 break
-            if app_settings.editable_settings["Real Time"] == True:
+            if app_settings.editable_settings["Real Time"]:
                 print("Real Time Audio to Text")
-                audio_buffer = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768
+                audio_buffer = np.frombuffer(
+                    audio_data, dtype=np.int16).astype(
+                    np.float32) / 32768
                 if not is_silent(audio_buffer):
-                    if app_settings.editable_settings["Local Whisper"] == True:
+                    if app_settings.editable_settings["Local Whisper"]:
                         print("Local Real Time Whisper")
                         result = model.transcribe(audio_buffer, fp16=False)
                         update_gui(result['text'])
@@ -216,13 +242,20 @@ def realtime_text():
                             files = {'audio': f}
 
                             headers = {
-                                "Authorization": "Bearer "+app_settings.editable_settings["Whisper Server API Key"]
-                            }
+                                "Authorization": "Bearer " +
+                                app_settings.editable_settings["Whisper Server API Key"]}
 
-                            if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1":
-                                response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers,files=files, verify=False)
+                            if str(
+                                    app_settings.SSL_ENABLE) == "1" and str(
+                                    app_settings.SSL_SELFCERT) == "1":
+                                response = requests.post(
+                                    app_settings.editable_settings["Whisper Endpoint"],
+                                    headers=headers,
+                                    files=files,
+                                    verify=False)
                             else:
-                                response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers,files=files)
+                                response = requests.post(
+                                    app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files)
                             if response.status_code == 200:
                                 text = response.json()['text']
                                 update_gui(text)
@@ -230,9 +263,11 @@ def realtime_text():
     else:
         is_realtimeactive = False
 
+
 def update_gui(text):
     user_input.insert(tk.END, text + '\n')
     user_input.see(tk.END)
+
 
 def save_audio():
     global frames
@@ -243,10 +278,11 @@ def save_audio():
             wf.setframerate(RATE)
             wf.writeframes(b''.join(frames))
         frames = []  # Clear recorded data
-        if app_settings.editable_settings["Real Time"] == True:
+        if app_settings.editable_settings["Real Time"]:
             send_and_receive()
         else:
             threaded_send_audio_to_server()
+
 
 def toggle_recording():
     global is_recording, recording_thread
@@ -270,6 +306,7 @@ def toggle_recording():
         save_audio()
         mic_button.config(bg="gray85", text="Mic OFF")
 
+
 def clear_all_text_fields():
     user_input.configure(state='normal')
     user_input.delete("1.0", tk.END)
@@ -278,10 +315,13 @@ def clear_all_text_fields():
     response_display.delete("1.0", tk.END)
     response_display.configure(state='disabled')
 
+
 def toggle_aiscribe():
     global use_aiscribe
     use_aiscribe = not use_aiscribe
-    toggle_button.config(text="AISCRIBE ON" if use_aiscribe else "AISCRIBE OFF")
+    toggle_button.config(
+        text="AISCRIBE ON" if use_aiscribe else "AISCRIBE OFF")
+
 
 def send_audio_to_server():
     """
@@ -314,7 +354,7 @@ def send_audio_to_server():
     global uploaded_file_path
 
     # Check if Local Whisper is enabled in the editable settings
-    if app_settings.editable_settings["Local Whisper"] == True:
+    if app_settings.editable_settings["Local Whisper"]:
         # Inform the user that Local Whisper is being used for transcription
         print("Using Local Whisper for transcription.")
 
@@ -322,7 +362,8 @@ def send_audio_to_server():
         user_input.configure(state='normal')
         user_input.delete("1.0", tk.END)
 
-        # Display a message indicating that audio to text processing is in progress
+        # Display a message indicating that audio to text processing is in
+        # progress
         user_input.insert(tk.END, "Audio to Text Processing...Please Wait")
 
         # Load the specified Whisper model
@@ -352,7 +393,8 @@ def send_audio_to_server():
         user_input.configure(state='normal')
         user_input.delete("1.0", tk.END)
 
-        # Display a message indicating that audio to text processing is in progress
+        # Display a message indicating that audio to text processing is in
+        # progress
         user_input.insert(tk.END, "Audio to Text Processing...Please Wait")
 
         # Determine the file to send for transcription
@@ -368,17 +410,26 @@ def send_audio_to_server():
 
             # Add the Bearer token to the headers for authentication
             headers = {
-                "Authorization": f"Bearer {app_settings.editable_settings['Whisper Server API Key']}"
-            }
+                "Authorization": f"Bearer {app_settings.editable_settings['Whisper Server API Key']}"}
 
             # Check for SSL and self-signed certificate settings
-            if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1":
+            if str(
+                    app_settings.SSL_ENABLE) == "1" and str(
+                    app_settings.SSL_SELFCERT) == "1":
                 # Send the request without verifying the SSL certificate
-                response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files, verify=False)
+                response = requests.post(
+                    app_settings.editable_settings["Whisper Endpoint"],
+                    headers=headers,
+                    files=files,
+                    verify=False)
             else:
-                # Send the request with the audio file and headers/authorization
-                response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files)
-            
+                # Send the request with the audio file and
+                # headers/authorization
+                response = requests.post(
+                    app_settings.editable_settings["Whisper Endpoint"],
+                    headers=headers,
+                    files=files)
+
             # On successful response (status code 200)
             if response.status_code == 200:
                 # Update the UI with the transcribed text
@@ -390,6 +441,7 @@ def send_audio_to_server():
                 # Send the transcribed text and receive a response
                 send_and_receive()
 
+
 def send_and_receive():
     global use_aiscribe, user_message
     user_message = user_input.get("1.0", tk.END).strip()
@@ -400,13 +452,13 @@ def send_and_receive():
         formatted_message = user_message
     threaded_handle_message(formatted_message)
 
-        
 
 def display_text(text):
     response_display.configure(state='normal')
     response_display.delete("1.0", tk.END)
     response_display.insert(tk.END, f"{text}\n")
     response_display.configure(state='disabled')
+
 
 def update_gui_with_response(response_text):
     global response_history, user_message
@@ -422,6 +474,7 @@ def update_gui_with_response(response_text):
     pyperclip.copy(response_text)
     stop_flashing()
 
+
 def show_response(event):
     selection = event.widget.curselection()
     if selection:
@@ -436,6 +489,7 @@ def show_response(event):
         response_display.insert('1.0', response_text)
         response_display.configure(state='disabled')
         pyperclip.copy(response_text)
+
 
 def send_text_to_chatgpt(edited_text):
     api_key = app_settings.OPENAI_API_KEY
@@ -458,10 +512,21 @@ def send_text_to_chatgpt(edited_text):
 
         if app_settings.API_STYLE == "OpenAI":
             response = requests.Response
-            if str(app_settings.SSL_SELFCERT) == "1" and str(app_settings.SSL_ENABLE) == "1":
-                response = requests.post(app_settings.editable_settings["Model Endpoint"]+"/chat/completions", headers=headers, json=payload, verify=False)
+            if str(
+                    app_settings.SSL_SELFCERT) == "1" and str(
+                    app_settings.SSL_ENABLE) == "1":
+                response = requests.post(
+                    app_settings.editable_settings["Model Endpoint"] +
+                    "/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    verify=False)
             else:
-                response = requests.post(app_settings.editable_settings["Model Endpoint"]+"/chat/completions", headers=headers, json=payload)
+                response = requests.post(
+                    app_settings.editable_settings["Model Endpoint"] +
+                    "/chat/completions",
+                    headers=headers,
+                    json=payload)
 
             response.raise_for_status()
             response_data = response.json()
@@ -469,10 +534,19 @@ def send_text_to_chatgpt(edited_text):
             update_gui_with_response(response_text)
         elif app_settings.API_STYLE == "KoboldCpp":
             prompt = get_prompt(edited_text)
-            if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1":
-                response = requests.post(app_settings.editable_settings["Model Endpoint"] + "/api/v1/generate", json=prompt, verify=False)
+            if str(
+                    app_settings.SSL_ENABLE) == "1" and str(
+                    app_settings.SSL_SELFCERT) == "1":
+                response = requests.post(
+                    app_settings.editable_settings["Model Endpoint"] +
+                    "/api/v1/generate",
+                    json=prompt,
+                    verify=False)
             else:
-                response = requests.post(app_settings.editable_settings["Model Endpoint"] + "/api/v1/generate", json=prompt)
+                response = requests.post(
+                    app_settings.editable_settings["Model Endpoint"] +
+                    "/api/v1/generate",
+                    json=prompt)
             if response.status_code == 200:
                 results = response.json()['results']
                 response_text = results[0]['text']
@@ -504,7 +578,7 @@ def show_edit_transcription_popup(formatted_message):
     scrubbed_message = scrubadub.clean(formatted_message)
 
     pattern = r'\b\d{10}\b'     # Any 10 digit number, looks like OHIP
-    cleaned_message = re.sub(pattern,'{{OHIP}}',scrubbed_message)
+    cleaned_message = re.sub(pattern, '{{OHIP}}', scrubbed_message)
     text_area.insert(tk.END, cleaned_message)
 
     def on_proceed():
@@ -522,12 +596,12 @@ def show_edit_transcription_popup(formatted_message):
 
 def upload_file():
     global uploaded_file_path
-    file_path = filedialog.askopenfilename(filetypes=(("Audio files", "*.wav *.mp3"),))
+    file_path = filedialog.askopenfilename(
+        filetypes=(("Audio files", "*.wav *.mp3"),))
     if file_path:
         uploaded_file_path = file_path
         threaded_send_audio_to_server()  # Add this line to process the file immediately
     start_flashing()
-
 
 
 def start_flashing():
@@ -535,10 +609,13 @@ def start_flashing():
     is_flashing = True
     flash_circle()
 
+
 def stop_flashing():
     global is_flashing
     is_flashing = False
-    blinking_circle_canvas.itemconfig(circle, fill='white')  # Reset to default color
+    blinking_circle_canvas.itemconfig(
+        circle, fill='white')  # Reset to default color
+
 
 def flash_circle():
     if is_flashing:
@@ -547,20 +624,26 @@ def flash_circle():
         blinking_circle_canvas.itemconfig(circle, fill=new_color)
         root.after(1000, flash_circle)  # Adjust the flashing speed as needed
 
+
 def send_and_flash():
     start_flashing()
     send_and_receive()
 
+
 def clear_settings_file(settings_window):
     try:
-        open('settings.txt', 'w').close()  # This opens the files and immediately closes it, clearing its contents.
+        # This opens the files and immediately closes it, clearing its
+        # contents.
+        open('settings.txt', 'w').close()
         open('aiscribe.txt', 'w').close()
         open('aiscribe2.txt', 'w').close()
-        messagebox.showinfo("Settings Reset", "Settings have been reset. Please restart.")
+        messagebox.showinfo("Settings Reset",
+                            "Settings have been reset. Please restart.")
         print("Settings file cleared.")
         settings_window.destroy()
     except Exception as e:
         print(f"Error clearing settings files: {e}")
+
 
 def toggle_view():
     global current_view
@@ -604,14 +687,22 @@ def toggle_view():
         pause_button.grid(row=1, column=3, pady=5, sticky='nsew')
         switch_view_button.grid(row=1, column=9, pady=5, sticky='nsew')
         blinking_circle_canvas.grid(row=1, column=10, pady=5)
-        combobox.grid(row=3, column=4, columnspan=4, pady=10, padx=10, sticky='nsew')
+        combobox.grid(
+            row=3,
+            column=4,
+            columnspan=4,
+            pady=10,
+            padx=10,
+            sticky='nsew')
         root.attributes('-topmost', False)
         root.minsize(900, 400)
         current_view = "full"
 
+
 def copy_text(widget):
     text = widget.get("1.0", tk.END)
     pyperclip.copy(text)
+
 
 def get_dropdown_values_and_mapping():
     options = []
@@ -630,10 +721,13 @@ def get_dropdown_values_and_mapping():
         print("options.txt not found, using default values.")
         # Fallback default options if file not found
         options = ["Settings Template"]
-        mapping["Settings Template"] = (app_settings.AISCRIBE, app_settings.AISCRIBE2)
+        mapping["Settings Template"] = (
+            app_settings.AISCRIBE, app_settings.AISCRIBE2)
     return options, mapping
 
+
 dropdown_values, option_mapping = get_dropdown_values_and_mapping()
+
 
 def update_aiscribe_texts(event):
     global AISCRIBE, AISCRIBE2
@@ -641,8 +735,9 @@ def update_aiscribe_texts(event):
     if selected_option in option_mapping:
         AISCRIBE, AISCRIBE2 = option_mapping[selected_option]
 
+
 # Configure grid weights for scalability
-root.grid_columnconfigure(0, weight=1, minsize= 10)
+root.grid_columnconfigure(0, weight=1, minsize=10)
 root.grid_columnconfigure(1, weight=1)
 root.grid_columnconfigure(2, weight=1)
 root.grid_columnconfigure(3, weight=1)
@@ -665,28 +760,70 @@ root.grid_rowconfigure(4, weight=0)
 user_input = scrolledtext.ScrolledText(root, height=12)
 user_input.grid(row=0, column=1, columnspan=9, padx=5, pady=15, sticky='nsew')
 
-mic_button = tk.Button(root, text="Mic OFF", command=lambda: (threaded_toggle_recording(), threaded_realtime_text()), height=2, width=11)
+mic_button = tk.Button(
+    root,
+    text="Mic OFF",
+    command=lambda: (
+        threaded_toggle_recording(),
+        threaded_realtime_text()),
+    height=2,
+    width=11)
 mic_button.grid(row=1, column=1, pady=5, sticky='nsew')
 
-send_button = tk.Button(root, text="AI Request", command=send_and_flash, height=2, width=11)
+send_button = tk.Button(
+    root,
+    text="AI Request",
+    command=send_and_flash,
+    height=2,
+    width=11)
 send_button.grid(row=1, column=2, pady=5, sticky='nsew')
 
-pause_button = tk.Button(root, text="Pause", command=toggle_pause, height=2, width=11)
+pause_button = tk.Button(
+    root,
+    text="Pause",
+    command=toggle_pause,
+    height=2,
+    width=11)
 pause_button.grid(row=1, column=3, pady=5, sticky='nsew')
 
-clear_button = tk.Button(root, text="Clear", command=clear_all_text_fields, height=2, width=11)
+clear_button = tk.Button(
+    root,
+    text="Clear",
+    command=clear_all_text_fields,
+    height=2,
+    width=11)
 clear_button.grid(row=1, column=4, pady=5, sticky='nsew')
 
-toggle_button = tk.Button(root, text="AISCRIBE ON", command=toggle_aiscribe, height=2, width=11)
+toggle_button = tk.Button(
+    root,
+    text="AISCRIBE ON",
+    command=toggle_aiscribe,
+    height=2,
+    width=11)
 toggle_button.grid(row=1, column=5, pady=5, sticky='nsew')
 
-settings_button = tk.Button(root, text="Settings", command= settings_window.open_settings_window, height=2, width=11)
+settings_button = tk.Button(
+    root,
+    text="Settings",
+    command=settings_window.open_settings_window,
+    height=2,
+    width=11)
 settings_button.grid(row=1, column=6, pady=5, sticky='nsew')
 
-upload_button = tk.Button(root, text="Upload File", command=upload_file, height=2, width=11)
+upload_button = tk.Button(
+    root,
+    text="Upload File",
+    command=upload_file,
+    height=2,
+    width=11)
 upload_button.grid(row=1, column=7, pady=5, sticky='nsew')
 
-switch_view_button = tk.Button(root, text="Switch View", command=toggle_view, height=2, width=11)
+switch_view_button = tk.Button(
+    root,
+    text="Switch View",
+    command=toggle_view,
+    height=2,
+    width=11)
 switch_view_button.grid(row=1, column=8, pady=5, sticky='nsew')
 
 blinking_circle_canvas = tk.Canvas(root, width=20, height=20)
@@ -694,19 +831,47 @@ blinking_circle_canvas.grid(row=1, column=9, pady=5)
 circle = blinking_circle_canvas.create_oval(5, 5, 15, 15, fill='white')
 
 response_display = scrolledtext.ScrolledText(root, height=12, state='disabled')
-response_display.grid(row=2, column=1, columnspan=9, padx=5, pady=15, sticky='nsew')
+response_display.grid(
+    row=2,
+    column=1,
+    columnspan=9,
+    padx=5,
+    pady=15,
+    sticky='nsew')
 
-copy_user_input_button = tk.Button(root, text="Copy", command=lambda: copy_text(user_input), height=2, width=10)
+copy_user_input_button = tk.Button(
+    root,
+    text="Copy",
+    command=lambda: copy_text(user_input),
+    height=2,
+    width=10)
 copy_user_input_button.grid(row=0, column=10, pady=5, padx=5, sticky='ew')
 
-copy_response_display_button = tk.Button(root, text="Copy", command=lambda: copy_text(response_display), height=2, width=10)
-copy_response_display_button.grid(row=2, column=10, pady=5, padx=5, sticky='ew')
+copy_response_display_button = tk.Button(
+    root,
+    text="Copy",
+    command=lambda: copy_text(response_display),
+    height=2,
+    width=10)
+copy_response_display_button.grid(
+    row=2, column=10, pady=5, padx=5, sticky='ew')
 
 timestamp_listbox = tk.Listbox(root, height=30)
-timestamp_listbox.grid(row=0, column=11, columnspan=2, rowspan=3, padx=5, pady=15, sticky='nsew')
+timestamp_listbox.grid(
+    row=0,
+    column=11,
+    columnspan=2,
+    rowspan=3,
+    padx=5,
+    pady=15,
+    sticky='nsew')
 timestamp_listbox.bind('<<ListboxSelect>>', show_response)
 
-combobox = ttk.Combobox(root, values=dropdown_values, width=35, state="readonly")
+combobox = ttk.Combobox(
+    root,
+    values=dropdown_values,
+    width=35,
+    state="readonly")
 combobox.current(0)
 combobox.bind("<<ComboboxSelected>>", update_aiscribe_texts)
 combobox.grid(row=3, column=4, columnspan=4, pady=10, padx=10, sticky='nsew')
@@ -720,22 +885,30 @@ root.bind('<Alt-p>', lambda event: pause_button.invoke())
 # Bind Alt+R to toggle_recording function
 root.bind('<Alt-r>', lambda event: mic_button.invoke())
 
-#set min size
+# set min size
 root.minsize(900, 400)
 
 root.mainloop()
 
 p.terminate()
 
+
 def on_exit():
-    # Create a pop up that says yes or no with tkinter messagebox to option to close the docker containers
+    # Create a pop up that says yes or no with tkinter messagebox to option to
+    # close the docker containers
 
     main_window = MainWindow()
 
-    if main_window.container_manager is not None and app_settings.editable_settings["Auto Shutdown Containers on Exit"] is True:
-        main_window.container_manager.stop_container(app_settings.editable_settings["LLM Container Name"])
-        main_window.container_manager.stop_container(app_settings.editable_settings["LLM Caddy Container Name"])
-        main_window.container_manager.stop_container(app_settings.editable_settings["Whisper Container Name"])
-        main_window.container_manager.stop_container(app_settings.editable_settings["Whisper Caddy Container Name"])
+    if main_window.container_manager is not None and app_settings.editable_settings[
+            "Auto Shutdown Containers on Exit"] is True:
+        main_window.container_manager.stop_container(
+            app_settings.editable_settings["LLM Container Name"])
+        main_window.container_manager.stop_container(
+            app_settings.editable_settings["LLM Caddy Container Name"])
+        main_window.container_manager.stop_container(
+            app_settings.editable_settings["Whisper Container Name"])
+        main_window.container_manager.stop_container(
+            app_settings.editable_settings["Whisper Caddy Container Name"])
+
 
 atexit.register(on_exit)

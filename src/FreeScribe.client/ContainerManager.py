@@ -2,17 +2,18 @@
 This software is released under the AGPL-3.0 license
 Copyright (c) 2023-2024 Braedon Hendy
 
-Further updates and packaging added in 2024 through the ClinicianFOCUS initiative, 
-a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied 
-Learning and Technology as part of the CNERG+ applied research project, 
-Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform". 
-Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner), 
+Further updates and packaging added in 2024 through the ClinicianFOCUS initiative,
+a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied
+Learning and Technology as part of the CNERG+ applied research project,
+Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform".
+Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner),
 and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and Naitik Patel.
 """
 
 import docker
 import asyncio
 import time
+
 
 class ContainerManager:
     """
@@ -34,7 +35,8 @@ class ContainerManager:
         try:
             self.client = docker.from_env()
         except docker.errors.DockerException as e:
-            print(f"An error occurred while initializing the Docker client, removing status bar: {e}")
+            print(
+                f"An error occurred while initializing the Docker client, removing status bar: {e}")
 
     def start_container(self, container_name):
         """
@@ -50,9 +52,11 @@ class ContainerManager:
             container.start()
             return True
         except docker.errors.NotFound as e:
-            raise docker.errors.NotFound(f"Container {container_name} not found.") from e
+            raise docker.errors.NotFound(
+                f"Container {container_name} not found.") from e
         except docker.errors.APIError as e:
-            raise docker.errors.APIError(f"An error occurred while starting the container: {e}") from e
+            raise docker.errors.APIError(
+                f"An error occurred while starting the container: {e}") from e
 
     def stop_container(self, container_name):
         """
@@ -69,9 +73,11 @@ class ContainerManager:
             print(f"Container {container_name} stopped successfully.")
             return True
         except docker.errors.NotFound as e:
-            raise docker.errors.NotFound(f"Container {container_name} not found.") from e
+            raise docker.errors.NotFound(
+                f"Container {container_name} not found.") from e
         except docker.errors.APIError as e:
-            raise docker.errors.APIError(f"An error occurred while stopping the container: {e}") from e
+            raise docker.errors.APIError(
+                f"An error occurred while stopping the container: {e}") from e
 
     def check_container_status(self, container_name):
         """
@@ -94,7 +100,8 @@ class ContainerManager:
             print(f"Container {container_name} not found.")
             return False
         except docker.errors.APIError as e:
-            print(f"An error occurred while checking the container status: {e}")
+            print(
+                f"An error occurred while checking the container status: {e}")
             return False
 
     def set_status_icon_color(self, widget, status):
@@ -127,11 +134,18 @@ class ContainerManager:
         """
         while True:
             print("Checking Docker container status...")
-            # Check the status of the containers and set the color of the status icons.
-            if self.check_container_status(app_settings.editable_settings["LLM Container Name"]) and self.check_container_status(app_settings.editable_settings["LLM Caddy Container Name"]):
+            # Check the status of the containers and set the color of the
+            # status icons.
+            if self.check_container_status(
+                    app_settings.editable_settings["LLM Container Name"]) and self.check_container_status(
+                    app_settings.editable_settings["LLM Caddy Container Name"]):
                 self.set_status_icon_color(llm_dot, True)
 
-            if self.check_container_status(app_settings.editable_settings["Whisper Container Name"]) and self.check_container_status(app_settings.editable_settings["Whisper Caddy Container Name"]):
+            if self.check_container_status(
+                    app_settings.editable_settings["Whisper Container Name"]) and self.check_container_status(
+                    app_settings.editable_settings["Whisper Caddy Container Name"]):
                 self.set_status_icon_color(whisper_dot, True)
 
-            llm_dot.after(10000, lambda: self.check_docker_status_thread(llm_dot, whisper_dot, app_settings))
+            llm_dot.after(
+                10000, lambda: self.check_docker_status_thread(
+                    llm_dot, whisper_dot, app_settings))

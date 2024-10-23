@@ -4,11 +4,11 @@ application_settings.py
 This software is released under the AGPL-3.0 license
 Copyright (c) 2023-2024 Braedon Hendy
 
-Further updates and packaging added in 2024 through the ClinicianFOCUS initiative, 
-a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied 
-Learning and Technology as part of the CNERG+ applied research project, 
-Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform". 
-Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner), 
+Further updates and packaging added in 2024 through the ClinicianFOCUS initiative,
+a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied
+Learning and Technology as part of the CNERG+ applied research project,
+Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform".
+Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner),
 and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and Naitik Patel.
 
 This module contains the ApplicationSettings class, which manages the settings for an
@@ -26,6 +26,7 @@ import pyaudio
 
 
 p = pyaudio.PyAudio()
+
 
 class SettingsWindow():
     """
@@ -47,16 +48,16 @@ class SettingsWindow():
         The API style to be used (default is 'OpenAI').
 
     editable_settings : dict
-        A dictionary containing user-editable settings such as model parameters, audio 
+        A dictionary containing user-editable settings such as model parameters, audio
         settings, and real-time processing configurations.
-    
+
     Methods
     -------
     load_settings_from_file():
         Loads settings from a JSON file and updates the internal state.
     save_settings_to_file():
         Saves the current settings to a JSON file.
-    save_settings(openai_api_key, aiscribe_text, aiscribe2_text, 
+    save_settings(openai_api_key, aiscribe_text, aiscribe2_text,
                   settings_window, ssl_enable, ssl_selfcert, api_style, preset):
         Saves the current settings, including API keys, IP addresses, and user-defined parameters.
     load_aiscribe_from_file():
@@ -79,7 +80,6 @@ class SettingsWindow():
         self.AISCRIBE2 = ""
         self.API_STYLE = "OpenAI"
         self.main_window = None
-
 
         self.basic_settings = {
             "Model",
@@ -184,10 +184,13 @@ class SettingsWindow():
                     return self.OPENAI_API_KEY, self.SSL_ENABLE, self.SSL_SELFCERT, self.API_STYLE
 
                 self.SSL_ENABLE = settings.get("ssl_enable", self.SSL_ENABLE)
-                self.SSL_SELFCERT = settings.get("ssl_selfcert", self.SSL_SELFCERT)
-                self.OPENAI_API_KEY = settings.get("openai_api_key", self.OPENAI_API_KEY)
+                self.SSL_SELFCERT = settings.get(
+                    "ssl_selfcert", self.SSL_SELFCERT)
+                self.OPENAI_API_KEY = settings.get(
+                    "openai_api_key", self.OPENAI_API_KEY)
                 self.API_STYLE = settings.get("api_style", self.API_STYLE)
-                loaded_editable_settings = settings.get("editable_settings", {})
+                loaded_editable_settings = settings.get(
+                    "editable_settings", {})
                 for key, value in loaded_editable_settings.items():
                     if key in self.editable_settings:
                         self.editable_settings[key] = value
@@ -204,7 +207,7 @@ class SettingsWindow():
         """
         Saves the current settings to a JSON file.
 
-        The settings are written to 'settings.txt'. This includes all application settings 
+        The settings are written to 'settings.txt'. This includes all application settings
         such as IP addresses, ports, SSL settings, and editable settings.
 
         Returns:
@@ -220,8 +223,16 @@ class SettingsWindow():
         with open('settings.txt', 'w') as file:
             json.dump(settings, file)
 
-    def save_settings(self, openai_api_key, aiscribe_text, aiscribe2_text, settings_window,
-                      ssl_enable, ssl_selfcert, api_style, silence_cutoff):
+    def save_settings(
+            self,
+            openai_api_key,
+            aiscribe_text,
+            aiscribe2_text,
+            settings_window,
+            ssl_enable,
+            ssl_selfcert,
+            api_style,
+            silence_cutoff):
         """
         Save the current settings, including IP addresses, API keys, and user-defined parameters.
 
@@ -243,9 +254,13 @@ class SettingsWindow():
 
         self.editable_settings["Silence cut-off"] = silence_cutoff
 
-        for setting, entry in self.editable_settings_entries.items():     
+        for setting, entry in self.editable_settings_entries.items():
             value = entry.get()
-            if setting in ["max_context_length", "max_length", "rep_pen_range", "top_k"]:
+            if setting in [
+                "max_context_length",
+                "max_length",
+                "rep_pen_range",
+                    "top_k"]:
                 value = int(value)
             self.editable_settings[setting] = value
 
@@ -258,7 +273,7 @@ class SettingsWindow():
             f.write(self.AISCRIBE)
         with open('aiscribe2.txt', 'w') as f:
             f.write(self.AISCRIBE2)
-      
+
     def load_aiscribe_from_file(self):
         """
         Load the AI Scribe text from a file.
@@ -291,7 +306,7 @@ class SettingsWindow():
 
         If SSL is enabled (`SSL_ENABLE` is set to "1"), the method returns a URL
         with the `https` scheme, otherwise, it returns a URL with the `http` scheme.
-        
+
         The method also handles the case of self-signed SSL certificates based on
         the `SSL_SELFCERT` setting.
 
@@ -322,7 +337,8 @@ class SettingsWindow():
                 print("...Self-signed SSL certificates are DISABLED in Settings...\n...Trusted/Verified SSL certificates must be used on server, otherwise SSL connection will fail...")
             return f"https://{ip}:{port}"
         else:
-            print("UNENCRYPTED http connections are being used between Client and Whisper/Kobbold server...")
+            print(
+                "UNENCRYPTED http connections are being used between Client and Whisper/Kobbold server...")
             return f"http://{ip}:{port}"
 
     def start(self):
@@ -335,8 +351,7 @@ class SettingsWindow():
         self.load_settings_from_file()
         self.AISCRIBE = self.load_aiscribe_from_file() or "AI, please transform the following conversation into a concise SOAP note. Do not assume any medical data, vital signs, or lab values. Base the note strictly on the information provided in the conversation. Ensure that the SOAP note is structured appropriately with Subjective, Objective, Assessment, and Plan sections. Strictly extract facts from the conversation. Here's the conversation:"
         self.AISCRIBE2 = self.load_aiscribe2_from_file() or "Remember, the Subjective section should reflect the patient's perspective and complaints as mentioned in the conversation. The Objective section should only include observable or measurable data from the conversation. The Assessment should be a summary of your understanding and potential diagnoses, considering the conversation's content. The Plan should outline the proposed management, strictly based on the dialogue provided. Do not add any information that did not occur and do not make assumptions. Strictly extract facts from the conversation."
-        
-  
+
     def clear_settings_file(self, settings_window):
         """
         Clears the content of settings files and closes the settings window.
@@ -355,19 +370,22 @@ class SettingsWindow():
 
         """
         try:
-            # Open the files and immediately close them to clear their contents.
-            open('settings.txt', 'w').close()  
+            # Open the files and immediately close them to clear their
+            # contents.
+            open('settings.txt', 'w').close()
             open('aiscribe.txt', 'w').close()
             open('aiscribe2.txt', 'w').close()
 
             # Display a message box informing the user of successful reset.
-            messagebox.showinfo("Settings Reset", "Settings have been reset. Please restart.")
+            messagebox.showinfo("Settings Reset",
+                                "Settings have been reset. Please restart.")
             print("Settings file cleared.")
 
             # Close the settings window.
             settings_window.destroy()
         except Exception as e:
-            # Print any exception that occurs during file handling or window destruction.
+            # Print any exception that occurs during file handling or window
+            # destruction.
             print(f"Error clearing settings files: {e}")
 
     def get_available_models(self):
@@ -381,19 +399,25 @@ class SettingsWindow():
         Returns:
             list: A list of available models for the user to choose from.
         """
-        
+
         headers = {
             "Authorization": f"Bearer {self.OPENAI_API_KEY}",
             "X-API-Key": self.OPENAI_API_KEY
         }
 
         try:
-            response = requests.get(self.editable_settings["Model Endpoint"] + "/models", headers=headers, timeout=1000)
+            response = requests.get(
+                self.editable_settings["Model Endpoint"] +
+                "/models",
+                headers=headers,
+                timeout=1000)
             response.raise_for_status()  # Raise an error for bad responses
             models = response.json().get("data", [])  # Extract the 'data' field
             return [model["id"] for model in models]
         except requests.RequestException as e:
-            messagebox.showerror("Error", f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.") 
+            messagebox.showerror(
+                "Error",
+                f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.")
             return ["Failed to load models"]
 
     def update_models_dropdown(self, dropdown):
@@ -403,7 +427,7 @@ class SettingsWindow():
         This method fetches the available models from the AI Scribe service and updates
         the dropdown widget in the settings window with the new list of models.
         """
-        
+
         models = self.get_available_models()
         dropdown["values"] = models
 
@@ -425,13 +449,17 @@ class SettingsWindow():
         if preset_name != "Custom":
             # load the settigns from the json preset file
             self.load_settings_from_file("presets/" + preset_name + ".json")
-            messagebox.showinfo("Settings Preset", "Settings preset loaded successfully. Closing settings window. Please re-open and set respective API keys.")
-            
+            messagebox.showinfo(
+                "Settings Preset",
+                "Settings preset loaded successfully. Closing settings window. Please re-open and set respective API keys.")
+
             self.editable_settings["Preset"] = preset_name
             settings_class.settings_window.destroy()
             self.save_settings_to_file()
         else:
-            messagebox.showinfo("Custom Settings", "To use custom settings then please fill in the values and save them.")
+            messagebox.showinfo(
+                "Custom Settings",
+                "To use custom settings then please fill in the values and save them.")
 
     def set_main_window(self, window):
         """
