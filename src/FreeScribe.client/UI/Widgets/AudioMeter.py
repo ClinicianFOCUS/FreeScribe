@@ -4,11 +4,11 @@ src/FreeScribe.client/UI/Widgets/AudioMeter.py
 This software is released under the AGPL-3.0 license
 Copyright (c) 2023-2024 Braedon Hendy
 
-Further updates and packaging added in 2024 through the ClinicianFOCUS initiative, 
-a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied 
-Learning and Technology as part of the CNERG+ applied research project, 
-Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform". 
-Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner), 
+Further updates and packaging added in 2024 through the ClinicianFOCUS initiative,
+a collaboration with Dr. Braedon Hendy and Conestoga College Institute of Applied
+Learning and Technology as part of the CNERG+ applied research project,
+Unburdening Primary Healthcare: An Open-Source AI Clinician Partner Platform".
+Prof. Michael Yingbull (PI), Dr. Braedon Hendy (Partner),
 and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and Naitik Patel.
 
 """
@@ -19,6 +19,7 @@ from tkinter import ttk
 import pyaudio
 import numpy as np
 from threading import Thread
+
 
 class AudioMeter(tk.Frame):
     """
@@ -36,6 +37,7 @@ class AudioMeter(tk.Frame):
     :param threshold: The initial threshold value for the audio meter.
     :type threshold: int
     """
+
     def __init__(self, master=None, width=400, height=100, threshold=750):
         """
         Initialize the AudioMeter widget.
@@ -58,7 +60,7 @@ class AudioMeter(tk.Frame):
         self.destroyed = False  # Add flag to track widget destruction
         self.setup_audio()
         self.create_widgets()
-        
+
         # Bind the cleanup method to widget destruction
         self.bind('<Destroy>', self.cleanup)
 
@@ -71,20 +73,20 @@ class AudioMeter(tk.Frame):
         :param event: The event that triggered the cleanup (default is None).
         :type event: tkinter.Event
         """
-        
+
         if self.destroyed:
             return
 
         self.destroyed = True
         self.running = False
-        
+
         # Stop audio first
         if hasattr(self, 'stream') and self.stream:
             self.stream.stop_stream()
             self.stream.close()
         if hasattr(self, 'p') and self.p:
             self.p.terminate()
-            
+
         # Then wait for thread
         if hasattr(self, 'monitoring_thread') and self.monitoring_thread:
             self.monitoring_thread.join(timeout=1.0)
@@ -111,7 +113,7 @@ class AudioMeter(tk.Frame):
         self.CHANNELS = 1
         self.RATE = 16000  # Changed from 44100 to 16000
         self.p = pyaudio.PyAudio()
-        
+
     def create_widgets(self):
         """
         Create the UI elements for the audio meter.
@@ -122,7 +124,7 @@ class AudioMeter(tk.Frame):
         # Create frame for slider
         self.slider_frame = tk.Frame(self)
         self.slider_frame.pack(fill='x', padx=5, pady=5)
-        
+
         # Add threshold slider - adjusted range for int16 audio values
         self.threshold_slider = tk.Scale(
             self.slider_frame,
@@ -134,24 +136,24 @@ class AudioMeter(tk.Frame):
         )
         self.threshold_slider.set(self.threshold)  # Set default threshold
         self.threshold_slider.pack(side='left', fill='x', expand=True, padx=0)
-               
+
         # Make the canvas shorter since we only need enough height for the bar
         self.canvas = tk.Canvas(
-            self, 
+            self,
             width=self.width,
             height=30,
             borderwidth=0,
             highlightthickness=0
         )
         self.canvas.pack(expand=True, fill='both', padx=0, pady=0)
-        
+
         # Create horizontal level meter rectangle
         self.level_meter = self.canvas.create_rectangle(
             0, 5,
             0, 25,
             fill='green'
         )
-        
+
         # Create threshold line indicator
         self.threshold_line = self.canvas.create_line(
             50, 0,
@@ -159,9 +161,9 @@ class AudioMeter(tk.Frame):
             fill='red',
             width=2
         )
-        
+
         self.toggle_monitoring()
-    
+
     def update_threshold(self, value):
         """
         Update the threshold value and the visual indicator.
@@ -205,7 +207,7 @@ class AudioMeter(tk.Frame):
             self.running = False
             self.stream.stop_stream()
             self.stream.close()
-    
+
     def update_meter(self):
         """
         Continuously update the audio meter.
@@ -215,18 +217,19 @@ class AudioMeter(tk.Frame):
         """
         while self.running and not self.destroyed:  # Check destroyed flag
             try:
-                data = self.stream.read(self.CHUNK, exception_on_overflow=False)
+                data = self.stream.read(
+                    self.CHUNK, exception_on_overflow=False)
                 audio_data = struct.unpack(f'{self.CHUNK}h', data)
                 max_value = max(abs(np.array(audio_data)))
                 level = min(self.width, int((max_value / 32767) * self.width))
-                
+
                 # Only schedule update if not destroyed
                 if not self.destroyed:
                     self.master.after(0, self.update_meter_display, level)
             except Exception as e:
                 print(f"Error in audio monitoring: {e}")
                 break
-    
+
     def update_meter_display(self, level):
         """
         Update the meter display on the canvas.
@@ -244,7 +247,7 @@ class AudioMeter(tk.Frame):
                     0, 5,
                     level, 25
                 )
-                
+
                 # Color logic
                 if level < 120:
                     color = 'green'
