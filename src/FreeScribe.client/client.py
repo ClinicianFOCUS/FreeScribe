@@ -43,6 +43,7 @@ from UI.Widgets.CustomTextBox import CustomTextBox
 from UI.LoadingWindow import LoadingWindow
 from Model import Model, ModelManager
 from utils.file_utils import get_file_path
+from utils.network_utils import secure_get, secure_post, InvalidRequestException
 
 # GUI Setup
 root = tk.Tk()
@@ -226,14 +227,15 @@ def realtime_text():
                         with open(file_to_send, 'rb') as f:
                             files = {'audio': f}
 
-                            headers = {
-                                "Authorization": "Bearer "+app_settings.editable_settings["Whisper Server API Key"]
-                            }
+                            try:
+                                headers = {
+                                    "Authorization": "Bearer "+app_settings.editable_settings["Whisper Server API Key"]
+                                }
+                                verify_request = False if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1" else True
+                                response = secure_post(app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files, verify=verify_request)
+                            except InvalidRequestException as e:
+                                messagebox.showerror("Error", f"Error sending request: {e}")
 
-                            if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1":
-                                response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers,files=files, verify=False)
-                            else:
-                                response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers,files=files)
                             if response.status_code == 200:
                                 text = response.json()['text']
                                 update_gui(text)
@@ -422,13 +424,8 @@ def send_audio_to_server():
 
             try:
                 response = None
-                # Check for SSL and self-signed certificate settings
-                if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1":
-                    # Send the request without verifying the SSL certificate
-                    response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files, verify=False)
-                else:
-                    # Send the request with the audio file and headers/authorization
-                    response = requests.post(app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files)
+                verify_request = False if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1" else True
+                response = secure_post(app_settings.editable_settings["Whisper Endpoint"], headers=headers, files=files, verify=verify_request)
 
                 # On successful response (status code 200)
                 if response.status_code == 200:
@@ -440,7 +437,6 @@ def send_audio_to_server():
 
                     # Send the transcribed text and receive a response
                     send_and_receive()
-
             except Exception as e:
                 # log error message
                 #TODO: Implment proper logging to system
@@ -560,10 +556,8 @@ def send_text_to_api(edited_text):
 
         if app_settings.API_STYLE == "OpenAI":
             response = requests.Response
-            if str(app_settings.SSL_SELFCERT) == "1" and str(app_settings.SSL_ENABLE) == "1":
-                response = requests.post(app_settings.editable_settings["Model Endpoint"]+"/chat/completions", headers=headers, json=payload, verify=False)
-            else:
-                response = requests.post(app_settings.editable_settings["Model Endpoint"]+"/chat/completions", headers=headers, json=payload)
+            verify_request = False if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1" else True
+            response = secure_post(app_settings.editable_settings["Model Endpoint"]+"/chat/completions", headers=headers, json=payload, verify=verify_request)
 
             response.raise_for_status()
             response_data = response.json()
@@ -571,10 +565,9 @@ def send_text_to_api(edited_text):
             return response_text
         elif app_settings.API_STYLE == "KoboldCpp":
             prompt = get_prompt(edited_text)
-            if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1":
-                response = requests.post(app_settings.editable_settings["Model Endpoint"] + "/api/v1/generate", json=prompt, verify=False)
-            else:
-                response = requests.post(app_settings.editable_settings["Model Endpoint"] + "/api/v1/generate", json=prompt)
+            verify_request = False if str(app_settings.SSL_ENABLE) == "1" and str(app_settings.SSL_SELFCERT) == "1" else True
+            response = secure_post(app_settings.editable_settings["Model Endpoint"] + "/api/v1/generate", json=prompt, verify=verify_request)
+
             if response.status_code == 200:
                 results = response.json()['results']
                 response_text = results[0]['text']
