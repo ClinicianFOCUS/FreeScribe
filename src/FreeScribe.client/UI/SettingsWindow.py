@@ -162,6 +162,7 @@ class SettingsWindow():
             "Real Time": True,
             "Real Time Audio Length": 5,
             "Real Time Silence Length": 1,
+            "Whisper Architecture": "CPU",
             "Silence cut-off": 0.035,
             "LLM Container Name": "ollama",
             "LLM Caddy Container Name": "caddy-ollama",

@@ -180,6 +180,11 @@ class SettingsWindowUI:
 
         self.settings.editable_settings_entries["Whisper Model"] = self.whisper_models_drop_down
 
+        # create the whisper model dropdown slection
+        self.whisper_architecture_dropdown = ArchitectureDropdown(left_frame, self.settings.editable_settings["Whisper Architecture"], left_row, 0)
+        self.settings.editable_settings_entries["Whisper Architecture"] = self.whisper_architecture_dropdown
+        left_row += 1
+
     def create_llm_settings(self):
         """
         Creates the LLM settings UI elements in a two-column layout.
@@ -246,12 +251,6 @@ class SettingsWindowUI:
 
         self.architecture_dropdown = ArchitectureDropdown(right_frame, self.settings.editable_settings["Architecture"], right_row, 0)
 
-        # tk.Label(right_frame, text="Local Architecture").grid(row=right_row, column=0, padx=0, pady=5, sticky="w")
-        # architecture_options = ["CPU", "CUDA (Nvidia GPU)"]
-        # self.architecture_dropdown = ttk.Combobox(right_frame, values=architecture_options, width=15, state="readonly")
-        # self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings["Architecture"]))
-
-        # self.architecture_dropdown.grid(row=right_row, column=1, padx=0, pady=5, sticky="w")
 
         right_row += 1
 

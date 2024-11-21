@@ -204,7 +204,8 @@ def realtime_text():
         if app_settings.editable_settings["Real Time"]:
             try:
                 model_name = app_settings.editable_settings["Whisper Model"].strip()
-                model = whisper.load_model(model_name)
+                device = "cpu" if app_settings.editable_settings["Whisper Architecture"] == "CPU" else "cuda"
+                model = whisper.load_model(model_name, device=device)
             except Exception as e:
                 messagebox.showerror("Model Error", f"Error loading model: {e}")
                 
@@ -462,7 +463,8 @@ def send_audio_to_server():
         try:
             # Load the specified Whisper model
             model_name = app_settings.editable_settings["Whisper Model"].strip()
-            model = whisper.load_model(model_name)
+            device = "cpu" if app_settings.editable_settings["Whisper Architecture"] == "CPU" else "cuda"
+            model = whisper.load_model(model_name, device=device)
 
             # Determine the file to send for transcription
             file_to_send = uploaded_file_path or get_resource_path('recording.wav')
