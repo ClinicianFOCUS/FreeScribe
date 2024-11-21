@@ -28,7 +28,9 @@ class ArchitectureDropdown:
         )
 
         # Dropdown options
-        architecture_options = ["CPU", "CUDA (Nvidia GPU)"]
+        architecture_options = ["CPU"]
+        if torch.cuda.is_available():
+            architecture_options.append("CUDA (Nvidia GPU)")
         self.architecture_dropdown = ttk.Combobox(
             self.parent, values=architecture_options, width=15, state="readonly"
         )
