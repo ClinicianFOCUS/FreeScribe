@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+import torch
 
 class ArchitectureDropdown:
     def __init__(self, parent, default_value, row=0, column=0):
