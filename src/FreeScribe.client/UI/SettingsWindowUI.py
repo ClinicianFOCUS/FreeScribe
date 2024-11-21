@@ -27,6 +27,7 @@ import threading
 from Model import Model, ModelManager
 from utils.file_utils import get_file_path
 from UI.MarkdownWindow import MarkdownWindow
+from UI.Widgets.ArchitectureDropdown import ArchitectureDropdown
 
 
 
@@ -242,12 +243,15 @@ class SettingsWindowUI:
         left_row += 1
 
         #6. GPU OR CPU SELECTION (Right Column)
-        tk.Label(right_frame, text="Local Architecture").grid(row=right_row, column=0, padx=0, pady=5, sticky="w")
-        architecture_options = ["CPU", "CUDA (Nvidia GPU)"]
-        self.architecture_dropdown = ttk.Combobox(right_frame, values=architecture_options, width=15, state="readonly")
-        self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings["Architecture"]))
 
-        self.architecture_dropdown.grid(row=right_row, column=1, padx=0, pady=5, sticky="w")
+        self.architecture_dropdown = ArchitectureDropdown(right_frame, self.settings.editable_settings["Architecture"], right_row, 0)
+
+        # tk.Label(right_frame, text="Local Architecture").grid(row=right_row, column=0, padx=0, pady=5, sticky="w")
+        # architecture_options = ["CPU", "CUDA (Nvidia GPU)"]
+        # self.architecture_dropdown = ttk.Combobox(right_frame, values=architecture_options, width=15, state="readonly")
+        # self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings["Architecture"]))
+
+        # self.architecture_dropdown.grid(row=right_row, column=1, padx=0, pady=5, sticky="w")
 
         right_row += 1
 
