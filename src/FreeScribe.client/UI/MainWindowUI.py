@@ -4,6 +4,7 @@ import UI.MainWindow as mw
 from UI.SettingsWindowUI import SettingsWindowUI
 from UI.MarkdownWindow import MarkdownWindow
 from utils.file_utils import get_file_path
+from utils.icon_utils import set_logo
 
 DOCKER_CONTAINER_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker container status
 DOCKER_DESKTOP_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker Desktop status
@@ -31,7 +32,7 @@ class MainWindowUI:
         self.logic = mw.MainWindow(self.app_settings)  # Logic to control the container behavior
         self.scribe_template = None
         self.setting_window = SettingsWindowUI(self.app_settings, self)  # Settings window
-        self.root.iconbitmap(get_file_path('assets','logo.ico'))
+        set_logo(self.root)
 
         self.current_docker_status_check_id = None  # ID for the current Docker status check
         self.current_container_status_check_id = None  # ID for the current container status check

@@ -12,6 +12,7 @@ and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and N
 """
 
 import os
+import sys
 import tkinter as tk
 from tkinter import scrolledtext, ttk, filedialog
 import requests
@@ -35,9 +36,11 @@ from UI.MainWindowUI import MainWindowUI
 from UI.SettingsWindow import SettingsWindow
 from UI.Widgets.CustomTextBox import CustomTextBox
 from UI.LoadingWindow import LoadingWindow
+from utils.file_utils import get_resource_path
+from utils.icon_utils import set_logo
 from Model import  ModelManager
 from utils.ip_utils import is_private_ip
-from utils.file_utils import get_file_path, get_resource_path
+from utils.file_utils import get_resource_path
 import ctypes
 
 # GUI Setup
@@ -145,19 +148,19 @@ def toggle_pause():
 
     if is_paused:
         if current_view == "full":
-            pause_button.config(text="Resume", bg="red")
+            pause_button.config(text="Resume", bg="red", highlightbackground="red")
         elif current_view == "minimal":
-            pause_button.config(text="▶️", bg="red")
+            pause_button.config(text="▶️", bg="red", highlightbackground="red")
     else:
         if current_view == "full":
-            pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
+            pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR, highlightbackground=DEFAULT_BUTTON_COLOUR)
         elif current_view == "minimal":
-            pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
+            pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR, highlightbackground=DEFAULT_BUTTON_COLOUR)
     
 
 def record_audio():
     global is_paused, frames, audio_queue
-    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK, input_device_index=1)
+    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
     current_chunk = []
     silent_duration = 0
     record_duration = 0
@@ -318,9 +321,9 @@ def toggle_recording():
 
 
         if current_view == "full":
-            mic_button.config(bg="red", text="Stop\nRecording")
+            mic_button.config(highlightbackground="red", bg="red", text="Stop\nRecording")
         elif current_view == "minimal":
-            mic_button.config(bg="red", text="⏹️")
+            mic_button.config(highlightbackground="red",bg="red", text="⏹️")
         
         start_flashing()
     else:
@@ -369,9 +372,9 @@ def toggle_recording():
         save_audio()
 
         if current_view == "full":
-            mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
+            mic_button.config(bg=DEFAULT_BUTTON_COLOUR, highlightbackground=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
         elif current_view == "minimal":
-            mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="🎤")
+            mic_button.config(bg=DEFAULT_BUTTON_COLOUR, highlightbackground=DEFAULT_BUTTON_COLOUR, text="🎤")
 
 def cancel_processing():
     """Cancels any ongoing audio processing.
@@ -514,6 +517,8 @@ def send_audio_to_server():
         # Display a message indicating that audio to text processing is in progress
         user_input.scrolled_text.insert(tk.END, "Audio to Text Processing...Please Wait")
         try:
+            if getattr(sys, 'frozen', False) and sys.platform == 'darwin':  # Check if running as a bundled app in macOS
+                os.environ["PATH"] = os.path.join(sys._MEIPASS, 'ffmpeg') + os.pathsep + os.environ["PATH"]
             # Load the specified Whisper model
             model_name = app_settings.editable_settings["Whisper Model"].strip()
             model = whisper.load_model(model_name)
@@ -853,7 +858,7 @@ def show_edit_transcription_popup(formatted_message):
     
     popup = tk.Toplevel(root)
     popup.title("Scrub PHI Prior to GPT")
-    popup.iconbitmap(get_file_path('assets','logo.ico'))
+    set_logo(popup)
     text_area = scrolledtext.ScrolledText(popup, height=20, width=80)
     text_area.pack(padx=10, pady=10)
     text_area.insert(tk.END, cleaned_message)
@@ -1000,9 +1005,11 @@ def set_full_view():
 
     # Reconfigure button styles and text
     mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR,
-                      text="Stop\nRecording" if is_recording else "Start\nRecording")
+                      text="Stop\nRecording" if is_recording else "Start\nRecording",
+                      highlightbackground="red" if is_recording else DEFAULT_BUTTON_COLOUR)
     pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR,
-                        text="Resume" if is_paused else "Pause")
+                        text="Resume" if is_paused else "Pause",
+                        highlightbackground="red" if is_recording else DEFAULT_BUTTON_COLOUR)
 
     # Unbind transparency events and reset window properties
     root.unbind('<Enter>')

@@ -1,9 +1,11 @@
+import sys
 from llama_cpp import Llama
 import os
 from typing import Optional, Dict, Any
 import threading
 from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
+from utils.file_utils import get_resource_path
 
 class Model:
     """
@@ -194,8 +196,11 @@ class ModelManager:
                 gpu_layers = -1
 
             model_to_use = "gemma-2-2b-it-Q8_0.gguf"
-                
-            model_path = f"./models/{model_to_use}"
+
+            if sys.platform == "darwin":
+                model_path = get_resource_path("models", model_to_use, shared=True)
+            else:
+                model_path = f"./models/{model_to_use}"
             try:
                 ModelManager.local_model = Model(model_path,
                     context_size=4096,
