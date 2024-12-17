@@ -133,27 +133,32 @@ class SettingsWindow():
         ]
 
         self.adv_ai_settings = [
-            "use_story",
-            "use_memory",
-            "use_authors_note",
-            "use_world_info",
+            ##############################################################################################
+            # Stuff that is commented is related to KobolodCPP API and not used in the current version   #
+            # Maybe use it in the future? commented out for now, goes hand in hand with API style        #
+            ##############################################################################################
+
+            # "use_story",
+            # "use_memory",
+            # "use_authors_note",
+            # "use_world_info",
             "Use best_of",
             "best_of",
-            "max_context_length",
-            "max_length",
-            "rep_pen",
-            "rep_pen_range",
-            "rep_pen_slope",
+            # "max_context_length",
+            # "max_length",
+            # "rep_pen",
+            # "rep_pen_range",
+            # "rep_pen_slope",
             "temperature",
             "tfs",
-            "top_a",
+            # "top_a",
             "top_k",
             "top_p",
-            "typical",
-            "sampler_order",
-            "singleline",
-            "frmttriminc",
-            "frmtrmblln",
+            # "typical",
+            # "sampler_order",
+            # "singleline",
+            # "frmttriminc",
+            # "frmtrmblln",
         ]
 
         self.adv_whisper_settings = [
