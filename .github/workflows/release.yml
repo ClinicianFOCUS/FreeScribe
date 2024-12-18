@@ -71,14 +71,150 @@ jobs:
           }
         shell: pwsh
 
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Rename Installer
+        run: |
+          mv dist/FreeScribeInstaller.exe dist/FreeScribeInstaller_windows.exe
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_windows.exe
+          path: dist/FreeScribeInstaller_windows.exe
+
+  
+  build-macos-intel:
+    runs-on: macos-13
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PortAudio
+        run: |
+          brew install portaudio
+
+      - name: Install requirements
+        run: |
+          pip install -r client_requirements.txt
+      
+      - name: Uninstall CUDA-enabled llama_cpp (if necessary) and install CPU-only llama_cpp
+        run: |
+          pip uninstall -y llama-cpp-python
+          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/metal --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
+          
+      - name: Install ffmpeg
+        run: |
+          brew install ffmpeg
+
+      - name: Build macOS app
+        run: |
+          ./build-mac.sh
+      
+      - name: Build PKG installer
+        run: |
+          ./build-pkg.sh
+
+      - name: Rename Installer
+        run: |
+          mv dist/FreeScribeInstaller.pkg dist/FreeScribeInstaller_x86_64.pkg
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_x86_64.pkg
+          path: dist/FreeScribeInstaller_x86_64.pkg
+  
+  build-macos-arm:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PortAudio
+        run: |
+          brew install portaudio
+
+      - name: Install requirements
+        run: |
+          pip install -r client_requirements.txt
+
+      # - name: Uninstall CUDA-enabled llama_cpp (if necessary) and install CPU-only llama_cpp
+      #   run: |
+      #     pip uninstall -y llama-cpp-python
+      #     pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/metal --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
+          
+      - name: Install ffmpeg
+        run: |
+          brew install ffmpeg
+
+      - name: Build macOS app
+        run: |
+          ./build-mac.sh
+      
+      - name: Build PKG installer
+        run: |
+          ./build-pkg.sh
+
+      - name: Rename Installer
+        run: |
+          mv dist/FreeScribeInstaller.pkg dist/FreeScribeInstaller_arm64.pkg
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_arm64.pkg
+          path: dist/FreeScribeInstaller_arm64.pkg
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos-intel, build-macos-arm]
+    steps:
+      - name: Download Windows Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: FreeScribeInstaller_windows.exe
+
+      - name: Download Intel Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: FreeScribeInstaller_x86_64.pkg
+
+      - name: Download ARM Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: FreeScribeInstaller_arm64.pkg
+
+      - name: Check if alpha release
+        id: check_alpha
+        run: |
+          if ("${{ github.ref }}" -like "*.alpha") {
+            echo "is_alpha=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "is_alpha=false" >> $env:GITHUB_OUTPUT
+          }
+        shell: pwsh
+
+      - name: Upload Installer
+        id: upload-installer
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: Release ${{ github.ref }}
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
           body: |
             ## What's Changed
             ${{ steps.changelog.outputs.CHANGELOG }}
@@ -86,14 +222,7 @@ jobs:
             For full changelog, see [the commits since last release](${{ github.server_url }}/${{ github.repository }}/compare/${{ steps.changelog.last_tag }}...${{ github.ref }})
           draft: false
           prerelease: ${{ steps.check_alpha.outputs.is_alpha == 'true' }}
-
-      - name: Upload Installer
-        id: upload-installer
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{steps.create_release.outputs.upload_url}}
-          asset_path: dist/FreeScribeInstaller.exe
-          asset_name: FreeScribeInstaller_windows.exe
-          asset_content_type: application/octet-stream
+          files: |
+            FreeScribeInstaller_x86_64.pkg
+            FreeScribeInstaller_arm64.pkg
+            FreeScribeInstaller_windows.exe
