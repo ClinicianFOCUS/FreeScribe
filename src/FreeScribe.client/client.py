@@ -612,10 +612,7 @@ def send_audio_to_server():
         try:
             if getattr(sys, 'frozen', False) and sys.platform == 'darwin':  # Check if running as a bundled app in macOS
                 os.environ["PATH"] = os.path.join(sys._MEIPASS, 'ffmpeg') + os.pathsep + os.environ["PATH"]
-            # Load the specified Whisper model
-            model_name = app_settings.editable_settings["Whisper Model"].strip()
-            model = whisper.load_model(model_name)
-
+                
             # Determine the file to send for transcription
             file_to_send = uploaded_file_path or get_resource_path('recording.wav')
             delete_file = False if uploaded_file_path else True
