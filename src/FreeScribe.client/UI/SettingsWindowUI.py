@@ -467,8 +467,9 @@ class SettingsWindowUI:
         row = self._create_section_header("⚠️ Advanced Settings (For Advanced Users Only)", 0, text_colour="red")
         
         # General Settings
-        row = self._create_section_header("General Settings", row, text_colour="black")
-        row = create_settings_columns(self.settings.adv_general_settings, row)
+        if len(self.settings.adv_general_settings) > 0:
+            row = self._create_section_header("General Settings", row, text_colour="black")
+            row = create_settings_columns(self.settings.adv_general_settings, row)
 
         # Whisper Settings
         row = self._create_section_header("Whisper Settings", row, text_colour="black")

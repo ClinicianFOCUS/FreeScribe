@@ -167,7 +167,7 @@ class SettingsWindow():
 
 
         self.adv_general_settings = [
-            "Enable Scribe Template",
+            # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
         ]
 
         self.editable_settings = {
