@@ -15,6 +15,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
+      - name: Create Version Text File for PyInstaller
+        run: |
+          $tag = '${{ github.ref }}' -replace 'refs/tags/', ''
+          echo $tag > .\scripts\__version__
+        shell: pwsh
+
       - name: Install Python
         uses: actions/setup-python@v1
         with:

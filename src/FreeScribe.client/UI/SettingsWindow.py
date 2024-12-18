@@ -99,6 +99,8 @@ class SettingsWindow():
     CPU_INSTALL_FILE = "CPU_INSTALL.txt"
     NVIDIA_INSTALL_FILE = "NVIDIA_INSTALL.txt"
     STATE_FILES_DIR = "install_state"
+    DEFAULT_WHISPER_ARCHITECTURE = Architectures.CPU.architecture_value
+    DEFAULT_LLM_ARCHITECTURE = Architectures.CPU.architecture_value
 
     def __init__(self):
         """Initializes the ApplicationSettings with default values."""
@@ -174,7 +176,7 @@ class SettingsWindow():
             "Model": "gemma2:2b-instruct-q8_0",
             "Model Endpoint": "https://localhost:3334/v1",
             "Use Local LLM": True,
-            "Architecture": "CPU",
+            "Architecture": SettingsWindow.DEFAULT_LLM_ARCHITECTURE,
             "use_story": False,
             "use_memory": False,
             "use_authors_note": False,
@@ -199,7 +201,7 @@ class SettingsWindow():
             SettingsKeys.LOCAL_WHISPER.value: True,
             SettingsKeys.WHISPER_ENDPOINT.value: "https://localhost:2224/whisperaudio",
             SettingsKeys.WHISPER_SERVER_API_KEY.value: "",
-            SettingsKeys.WHISPER_ARCHITECTURE.value: "CPU",
+            SettingsKeys.WHISPER_ARCHITECTURE.value: SettingsWindow.DEFAULT_WHISPER_ARCHITECTURE,
             SettingsKeys.WHISPER_BEAM_SIZE.value: 5,
             SettingsKeys.WHISPER_CPU_COUNT.value: multiprocessing.cpu_count(),
             SettingsKeys.WHISPER_VAD_FILTER.value: False,
@@ -329,8 +331,9 @@ class SettingsWindow():
         """
         settings = {
             "openai_api_key": self.OPENAI_API_KEY,
-            "editable_settings": self.editable_settings
+            "editable_settings": self.editable_settings,
             # "api_style": self.API_STYLE # FUTURE FEATURE REVISION
+            "app_version": self.get_application_version()
         }
         with open(get_resource_path('settings.txt'), 'w') as file:
             json.dump(settings, file)
@@ -608,3 +611,13 @@ class SettingsWindow():
                 old_cpu_count != self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get() or
                 old_compute_type != self.editable_settings_entries[SettingsKeys.WHISPER_COMPUTE_TYPE.value].get()):
             self.main_window.root.event_generate("<<LoadSttModel>>")
+
+    def get_application_version(self):
+        version_str = "vx.x.x.alpha"
+        try:
+            with open(get_file_path('__version__'), 'r') as file:
+                version_str = file.read().strip()
+        except Exception as e:
+            print(f"Error loading version file ({type(e).__name__}). {e}")
+        finally:
+            return version_str

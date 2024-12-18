@@ -48,8 +48,12 @@ class MainWindowUI:
         """
         self._bring_to_focus()
         self._create_menu_bar()
-        if (self.setting_window.settings.editable_settings['Show Welcome Message']):
-            self._show_welcome_message()
+
+        # Uncomment this once the UI is refactored to this class
+        # For now we need to force load it after all our widgets are created
+        # inside client.py. This is a temporary solution. 
+        # if (self.setting_window.settings.editable_settings['Show Welcome Message']):
+        #     self._show_welcome_message()
 
     def _bring_to_focus(self):
         """
@@ -325,7 +329,7 @@ class MainWindowUI:
         self.setting_window.settings.save_settings_to_file()
         help_window.destroy()
     
-    def _show_welcome_message(self):
+    def show_welcome_message(self):
         """
         Private method to display a welcome message.
         Display a welcome message when the application is launched.

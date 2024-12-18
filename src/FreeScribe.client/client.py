@@ -595,6 +595,7 @@ def send_audio_to_server():
             print(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
+            clear_application_press()
 
     loading_window = LoadingWindow(root, "Processing Audio", "Processing Audio. Please wait.", on_cancel=lambda: (cancel_processing(), cancel_whole_audio_process(current_thread_id)))
 
@@ -1484,7 +1485,8 @@ root.bind('<Alt-r>', lambda event: mic_button.invoke())
 #set min size
 root.minsize(900, 400)
 
-
+if (app_settings.editable_settings['Show Welcome Message']):
+    window.show_welcome_message()
 
 #Wait for the UI root to be intialized then load the model. If using local llm.
 if app_settings.editable_settings["Use Local LLM"]:

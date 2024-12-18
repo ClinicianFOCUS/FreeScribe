@@ -220,6 +220,9 @@ Section "MainSection" SEC01
         File /r "..\dist\freescribe-client-nvidia\_internal"
     ${EndIf}
 
+    ; Install version file to both nvidia and cpu directories for version checking
+    SetOutPath "$INSTDIR\_internal"
+    File ".\__version__"
 
     ; add presets
     CreateDirectory "$INSTDIR\presets"
