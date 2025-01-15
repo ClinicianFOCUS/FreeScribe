@@ -17,9 +17,9 @@ def set_window_icon(window):
 
 def disable_parent_window(parent, child):
     if sys.platform == 'linux':
-        # child.transient(parent)
+        child.transient(parent)
         child.grab_set()
-        # child.focus_force()
+        child.focus_force()
     else:
         parent.wm_attributes('-disabled', True)
 
