@@ -8,6 +8,7 @@ import fcntl
 # Define the mutex name and error code
 MUTEX_NAME = 'Global\\FreeScribe_Instance'
 ERROR_ALREADY_EXISTS = 183
+LINUX_LOCK_PATH = '/tmp/FreeScribe.lock'
 
 # Global variable to store the mutex handle
 mutex = None
@@ -26,25 +27,17 @@ def window_has_running_instance() -> bool:
         mutex = ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX_NAME)
         return ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS
     elif sys.platform == 'linux':
-        lock_file_path = '/tmp/FreeScribe.lock'
-
         try:
             # Create or open the lock file
-            mutex = open(lock_file_path, 'w')
-
-            # Try to acquire the lock
-            fcntl.lockf(mutex, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
+            with open(LINUX_LOCK_PATH, 'w') as mutex:
+                # Try to acquire the lock
+                fcntl.lockf(mutex, fcntl.LOCK_EX | fcntl.LOCK_NB)
             # If we get here, no other instance is running
             return False
 
         except IOError:
             # Another instance has the lock
             return True
-        except Exception as e:
-            # Handle any other errors
-            print(f"Error checking for running instance: {e}")
-            return False
     else:
         raise RuntimeError('Unsupported platform')
 
@@ -77,7 +70,7 @@ def cleanup_lock():
         try:
             fcntl.lockf(mutex, fcntl.LOCK_UN)
             mutex.close()
-            os.remove(mutex.name)
+            os.remove(LINUX_LOCK_PATH)
         except Exception as e:
             print(f"Error cleaning up lock file: {e}")
 
