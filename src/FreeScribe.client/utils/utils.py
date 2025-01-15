@@ -33,6 +33,7 @@ def window_has_running_instance() -> bool:
                 # Try to acquire the lock
                 fcntl.lockf(mutex, fcntl.LOCK_EX | fcntl.LOCK_NB)
             # If we get here, no other instance is running
+            mutex = open(LINUX_LOCK_PATH, 'w')
             return False
 
         except IOError:
