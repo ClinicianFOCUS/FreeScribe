@@ -85,7 +85,7 @@ def close_mutex():
     global mutex
     if not mutex:
         return
-    elif sys.platform == 'linux':
+    if sys.platform == 'linux':
         cleanup_lock()
     else:
         ctypes.windll.kernel32.ReleaseMutex(mutex)
