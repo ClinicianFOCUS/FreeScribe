@@ -29,11 +29,10 @@ def window_has_running_instance() -> bool:
 
         try:
             # Create or open the lock file
-            global lock_file  # Keep reference to prevent garbage collection
-            lock_file = open(lock_file_path, 'w')
+            mutex = open(lock_file_path, 'w')
 
             # Try to acquire the lock
-            fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.lockf(mutex, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
             # If we get here, no other instance is running
             return False
@@ -69,11 +68,12 @@ def cleanup_lock():
     Cleanup function to release the lock file when the application exits.
     Should be called when the application is shutting down.
     """
-    if sys.platform == 'linux' and 'lock_file' in globals():
+    global mutex
+    if sys.platform == 'linux' and mutex is not None:
         try:
-            fcntl.lockf(lock_file, fcntl.LOCK_UN)
-            lock_file.close()
-            os.remove(lock_file.name)
+            fcntl.lockf(mutex, fcntl.LOCK_UN)
+            mutex.close()
+            os.remove(mutex.name)
         except Exception as e:
             print(f"Error cleaning up lock file: {e}")
 

@@ -12,8 +12,19 @@ def set_window_icon(window, icon_path):
         window.iconbitmap(icon_path)
 
 
-def disable_window(window):
+def disable_parent_window(parent, child):
     if sys.platform == 'linux':
-        window.grab_set()
+        child.transient(parent)
+        child.grab_set()
+        child.focus_force()
     else:
-        window.wm_attributes('-disabled', True)
+        parent.wm_attributes('-disabled', True)
+
+
+def enable_parent_window(parent, child):
+    if sys.platform == 'linux':
+        child.grab_release()  # Release the grab
+        parent.grab_set()
+        parent.focus_force()
+    else:
+        parent.wm_attributes('-disabled', False)

@@ -2,7 +2,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 from utils.file_utils import get_file_path
-from utils.ui_utils import set_window_icon, disable_window
+from utils.ui_utils import set_window_icon, disable_parent_window, enable_parent_window
 
 
 class LoadingWindow:
@@ -74,7 +74,7 @@ class LoadingWindow:
                 self.popup.transient(parent)
                 
                 # Disable the parent window
-                disable_window(parent)
+                disable_parent_window(parent, self.popup)
 
 
             # Use label and progress bar
@@ -96,7 +96,7 @@ class LoadingWindow:
         except Exception:
             # Enable the window on exception
             if parent:
-                disable_window(parent)
+                enable_parent_window(parent, self.popup)
             raise
 
     def _handle_cancel(self):
@@ -136,7 +136,7 @@ class LoadingWindow:
         if self.popup:
             # Enable the parent window
             if self.parent:
-                disable_window(self.parent)
+                enable_parent_window(self.parent, self.popup)
 
             if self.progress.winfo_exists():
                 self.progress.stop()
