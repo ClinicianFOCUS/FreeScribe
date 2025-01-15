@@ -27,7 +27,5 @@ def disable_parent_window(parent, child):
 def enable_parent_window(parent, child):
     if sys.platform == 'linux':
         child.grab_release()  # Release the grab
-        parent.grab_set()
-        parent.focus_force()
     else:
         parent.wm_attributes('-disabled', False)
