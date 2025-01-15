@@ -4,6 +4,7 @@ import os
 import sys
 import fcntl
 
+
 # Define the mutex name and error code
 MUTEX_NAME = 'Global\\FreeScribe_Instance'
 ERROR_ALREADY_EXISTS = 183
@@ -56,11 +57,14 @@ def bring_to_front(app_name: str):
     """
 
     # TODO - Check platform and handle for different platform
-    U32DLL = ctypes.WinDLL('user32')
-    SW_SHOW = 5
-    hwnd = U32DLL.FindWindowW(None, app_name)
-    U32DLL.ShowWindow(hwnd, SW_SHOW)
-    U32DLL.SetForegroundWindow(hwnd)
+    if sys.platform == 'linux':
+        print("An instance of the application is already running.")
+    else:
+        U32DLL = ctypes.WinDLL('user32')
+        SW_SHOW = 5
+        hwnd = U32DLL.FindWindowW(None, app_name)
+        U32DLL.ShowWindow(hwnd, SW_SHOW)
+        U32DLL.SetForegroundWindow(hwnd)
 
 
 def cleanup_lock():

@@ -35,7 +35,7 @@ class MainWindowUI:
         self.logic = mw.MainWindow(self.app_settings)  # Logic to control the container behavior
         self.scribe_template = None
         self.setting_window = SettingsWindowUI(self.app_settings, self, self.root)  # Settings window
-        set_window_icon(self.root, get_file_path('assets', 'logo.ico'))
+        set_window_icon(self.root)
 
         self.debug_window_open = False  # Flag to indicate if the debug window is open
 

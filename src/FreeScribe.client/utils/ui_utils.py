@@ -1,22 +1,25 @@
 import sys
 import tkinter as tk
+from utils.file_utils import get_file_path
 
 
-def set_window_icon(window, icon_path):
+def set_window_icon(window):
     """
     Set a window icon on the given window.
     """
     if sys.platform == 'linux':
-        window.tk.call('wm', 'iconphoto', window._w, tk.PhotoImage(icon_path))
+        icon_path = get_file_path('assets', 'logo.png')
+        window.iconphoto(True, tk.PhotoImage(file=icon_path))
     else:
+        icon_path = get_file_path('assets', 'logo.ico')
         window.iconbitmap(icon_path)
 
 
 def disable_parent_window(parent, child):
     if sys.platform == 'linux':
-        child.transient(parent)
+        # child.transient(parent)
         child.grab_set()
-        child.focus_force()
+        # child.focus_force()
     else:
         parent.wm_attributes('-disabled', True)
 

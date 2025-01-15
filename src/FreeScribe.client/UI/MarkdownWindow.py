@@ -37,7 +37,7 @@ class MarkdownWindow:
         self.window.title(title)
         self.window.transient(parent)
         self.window.grab_set()
-        set_window_icon(self.window, get_file_path('assets', 'logo.ico'))
+        set_window_icon(self.window)
 
         # Footer frame to hold checkbox and close button
         footer_frame = tk.Frame(self.window)

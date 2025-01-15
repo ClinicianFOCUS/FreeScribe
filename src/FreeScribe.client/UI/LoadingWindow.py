@@ -63,7 +63,7 @@ class LoadingWindow:
             self.popup = tk.Toplevel(parent)
             self.popup.title(title)
             self.popup.geometry("200x105")  # Increased height for cancel button
-            set_window_icon(self.popup, get_file_path('assets', 'logo.ico'))
+            set_window_icon(self.popup)
 
             if parent:
                 # Center the popup window on the parent window

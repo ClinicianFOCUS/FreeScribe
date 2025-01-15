@@ -87,7 +87,7 @@ class SettingsWindowUI:
         self.settings_window.minsize(775, 400)    # Set minimum window size
         self.settings_window.resizable(True, True)
         self.settings_window.grab_set()
-        set_window_icon(self.settings_window, get_file_path('assets', 'logo.ico'))
+        set_window_icon(self.settings_window)
 
         self._display_center_to_parent()
 

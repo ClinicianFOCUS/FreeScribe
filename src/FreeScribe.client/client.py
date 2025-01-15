@@ -39,6 +39,7 @@ from UI.Widgets.MicrophoneSelector import MicrophoneState
 from Model import  ModelManager
 from utils.ip_utils import is_private_ip
 from utils.file_utils import get_file_path, get_resource_path
+from utils.ui_utils import set_window_icon
 import ctypes
 import sys
 from UI.DebugWindow import DualOutput
@@ -963,7 +964,7 @@ def show_edit_transcription_popup(formatted_message):
     
     popup = tk.Toplevel(root)
     popup.title("Scrub PHI Prior to GPT")
-    popup.iconbitmap(get_file_path('assets','logo.ico'))
+    set_window_icon(popup)
     text_area = scrolledtext.ScrolledText(popup, height=20, width=80)
     text_area.pack(padx=10, pady=10)
     text_area.insert(tk.END, cleaned_message)
