@@ -1,8 +1,11 @@
+import sys
 from tkinter import Toplevel, messagebox
 import markdown as md
 import tkinter as tk
 from tkhtmlview import HTMLLabel
 from utils.file_utils import get_file_path
+from utils.ui_utils import set_window_icon
+
 
 class MarkdownWindow:
     """
@@ -34,7 +37,7 @@ class MarkdownWindow:
         self.window.title(title)
         self.window.transient(parent)
         self.window.grab_set()
-        self.window.iconbitmap(get_file_path('assets', 'logo.ico'))
+        set_window_icon(self.window, get_file_path('assets', 'logo.ico'))
 
         # Footer frame to hold checkbox and close button
         footer_frame = tk.Frame(self.window)

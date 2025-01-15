@@ -20,12 +20,14 @@ Classes:
 """
 
 import json
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 from UI.Widgets.AudioMeter import AudioMeter
 import threading
 from Model import Model, ModelManager
 from utils.file_utils import get_file_path
+from utils.ui_utils import set_window_icon
 from UI.MarkdownWindow import MarkdownWindow
 from UI.Widgets.MicrophoneSelector import MicrophoneSelector
 from UI.SettingsWindow import SettingsKeys, FeatureToggle, Architectures, SettingsWindow
@@ -85,7 +87,7 @@ class SettingsWindowUI:
         self.settings_window.minsize(775, 400)    # Set minimum window size
         self.settings_window.resizable(True, True)
         self.settings_window.grab_set()
-        self.settings_window.iconbitmap(get_file_path('assets','logo.ico'))
+        set_window_icon(self.settings_window, get_file_path('assets', 'logo.ico'))
 
         self._display_center_to_parent()
 

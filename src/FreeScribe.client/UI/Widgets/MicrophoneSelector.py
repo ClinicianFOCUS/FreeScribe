@@ -30,7 +30,7 @@ class MicrophoneState:
                 if device_info['name'] == MicrophoneState.SELECTED_MICROPHONE_NAME:
                     MicrophoneState.SELECTED_MICROPHONE_INDEX = device_info["index"]
                     break
-        else:
+        if MicrophoneState.SELECTED_MICROPHONE_INDEX is None:
             MicrophoneState.SELECTED_MICROPHONE_INDEX = 0
             MicrophoneState.SELECTED_MICROPHONE_NAME = p.get_device_info_by_index(0)['name']
 

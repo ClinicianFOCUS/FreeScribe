@@ -1,3 +1,5 @@
+.idea
+
 aiscribe.txt
 aiscribe2.txt
 settings.txt
@@ -14,6 +16,7 @@ client.spec
 
 realtime.wav
 src/FreeScribe.client/models
+src/FreeScribe.client/__version__
 freescribe-client.spec
 freescribe-client-cpu.spec
 freescribe-client-nvidia.spec

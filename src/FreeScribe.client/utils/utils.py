@@ -1,5 +1,8 @@
 
 import ctypes
+import os
+import sys
+import fcntl
 
 # Define the mutex name and error code
 MUTEX_NAME = 'Global\\FreeScribe_Instance'
@@ -17,9 +20,34 @@ def window_has_running_instance() -> bool:
     """
     global mutex
 
-    # Create a named mutex
-    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX_NAME)
-    return ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS
+    if sys.platform == 'win32':
+        # Create a named mutex
+        mutex = ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX_NAME)
+        return ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS
+    elif sys.platform == 'linux':
+        lock_file_path = '/tmp/FreeScribe.lock'
+
+        try:
+            # Create or open the lock file
+            global lock_file  # Keep reference to prevent garbage collection
+            lock_file = open(lock_file_path, 'w')
+
+            # Try to acquire the lock
+            fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            # If we get here, no other instance is running
+            return False
+
+        except IOError:
+            # Another instance has the lock
+            return True
+        except Exception as e:
+            # Handle any other errors
+            print(f"Error checking for running instance: {e}")
+            return False
+    else:
+        raise RuntimeError('Unsupported platform')
+
 
 def bring_to_front(app_name: str):
     """
@@ -35,12 +63,31 @@ def bring_to_front(app_name: str):
     U32DLL.ShowWindow(hwnd, SW_SHOW)
     U32DLL.SetForegroundWindow(hwnd)
 
+
+def cleanup_lock():
+    """
+    Cleanup function to release the lock file when the application exits.
+    Should be called when the application is shutting down.
+    """
+    if sys.platform == 'linux' and 'lock_file' in globals():
+        try:
+            fcntl.lockf(lock_file, fcntl.LOCK_UN)
+            lock_file.close()
+            os.remove(lock_file.name)
+        except Exception as e:
+            print(f"Error cleaning up lock file: {e}")
+
+
 def close_mutex():
     """
     Close the mutex handle to release the resource.
     """
     global mutex
-    if mutex:
+    if not mutex:
+        return
+    elif sys.platform == 'linux':
+        cleanup_lock()
+    else:
         ctypes.windll.kernel32.ReleaseMutex(mutex)
         ctypes.windll.kernel32.CloseHandle(mutex)
-        mutex = None
+    mutex = None

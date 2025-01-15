@@ -111,7 +111,10 @@ is_audio_processing_realtime_canceled = threading.Event()
 is_audio_processing_whole_canceled = threading.Event()
 
 # Constants
-DEFAULT_BUTTON_COLOUR = "SystemButtonFace"
+if sys.platform == 'linux':
+    DEFAULT_BUTTON_COLOUR = 'grey85'
+else:
+    DEFAULT_BUTTON_COLOUR = "SystemButtonFace"
 
 #Thread tracking variables
 REALTIME_TRANSCRIBE_THREAD_ID = None

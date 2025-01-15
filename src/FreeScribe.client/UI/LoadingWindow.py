@@ -1,6 +1,9 @@
+import sys
 import tkinter as tk
 from tkinter import ttk
 from utils.file_utils import get_file_path
+from utils.ui_utils import set_window_icon, disable_window
+
 
 class LoadingWindow:
     """
@@ -60,7 +63,7 @@ class LoadingWindow:
             self.popup = tk.Toplevel(parent)
             self.popup.title(title)
             self.popup.geometry("200x105")  # Increased height for cancel button
-            self.popup.iconbitmap(get_file_path('assets','logo.ico'))
+            set_window_icon(self.popup, get_file_path('assets', 'logo.ico'))
 
             if parent:
                 # Center the popup window on the parent window
@@ -71,7 +74,8 @@ class LoadingWindow:
                 self.popup.transient(parent)
                 
                 # Disable the parent window
-                parent.wm_attributes('-disabled', True)
+                disable_window(parent)
+
 
             # Use label and progress bar
             self.label = tk.Label(self.popup, text=initial_text)
@@ -92,7 +96,7 @@ class LoadingWindow:
         except Exception:
             # Enable the window on exception
             if parent:
-                parent.wm_attributes('-disabled', False)
+                disable_window(parent)
             raise
 
     def _handle_cancel(self):
@@ -132,8 +136,8 @@ class LoadingWindow:
         if self.popup:
             # Enable the parent window
             if self.parent:
-                self.parent.wm_attributes('-disabled', False)
-            
+                disable_window(self.parent)
+
             if self.progress.winfo_exists():
                 self.progress.stop()
 
