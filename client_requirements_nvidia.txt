@@ -70,3 +70,4 @@ nvidia-cuda-runtime-cu12==12.4.127
 nvidia-cuda-nvrtc-cu12==12.4.127
 nvidia-cublas-cu12==12.4.5.8
 psutil==6.1.0
+Pillow==10.2.0
