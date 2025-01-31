@@ -652,20 +652,6 @@ class SettingsWindowUI:
         """
         frame, row = self.create_editable_settings(self.general_settings_frame, self.settings.general_settings)
         
-        # 1. LLM Preset (Left Column)
-        tk.Label(frame, text="Settings Presets:").grid(row=row, column=0, padx=0, pady=5, sticky="w")
-        llm_preset_options = ["Local AI", "ClinicianFocus Toolbox", "Custom"]
-        self.llm_preset_dropdown = ttk.Combobox(frame, values=llm_preset_options, width=20, state="readonly")
-        if self.settings.editable_settings["Preset"] in llm_preset_options:
-            self.llm_preset_dropdown.current(llm_preset_options.index(self.settings.editable_settings["Preset"]))
-        else:
-            self.llm_preset_dropdown.set("Custom")
-        self.llm_preset_dropdown.grid(row=row, column=1, padx=0, pady=5, sticky="w")
-
-        load_preset_btn = ttk.Button(frame, text="Load", width=5, 
-                                    command=lambda: self.settings.load_settings_preset(self.llm_preset_dropdown.get(), self))
-        load_preset_btn.grid(row=row, column=2, padx=0, pady=5, sticky="w")
-        
         # Add a note at the bottom of the general settings frame
         note_text = (
             "Note: 'Show Scrub PHI' will only work for local LLM and private network.\n"

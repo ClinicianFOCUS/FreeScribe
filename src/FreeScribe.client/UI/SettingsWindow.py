@@ -91,7 +91,7 @@ class SettingsWindow():
     save_settings_to_file():
         Saves the current settings to a JSON file.
     save_settings(openai_api_key, aiscribe_text, aiscribe2_text, 
-                  settings_window, preset):
+                  settings_window):
         Saves the current settings, including API keys, IP addresses, and user-defined parameters.
     load_aiscribe_from_file():
         Loads the first AI Scribe text from a file.
@@ -234,7 +234,6 @@ class SettingsWindow():
             "Whisper Caddy Container Name": "caddy",
             "Auto Shutdown Containers on Exit": True,
             "Use Docker Status Bar": False,
-            "Preset": "Custom",
             "Show Welcome Message": True,
             "Enable Scribe Template": False,
             "Use Pre-Processing": True,
@@ -512,45 +511,6 @@ class SettingsWindow():
             else:
                 dropdown.set(models[0])
         
-
-    def load_settings_preset(self, preset_name, settings_class):
-        """
-        Load a settings preset from a file.
-
-        This method loads a settings preset from a JSON file with the given name.
-        The settings are then applied to the application settings.
-
-        Parameters:
-            preset_name (str): The name of the settings preset to load.
-
-        Returns:
-            None
-        """
-        self.editable_settings["Preset"] = preset_name
-
-        if preset_name != "Custom":
-            # load the settigns from the json preset file
-            self.load_settings_from_file("presets/" + preset_name + ".json")
-
-            self.editable_settings["Preset"] = preset_name
-            #close the settings window 
-            settings_class.close_window()
-
-            # save the settings to the file
-            self.save_settings_to_file()
-
-            if preset_name != "Local AI":
-                messagebox.showinfo("Settings Preset", "Settings preset loaded successfully. Closing settings window. Please re-open and set respective API keys.")
-
-                # Unload ai model if switching
-                # already has safety check in unload to check if model exist.
-                ModelManager.unload_model()
-            else: # if is local ai
-                # load the models here
-                ModelManager.start_model_threaded(self, self.main_window.root)
-        else:
-            messagebox.showinfo("Custom Settings", "To use custom settings then please fill in the values and save them.")
-
     def set_main_window(self, window):
         """
         Set the main window instance for the settings.

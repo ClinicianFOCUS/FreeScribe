@@ -37,7 +37,6 @@ Function Check_For_Old_Version_In_App_Data
         MessageBox MB_YESNO|MB_ICONQUESTION "An old version of FreeScribe has been detected. Would you like to uninstall it?" IDYES UninstallOldVersion IDNO OldVersionDoesNotExist
         UninstallOldVersion:
             ; Remove the contents/folders of the old version
-            RMDir /r "$APPDATA\FreeScribe\presets"
             RMDir /r "$APPDATA\FreeScribe\_internal"
             RMDir /r "$APPDATA\FreeScribe\models"
 
@@ -167,7 +166,6 @@ FunctionEnd
 
 Function CleanUninstall
     ; Remove the contents/folders of the old version
-    RMDir /r "$INSTDIR\presets"
     RMDir /r "$INSTDIR\_internal"
 
     ; Remove the old version executable
@@ -223,11 +221,6 @@ Section "MainSection" SEC01
     ; Install version file to both nvidia and cpu directories for version checking
     SetOutPath "$INSTDIR\_internal"
     File ".\__version__"
-
-    ; add presets
-    CreateDirectory "$INSTDIR\presets"
-    SetOutPath "$INSTDIR\presets"
-    File /r "..\src\FreeScribe.client\presets\*"
 
     SetOutPath "$INSTDIR"
 
