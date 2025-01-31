@@ -1539,7 +1539,7 @@ def set_cuda_paths():
     architecture is selected. Updates CUDA_PATH, CUDA_PATH_V12_4, and PATH
     environment variables with the appropriate NVIDIA driver paths.
     """
-    if (get_selected_whisper_architecture() != Architectures.CUDA.architecture_value) or (app_settings.editable_settings["Architecture"] != Architectures.CUDA.label):
+    if (get_selected_whisper_architecture() != Architectures.CUDA.architecture_value) or (app_settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] != Architectures.CUDA.label):
         return
 
     nvidia_base_path = Path(get_file_path('nvidia-drivers'))

@@ -283,8 +283,8 @@ class SettingsWindowUI:
         self.local_architecture_label.grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         architecture_options = self.settings.get_available_architectures()
         self.architecture_dropdown = ttk.Combobox(left_frame, values=architecture_options, width=20, state="readonly")
-        if self.settings.editable_settings["Architecture"] in architecture_options:
-            self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings["Architecture"]))
+        if self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] in architecture_options:
+            self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value]))
         else:
             # Default cpu
             self.architecture_dropdown.set(Architectures.CPU.label)
@@ -597,7 +597,7 @@ class SettingsWindowUI:
             self.get_selected_model(),
             self.settings.editable_settings["Use Local LLM"],
             self.settings.editable_settings_entries["Use Local LLM"].get(),
-            self.settings.editable_settings["Architecture"],
+            self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value],
             self.architecture_dropdown.get())
 
         if self.get_selected_model() not in ["Loading models...", "Failed to load models"]:
@@ -609,7 +609,7 @@ class SettingsWindowUI:
         self.settings.editable_settings["Post-Processing"] = self.postprocess_text.get("1.0", "end-1c") # end-1c removes the trailing newline
 
         # save architecture
-        self.settings.editable_settings["Architecture"] = self.architecture_dropdown.get()
+        self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = self.architecture_dropdown.get()
 
         self.settings.save_settings(
             self.openai_api_key_entry.get(),

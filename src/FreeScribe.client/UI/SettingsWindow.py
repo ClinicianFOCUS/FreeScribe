@@ -45,6 +45,7 @@ class SettingsKeys(Enum):
     USE_TRANSLATE_TASK = "Use Translate Task"
     WHISPER_LANGUAGE_CODE = "Whisper Language Code"
     S2T_SELF_SIGNED_CERT = "S2T Server Self-Signed Certificates"
+    LLM_ARCHITECTURE = "Architecture"
 
 
 class Architectures(Enum):
@@ -191,7 +192,7 @@ class SettingsWindow():
             "Model": "gemma2:2b-instruct-q8_0",
             "Model Endpoint": "https://localhost:3334/v1",
             "Use Local LLM": True,
-            "Architecture": SettingsWindow.DEFAULT_LLM_ARCHITECTURE,
+            SettingsKeys.LLM_ARCHITECTURE.value: SettingsWindow.DEFAULT_LLM_ARCHITECTURE,
             "use_story": False,
             "use_memory": False,
             "use_authors_note": False,
@@ -582,8 +583,20 @@ class SettingsWindow():
             ModelManager.start_model_threaded(self, self.main_window.root)
 
     def _create_settings_and_aiscribe_if_not_exist(self):
+        """
+        Create the settings and AI Scribe files if they do not exist.
+        """
         if not os.path.exists(get_resource_path('settings.txt')):
-            print("Settings file not found. Creating default settings file.")
+            architectures = self.get_available_architectures()
+            
+            # If CUDA is available, set it as the default architecture to save in settings
+            if Architectures.CUDA.label in architectures:
+                print("Settings file not found. Creating default settings file with CUDA architecture.")
+                self.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value] = Architectures.CUDA.label
+                self.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = Architectures.CUDA.label
+            else:
+                print("Settings file not found. Creating default settings file.")
+
             self.save_settings_to_file()
         if not os.path.exists(get_resource_path('aiscribe.txt')):
             print("AIScribe file not found. Creating default AIScribe file.")
