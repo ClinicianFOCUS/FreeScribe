@@ -367,7 +367,7 @@ def check_silence_warning(silence_duration):
     # Check if we need to warn if silence is long than warn time
     if silence_duration >= SILENCE_WARNING_LENGTH and window.warning_bar is None:
         
-        window.create_warning_bar(f"No audio input detected for {SILENCE_WARNING_LENGTH} seconds. Please check your microphone input device in whisper settings and adjust your microphone cutoff level in advanced settings.")
+        window.create_warning_bar(f"No audio input detected for {SILENCE_WARNING_LENGTH} seconds. Please check and ensure your microphone input device is working.")
     elif silence_duration <= SILENCE_WARNING_LENGTH and window.warning_bar is not None:
         # If the warning bar is displayed, remove it
         window.destroy_warning_bar()
@@ -1605,7 +1605,7 @@ clear_button.grid(row=1, column=4, pady=5, sticky='nsew')
 toggle_button = tk.Button(root, text="AI Scribe\nON", command=toggle_aiscribe, height=2, width=11)
 toggle_button.grid(row=1, column=5, pady=5, sticky='nsew')
 
-upload_button = tk.Button(root, text="Upload\nRecording", command=upload_file, height=2, width=11)
+upload_button = tk.Button(root, text="Upload Audio\nFor Transcription", command=upload_file, height=2, width=11)
 upload_button.grid(row=1, column=6, pady=5, sticky='nsew')
 
 switch_view_button = tk.Button(root, text="Minimize View", command=toggle_view, height=2, width=11)
