@@ -45,6 +45,7 @@ class SettingsKeys(Enum):
     USE_TRANSLATE_TASK = "Use Translate Task"
     WHISPER_LANGUAGE_CODE = "Whisper Language Code"
     S2T_SELF_SIGNED_CERT = "S2T Server Self-Signed Certificates"
+    USE_PRESCREEN_AI_INPUT = "Use Pre-Screen AI Input"
 
 
 class Architectures(Enum):
@@ -179,6 +180,7 @@ class SettingsWindow():
             SettingsKeys.SILERO_SPEECH_THRESHOLD.value,
             SettingsKeys.USE_TRANSLATE_TASK.value,
             SettingsKeys.WHISPER_LANGUAGE_CODE.value,
+            SettingsKeys.USE_PRESCREEN_AI_INPUT.value,
         ]
 
 
@@ -248,6 +250,7 @@ class SettingsWindow():
             SettingsKeys.SILERO_SPEECH_THRESHOLD.value: 0.5,
             SettingsKeys.USE_TRANSLATE_TASK.value: False,
             SettingsKeys.WHISPER_LANGUAGE_CODE.value: "None (Auto Detect)",
+            SettingsKeys.USE_PRESCREEN_AI_INPUT.value: True,
         }
 
         self.docker_settings = [
