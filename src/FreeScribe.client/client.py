@@ -1114,32 +1114,69 @@ def send_text_to_localmodel(edited_text):
         repeat_penalty=float(app_settings.editable_settings["rep_pen"]),
     )
 
-    
 def screen_input_with_llm(conversation):
     """
     Send a conversation to a large language model (LLM) for prescreening.
-
     :param conversation: A string containing the conversation to be screened.
     :return: A boolean indicating whether the conversation is valid.
     """
+    if app_settings.editable_settings[SettingsKeys.Enable_AI_Conversation_Validation.value]:
+        # Define the chunk size (number of words per chunk)
+        words_per_chunk = 60  # Adjust this value based on your results
+        # Split the conversation into words
+        words = conversation.split()
+        # Split the words into chunks
+        chunks = [' '.join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
+        print(f"Total chunks count: {len(chunks)}")
+        # Process each chunk sequentially
+        for chunk in chunks:                               
+            if process_chunk(chunk):
+                # If any chunk is valid, return True
+                return True
+        # If no chunk is valid, return False
+        return False
+    else:
+        return True
+
+def process_chunk(chunk):
+    """
+    Process a chunk of the conversation using the LLM.
+    """
     prompt = (
-        "Go over this conversation and ensure it's a conversation with more than 50 words. "
-        "Also, if it is a conversation between a doctor and a patient. Please return one word. "
-        "Either True or False based. Do not give an explanation and do not format the text. "
+        "Analyze the following conversation and determine if it is a valid doctor-patient conversation. "
+        "A valid conversation involves a discussion between a healthcare provider and a patient about medical concerns, "
+        "symptoms, diagnoses, treatments, or health management. It may include:\n"
+        "- Descriptions of symptoms or health issues.\n"
+        "- Discussions about medications, treatments, or follow-up plans.\n"
+        "- Questions and answers related to the patient's health.\n"
+        "- Casual or conversational tones, as long as the topic is medically relevant.\n\n"
+        "If the conversation is unrelated to healthcare, lacks medical context, or appears to be non-medical, "
+        "it is not a valid doctor-patient conversation.\n\n"
+        "Return only one word: 'True' if the conversation is valid, or 'False' if it is not. "
+        "Do not provide explanations, additional formatting, or any text other than 'True' or 'False'.\n\n"
         "Here is the conversation:\n"
     )
-
-    # Send the prompt and conversation to the LLM for evaluation
-    prescreen = send_text_to_chatgpt(f"{prompt}{conversation}")
-
+    # Send the prompt and chunk to the LLM for evaluation
+    prescreen = send_text_to_chatgpt(f"{prompt}{chunk}")
     # Check if the response from the LLM is 'true' (case-insensitive)
-    is_valid_input = prescreen.strip().lower() == "true"
+    return prescreen.strip().lower() == "true"
 
-    # Log the AI's response for debugging purposes
-    print("Generating Input. AI Prescreen: ", prescreen)
-
-    return is_valid_input
-
+def has_more_than_50_words(text: str) -> bool:
+    if app_settings.editable_settings[SettingsKeys.Enable_Word_Count_Validation.value]:
+        # Split the text into words using whitespace as the delimiter
+        words = text.split()        
+        # Print the number of words
+        print(f"Number of words: {len(words)}")
+        # Check if the number of words is greater than 50
+        if len(words) > 50:
+            # Perform AI-based prescreening
+            screen_result = screen_input_with_llm(text)
+            return screen_result
+        else:
+            return False    
+    else:
+        # Perform AI-based prescreening
+        return screen_input_with_llm(text)
 
 def display_screening_popup():
     """
@@ -1176,9 +1213,9 @@ def screen_input(user_message):
     :return: A boolean indicating whether the input is valid and accepted for further processing.
     """
     # Check if AI prescreening is enabled in the application settings
-    if app_settings.editable_settings[SettingsKeys.USE_PRESCREEN_AI_INPUT.value]:
-        # Perform AI-based prescreening
-        screen_result = screen_input_with_llm(user_message)
+    if app_settings.editable_settings[SettingsKeys.USE_PRESCREEN_AI_INPUT.value]:        
+        # Perform basic word count to ensure 50 words and AI Prescreen
+        screen_result = has_more_than_50_words(user_message)
 
         # If the input fails prescreening, display a popup for the user
         if not screen_result:
