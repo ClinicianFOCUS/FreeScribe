@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Install portaudio. Needed for the pyaudio package.
+brew reinstall portaudio
+
 # Set Hugging Face model URL and output directory
 MODEL_URL="https://huggingface.co/lmstudio-community/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q8_0.gguf?download=true"
 OUTPUT_DIR="/Users/Shared/FreeScribe/models"

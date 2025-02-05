@@ -1,10 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+import subprocess
+
+# Determine the path to ffmpeg
+ffmpeg_path = subprocess.check_output(['which', 'ffmpeg']).decode().strip()
 
 a = Analysis(
     ['src/FreeScribe.client/client.py'],
     pathex=[],
-    binaries=[('/usr/local/bin/ffmpeg', 'ffmpeg')],
+    binaries=[(ffmpeg_path, 'ffmpeg')],
     datas=[('./src/FreeScribe.client/whisper-assets', 'whisper/assets'), ('./src/FreeScribe.client/markdown', 'markdown'), ('./src/FreeScribe.client/assets', 'assets')],
     hiddenimports=[],
     hookspath=['./scripts/hooks'],
