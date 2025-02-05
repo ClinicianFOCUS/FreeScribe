@@ -603,8 +603,11 @@ class SettingsWindowUI:
 
         self.settings.update_whisper_model()
 
-        self.settings.editable_settings["Pre-Processing"] = self.preprocess_text.get("1.0", "end-1c") # end-1c removes the trailing newline
-        self.settings.editable_settings["Post-Processing"] = self.postprocess_text.get("1.0", "end-1c") # end-1c removes the trailing newline
+        if FeatureToggle.PRE_PROCESSING is True:
+            self.settings.editable_settings["Pre-Processing"] = self.preprocess_text.get("1.0", "end-1c") # end-1c removes the trailing newline
+        
+        if FeatureToggle.POST_PROCESSING is True:
+            self.settings.editable_settings["Post-Processing"] = self.postprocess_text.get("1.0", "end-1c") # end-1c removes the trailing newline
 
         # save architecture
         self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = self.architecture_dropdown.get()
