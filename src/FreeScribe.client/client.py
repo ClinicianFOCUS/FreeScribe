@@ -1605,9 +1605,11 @@ def _load_stt_model_thread():
     """
     with stt_model_loading_thread_lock:
         global stt_local_model
-        model = app_settings.editable_settings[SettingsKeys.WHISPER_MODEL.value].strip()
-        stt_loading_window = LoadingWindow(root, "Voice to Text", f"Loading Voice to Text {model} model. Please wait.")
-        print(f"Loading STT model: {model}")
+
+        model_name = app_settings.editable_settings[SettingsKeys.WHISPER_MODEL.value].strip()
+        stt_loading_window = LoadingWindow(root, "Voice to Text", f"Loading Voice to Text {model_name} model. Please wait.")
+        print(f"Loading STT model: {model_name}")
+
         try:
             unload_stt_model()
             device_type = get_selected_whisper_architecture()
@@ -1620,7 +1622,7 @@ def _load_stt_model_thread():
 
 
             stt_local_model = WhisperModel(
-                model,
+                model_name,
                 device=device_type,
                 cpu_threads=int(app_settings.editable_settings[SettingsKeys.WHISPER_CPU_COUNT.value]),
                 compute_type=compute_type

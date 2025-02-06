@@ -33,6 +33,7 @@ import multiprocessing
 
 class SettingsKeys(Enum):
     LOCAL_WHISPER = "Built-in Speech2Text"
+    LOCAL_WHISPER_MODEL = "Whisper Model"
     WHISPER_ENDPOINT = "Speech2Text (Whisper) Endpoint"
     WHISPER_SERVER_API_KEY = "Speech2Text (Whisper) API Key"
     WHISPER_REAL_TIME = "Real Time Speech Transcription"
@@ -272,7 +273,7 @@ class SettingsWindow():
             "Auto Shutdown Containers on Exit",
             "Use Docker Status Bar",
         ]
-
+        # saves newest value, but not saved to config file yet
         self.editable_settings_entries = {}
         self.load_settings_from_file()
         self.AISCRIBE = self.load_aiscribe_from_file() or "AI, please transform the following conversation into a concise SOAP note. Do not assume any medical data, vital signs, or lab values. Base the note strictly on the information provided in the conversation. Ensure that the SOAP note is structured appropriately with Subjective, Objective, Assessment, and Plan sections. Strictly extract facts from the conversation. Here's the conversation:"
@@ -645,10 +646,15 @@ class SettingsWindow():
 
         # loading the model after the window is closed to prevent the window from freezing
         # if Local Whisper is selected, compare the old model with the new model and reload the model if it has changed
-        if self.editable_settings[SettingsKeys.LOCAL_WHISPER.value] and (
-                old_local_whisper != self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get() or 
-                old_model != self.editable_settings_entries[SettingsKeys.WHISPER_MODEL.value].get() or 
-                old_whisper_architecture != self.editable_settings_entries[SettingsKeys.WHISPER_ARCHITECTURE.value].get() or 
+        # if switched from remote to local whisper
+        if not old_local_whisper and self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get():
+            return True
+        # new settings of LOCAL_WHISPER should be True, or we can skip reloading
+        if self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get() and (
+                old_model != self.editable_settings_entries[SettingsKeys.WHISPER_MODEL.value].get() or
+                old_whisper_architecture != self.editable_settings_entries[SettingsKeys.WHISPER_ARCHITECTURE.value].get() or
                 old_cpu_count != self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get() or
-                old_compute_type != self.editable_settings_entries[SettingsKeys.WHISPER_COMPUTE_TYPE.value].get()):
-            self.main_window.root.event_generate("<<LoadSttModel>>")
+                old_compute_type != self.editable_settings_entries[SettingsKeys.WHISPER_COMPUTE_TYPE.value].get()
+        ):
+            return True
+        return False
