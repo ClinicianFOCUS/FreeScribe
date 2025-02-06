@@ -5,6 +5,7 @@ import threading
 from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
 
+
 class Model:
     """
     Model class for handling GPU-accelerated text generation using the Llama library.
@@ -194,7 +195,7 @@ class ModelManager:
             """
             gpu_layers = 0
 
-            if app_settings.editable_settings["Architecture"] == "CUDA (Nvidia GPU)":
+            if app_settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] == "CUDA (Nvidia GPU)":
                 gpu_layers = -1
 
             model_to_use = "gemma-2-2b-it-Q8_0.gguf"

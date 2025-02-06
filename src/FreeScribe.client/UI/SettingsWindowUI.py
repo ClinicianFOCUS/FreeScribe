@@ -27,7 +27,8 @@ from Model import Model, ModelManager
 from utils.file_utils import get_file_path
 from utils.utils import get_application_version
 from UI.MarkdownWindow import MarkdownWindow
-from UI.SettingsWindow import SettingsKeys, FeatureToggle, Architectures, SettingsWindow
+from UI.SettingsWindow import SettingsWindow
+from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from UI.Widgets.PopupBox import PopupBox
 
 

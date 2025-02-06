@@ -40,7 +40,8 @@ from tkinter import scrolledtext, ttk, filedialog
 import tkinter.messagebox as messagebox
 from faster_whisper import WhisperModel
 from UI.MainWindowUI import MainWindowUI
-from UI.SettingsWindow import SettingsWindow, SettingsKeys, Architectures
+from UI.SettingsWindow import SettingsWindow
+from UI.SettingsConstant import SettingsKeys, Architectures
 from UI.Widgets.CustomTextBox import CustomTextBox
 from UI.LoadingWindow import LoadingWindow
 from Model import  ModelManager

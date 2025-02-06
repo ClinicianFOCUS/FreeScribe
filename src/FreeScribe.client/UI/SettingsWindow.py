@@ -20,59 +20,16 @@ WhisperAudio, and OpenAI services.
 import json
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 import requests
-import numpy as np
+
+from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from utils.file_utils import get_resource_path, get_file_path
 from utils.utils import get_application_version
 from Model import ModelManager
-import threading
 from utils.ip_utils import is_valid_url
-from enum import Enum
 import multiprocessing
 
-class SettingsKeys(Enum):
-    LOCAL_WHISPER = "Built-in Speech2Text"
-    WHISPER_ENDPOINT = "Speech2Text (Whisper) Endpoint"
-    WHISPER_SERVER_API_KEY = "Speech2Text (Whisper) API Key"
-    WHISPER_REAL_TIME = "Real Time Speech Transcription"
-    WHISPER_MODEL = "Built-in Speech2Text Model"
-    WHISPER_ARCHITECTURE = "Built-in Speech2Text Architecture"
-    WHISPER_CPU_COUNT = "Whisper CPU Thread Count (Experimental)"
-    WHISPER_COMPUTE_TYPE = "Whisper Compute Type (Experimental)"
-    WHISPER_BEAM_SIZE = "Whisper Beam Size (Experimental)"
-    WHISPER_VAD_FILTER = "Use Whisper VAD Filter (Experimental)"
-    AUDIO_PROCESSING_TIMEOUT_LENGTH = "Audio Processing Timeout (seconds)"
-    SILERO_SPEECH_THRESHOLD = "Silero Speech Threshold"
-    USE_TRANSLATE_TASK = "Translate Speech to English Text"
-    WHISPER_LANGUAGE_CODE = "Whisper Language Code"
-    S2T_SELF_SIGNED_CERT = "S2T Server Self-Signed Certificates"
-    LLM_ARCHITECTURE = "Built-in AI Architecture"
-    USE_PRESCREEN_AI_INPUT = "Use Pre-Screen AI Input"
-    LOCAL_LLM = "Built-in AI Processing"
-    LOCAL_LLM_MODEL = "AI Model"
-    LLM_ENDPOINT = "AI Server Endpoint"
-    LLM_SERVER_API_KEY = "AI Server API Key"
-
-class Architectures(Enum):
-    CPU = ("CPU", "cpu")
-    CUDA = ("CUDA (Nvidia GPU)", "cuda")
-
-    @property
-    def label(self):
-        return self._value_[0]
-
-    @property
-    def architecture_value(self):
-        return self._value_[1]
-
-
-
-class FeatureToggle:
-    DOCKER_SETTINGS_TAB = False
-    DOCKER_STATUS_BAR = False
-    POST_PROCESSING = False
-    PRE_PROCESSING = False
 
 class SettingsWindow():
     """
@@ -646,9 +603,10 @@ class SettingsWindow():
         # loading the model after the window is closed to prevent the window from freezing
         # if Local Whisper is selected, compare the old model with the new model and reload the model if it has changed
         if self.editable_settings[SettingsKeys.LOCAL_WHISPER.value] and (
-                old_local_whisper != self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get() or 
-                old_model != self.editable_settings_entries[SettingsKeys.WHISPER_MODEL.value].get() or 
-                old_whisper_architecture != self.editable_settings_entries[SettingsKeys.WHISPER_ARCHITECTURE.value].get() or 
+                old_local_whisper != self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get() or
+                old_model != self.editable_settings_entries[SettingsKeys.WHISPER_MODEL.value].get() or
+                old_whisper_architecture != self.editable_settings_entries[
+                    SettingsKeys.WHISPER_ARCHITECTURE.value].get() or
                 old_cpu_count != self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get() or
                 old_compute_type != self.editable_settings_entries[SettingsKeys.WHISPER_COMPUTE_TYPE.value].get()):
             self.main_window.root.event_generate("<<LoadSttModel>>")
