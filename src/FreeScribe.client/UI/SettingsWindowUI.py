@@ -31,6 +31,10 @@ from UI.SettingsWindow import SettingsKeys, FeatureToggle, Architectures, Settin
 from UI.Widgets.PopupBox import PopupBox
 
 
+LONG_ENTRY_WIDTH = 30
+SHORT_ENTRY_WIDTH = 20
+
+
 class SettingsWindowUI:
     """
     Manages the settings window UI.
@@ -198,7 +202,7 @@ class SettingsWindowUI:
         # create the whisper model dropdown slection
         tk.Label(left_frame, text=SettingsKeys.WHISPER_MODEL.value).grid(row=3, column=0, padx=0, pady=5, sticky="w")
         whisper_models_drop_down_options = ["medium", "small", "tiny", "tiny.en", "base", "base.en", "small.en", "medium.en", "large"]
-        self.whisper_models_drop_down = ttk.Combobox(left_frame, values=whisper_models_drop_down_options, width=20)
+        self.whisper_models_drop_down = ttk.Combobox(left_frame, values=whisper_models_drop_down_options, width=SHORT_ENTRY_WIDTH)
         self.whisper_models_drop_down.grid(row=3, column=1, padx=0, pady=5, sticky="w")
 
         try:
@@ -216,7 +220,7 @@ class SettingsWindowUI:
         self.whisper_architecture_label = tk.Label(left_frame, text=SettingsKeys.WHISPER_ARCHITECTURE.value)
         self.whisper_architecture_label.grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         whisper_architecture_options = self.settings.get_available_architectures()
-        self.whisper_architecture_dropdown = ttk.Combobox(left_frame, values=whisper_architecture_options, width=20, state="readonly")
+        self.whisper_architecture_dropdown = ttk.Combobox(left_frame, values=whisper_architecture_options, width=SHORT_ENTRY_WIDTH, state="readonly")
         if self.settings.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value] in whisper_architecture_options:
             self.whisper_architecture_dropdown.current(whisper_architecture_options.index(self.settings.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value]))
         else:
@@ -278,7 +282,7 @@ class SettingsWindowUI:
         self.local_architecture_label = tk.Label(left_frame, text=SettingsKeys.LLM_ARCHITECTURE.value)
         self.local_architecture_label.grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         architecture_options = self.settings.get_available_architectures()
-        self.architecture_dropdown = ttk.Combobox(left_frame, values=architecture_options, width=20, state="readonly")
+        self.architecture_dropdown = ttk.Combobox(left_frame, values=architecture_options, width=LONG_ENTRY_WIDTH, state="readonly")
         if self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] in architecture_options:
             self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value]))
         else:
@@ -298,7 +302,7 @@ class SettingsWindowUI:
         # 5. Models (Left Column)
         tk.Label(left_frame, text=SettingsKeys.LOCAL_LLM_MODEL.value).grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         models_drop_down_options = []
-        self.models_drop_down = ttk.Combobox(left_frame, values=models_drop_down_options, width=20, state="readonly")
+        self.models_drop_down = ttk.Combobox(left_frame, values=models_drop_down_options, width=LONG_ENTRY_WIDTH, state="readonly")
         self.models_drop_down.grid(row=left_row, column=1, padx=0, pady=5, sticky="w")
         self.models_drop_down.bind('<<ComboboxSelected>>', self.on_model_selection_change)
         thread = threading.Thread(target=self.settings.update_models_dropdown, args=(self.models_drop_down,))
@@ -319,7 +323,7 @@ class SettingsWindowUI:
 
         # 2. OpenAI API Key (Right Column)
         tk.Label(right_frame, text=SettingsKeys.LLM_SERVER_API_KEY.value).grid(row=right_row, column=0, padx=0, pady=5, sticky="w")
-        self.openai_api_key_entry = tk.Entry(right_frame, width=25)
+        self.openai_api_key_entry = tk.Entry(right_frame, width=LONG_ENTRY_WIDTH)
         self.openai_api_key_entry.insert(0, self.settings.OPENAI_API_KEY)
         self.openai_api_key_entry.grid(row=right_row, column=1, columnspan=2, padx=0, pady=5, sticky="w")
         
@@ -726,7 +730,7 @@ class SettingsWindowUI:
         """
         tk.Label(frame, text=label).grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
         value = self.settings.editable_settings[setting_name]
-        entry = tk.Entry(frame, width=17)
+        entry = tk.Entry(frame, width=LONG_ENTRY_WIDTH)
         entry.insert(0, str(value))
         entry.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
         self.settings.editable_settings_entries[setting_name] = entry
