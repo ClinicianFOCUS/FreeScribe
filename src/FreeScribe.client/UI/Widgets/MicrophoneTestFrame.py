@@ -121,6 +121,7 @@ class MicrophoneTestFrame:
         
         # Bind selection change to save immediately
         self.mic_dropdown.bind('<<ComboboxSelected>>', self.on_mic_change)
+        self.mic_dropdown.bind('<Button-1>', self.on_dropdown_click)  # Bind click event
 
         # Volume meter container
         meter_frame = ttk.Frame(self.frame)
@@ -174,6 +175,32 @@ class MicrophoneTestFrame:
             self.setting_window.settings.save_settings_to_file()
             # Reopen the stream with the new device
             self.reopen_stream()  
+
+    def on_dropdown_click(self, event):
+        """
+        Handle the event when the dropdown is clicked.
+        """
+        # Reinitialize PyAudio
+        if self.p:
+            self.p.terminate()
+        self.p = pyaudio.PyAudio()
+
+        # Reinitialize the microphone list
+        self.initialize_microphones()
+
+        # Update the dropdown menu
+        mic_options = [f"{name}" for _, name in self.mic_list]
+        self.mic_dropdown['values'] = mic_options
+
+        # If the selected microphone is no longer available, select the first one
+        if MicrophoneState.SELECTED_MICROPHONE_NAME not in [name for _, name in self.mic_list]:
+            if self.mic_list:
+                self.update_selected_microphone(self.mic_list[0][0])
+                self.mic_dropdown.set(self.mic_list[0][1])
+            else:
+                self.status_label.config(text="Error: No microphones available", foreground="red")
+                MicrophoneState.SELECTED_MICROPHONE_INDEX = None
+                MicrophoneState.SELECTED_MICROPHONE_NAME = None
 
     def update_selected_microphone(self, selected_index):
         """
@@ -315,3 +342,5 @@ class MicrophoneTestFrame:
                 self.stream.close()
             except Exception as e:
                 print(f"Error closing stream in destructor: {e}")
+        if self.p:
+            self.p.terminate()
