@@ -57,7 +57,7 @@ from WhisperModel import TranscribeError
 from UI.Widgets.PopupBox import PopupBox
 from UI.Widgets.TimestampListbox import TimestampListbox
 from UI.ScrubWindow import ScrubWindow
-
+from Model import ModelStatus
 
 
 if os.environ.get("FREESCRIBE_DEBUG"):
@@ -2005,9 +2005,18 @@ def await_models(timeout_length=60):
     # if we are not using local llm then we can assume it is loaded and dont wait
     llm_loaded = (not app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value] or ModelManager.local_model)
  
+    # if there was a error stop checking
+    if ModelManager.local_model == ModelStatus.ERROR:
+        #Error message is displayed else where
+        llm_loaded = True
+
     # wait for both models to be loaded
     if not whisper_loaded or not llm_loaded:
         print("Waiting for models to load...")
+
+        # if error null out the model
+        if ModelManager.local_model == ModelStatus.ERROR:
+            ModelManager.local_model = None
 
         # override the lock in case something else tried to edit
         window.disable_settings_menu()
