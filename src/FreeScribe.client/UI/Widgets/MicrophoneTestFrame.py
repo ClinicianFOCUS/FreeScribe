@@ -5,6 +5,8 @@ import numpy as np
 from PIL import Image, ImageTk
 from utils.file_utils import get_file_path
 from UI.SettingsWindowUI import SettingsWindowUI
+from utils.log_config import logger
+
 
 class MicrophoneState:
     SELECTED_MICROPHONE_INDEX = None
@@ -61,7 +63,7 @@ class MicrophoneTestFrame:
             default_input_info = self.p.get_default_input_device_info()
             self.default_input_index = default_input_info['index']
         except IOError as e:
-            print(f"Failed to initialize microphone ({type(e).__name__}): {e}")
+            logger.error(f"Failed to initialize microphone ({type(e).__name__}): {e}")
             self.default_input_index = None
 
         device_count = self.p.get_device_count()
@@ -137,7 +139,7 @@ class MicrophoneTestFrame:
             mic_icon_label = ttk.Label(meter_frame, image=self.mic_photo)
             mic_icon_label.grid(row=0, column=0, padx=(5, 0), sticky='nsew')
         except Exception as e:
-            print(f"Error loading microphone icon: {e}")
+            logger.error(f"Error loading microphone icon: {e}")
 
         # Create volume meter segments
         self.segments_frame = ttk.Frame(meter_frame)
@@ -250,7 +252,7 @@ class MicrophoneTestFrame:
                 self.is_stream_active = True
             except Exception as e:
                 self.status_label.config(text="Error: Microphone not found", foreground="red")
-                print(f"Failed to open microphone ({type(e).__name__}): {e}")
+                logger.error(f"Failed to open microphone ({type(e).__name__}): {e}")
         else:
             MicrophoneState.SELECTED_MICROPHONE_INDEX = None
             MicrophoneState.SELECTED_MICROPHONE_NAME = None
@@ -267,7 +269,7 @@ class MicrophoneTestFrame:
                     self.stream.stop_stream()
                 self.stream.close()
             except Exception as e:
-                print(f"Error closing stream: {e}")
+                logger.error(f"Error closing stream: {e}")
             finally:
                 self.stream = None
                 self.is_stream_active = False
@@ -287,7 +289,7 @@ class MicrophoneTestFrame:
                 self.status_label.config(text="Microphone: Connected", foreground="green")
             except Exception as e:
                 self.status_label.config(text="Error: Microphone not found", foreground="red")
-                print(f"Failed to open microphone ({type(e).__name__}): {e}")
+                logger.error(f"Failed to open microphone ({type(e).__name__}): {e}")
 
     def update_volume_meter(self):
         """
@@ -332,7 +334,7 @@ class MicrophoneTestFrame:
                 # Handle any other stream errors
                 self.status_label.config(text="Error: Unknown Error. Check debug log for more.", foreground="red")
             
-            print(f"Error in update_volume_meter({type(e).__name__}): {e}")
+            logger.info(f"Error in update_volume_meter({type(e).__name__}): {e}")
             self.is_stream_active = False
             self.stream = None
             for segment in self.segments:
@@ -340,6 +342,7 @@ class MicrophoneTestFrame:
 
         self.frame.after(50, self.update_volume_meter)
 
+    @staticmethod
     def get_selected_microphone_index():
         """
         Get the selected microphone index.
@@ -394,6 +397,6 @@ class MicrophoneTestFrame:
                     self.stream.stop_stream()
                 self.stream.close()
             except Exception as e:
-                print(f"Error closing stream in destructor: {e}")
+                logger.error(f"Error closing stream in destructor: {e}")
         if self.p:
             self.p.terminate()

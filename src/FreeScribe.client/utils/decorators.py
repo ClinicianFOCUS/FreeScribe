@@ -12,6 +12,8 @@ Alex Simko, Pemba Sherpa, Naitik Patel, Yogesh Kumar and Xun Zhong.
 """
 
 import platform
+from utils.log_config import logger
+
 
 def windows_only(func):
     """Decorator to ensure a function only runs on Windows systems.
@@ -24,7 +26,7 @@ def windows_only(func):
     """
     def wrapper(*args, **kwargs):
         if platform.system() != "Windows":
-            print("This feature is only supported on Windows.")
+            logger.info("This feature is only supported on Windows.")
             return
         return func(*args, **kwargs)
     return wrapper
