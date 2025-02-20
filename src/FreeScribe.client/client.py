@@ -1377,7 +1377,7 @@ def generate_note_thread(text: str):
     # The return value from the screen input thread
     screen_return = tk.BooleanVar()
 
-    loading_window = LoadingWindow(root, "Generating Note.", "Generating Note. Please wait.", on_cancel=lambda: (cancel_note_generation(GENERATION_THREAD_ID, screen_thread)))
+    loading_window = LoadingWindow(root, "Screening Input Text", "Ensuring input is valid. Please wait.", on_cancel=lambda: (cancel_note_generation(GENERATION_THREAD_ID, screen_thread)))
     
     # screen input in its own thread so we can cancel it
     screen_thread = threading.Thread(target=threaded_screen_input, args=(text, screen_return))
@@ -1393,6 +1393,7 @@ def generate_note_thread(text: str):
         if display_screening_popup() is False:
             return
     
+    loading_window.destroy()
     loading_window = LoadingWindow(root, "Generating Note.", "Generating Note. Please wait.", on_cancel=lambda: (cancel_note_generation(GENERATION_THREAD_ID, screen_thread)))
 
 
