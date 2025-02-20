@@ -418,9 +418,9 @@ def record_audio():
                 try: 
                     speech_prob_threshold = float(app_settings.editable_settings[SettingsKeys.SILERO_SPEECH_THRESHOLD.value])
                 except ValueError:
-                    # default it to 0.5 on invalid error
-                    speech_prob_threshold = 0.5
-                
+                    # default it to value in DEFAULT_SETTINGS_TABLE on invalid error
+                    speech_prob_threshold = app_settings.DEFAULT_SETTINGS_TABLE[SettingsKeys.SILERO_SPEECH_THRESHOLD.value]
+
                 if is_silent(audio_buffer, speech_prob_threshold ):
                     silent_duration += CHUNK / RATE
                     silent_warning_duration += CHUNK / RATE
