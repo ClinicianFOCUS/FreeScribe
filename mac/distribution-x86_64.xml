@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+https://developer.apple.com/library/mac/documentation/DeveloperTools/Reference/DistributionDefinitionRef/
+https://developer.apple.com/library/mac/documentation/DeveloperTools/Reference/InstallerJavaScriptRef/
+-->
+<installer-gui-script minSpecVersion="1">
+    <title>FreeScribe Installer</title>
+    <license file="License.rtf" />
+    <options customize="never"/>
+    <script>
+        <![CDATA[
+            function checkRequirements() {
+                if(system.sysctl("hw.machine").includes("arm64")) {
+                    my.result.title = system.localizedString('Wrong Architecture');
+                    my.result.message = system.localizedString('This software(x86_64) is not supported on this architecture(arm64).');
+                    my.result.type = 'Fatal';
+                    return false;
+                }
+                my.result.title = system.localizedString('Check Metal Support');
+                my.result.message = system.localizedString('Intel device detected. This software requires Metal support. Please make sure your device supports Metal.');
+                my.result.type = 'Warn';
+                return true;
+            }
+        ]]>
+    </script>
+    <installation-check script="checkRequirements();"/>
+    <choices-outline>
+        <line choice="install"/>
+    </choices-outline>
+    <choice id="install" visible="true" title="Install" description="Installing freescribe client">
+        <pkg-ref id="com.prosc.RemoteExecution.install.pkg">#installer.pkg</pkg-ref>
+    </choice>
+</installer-gui-script>
