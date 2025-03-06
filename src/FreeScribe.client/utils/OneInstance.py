@@ -9,9 +9,7 @@ import os
 import platform
 import subprocess
 import time
-
-
-logger = logging.getLogger(__name__)
+from utils.log_config import logger
 
 
 class OneInstance:

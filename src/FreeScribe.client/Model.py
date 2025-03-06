@@ -2,10 +2,13 @@ from llama_cpp import Llama
 import os
 from typing import Optional, Dict, Any
 import threading
+import logging
 from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys, DEFAULT_CONTEXT_WINDOW_SIZE
+from utils.log_config import logger
 from enum import Enum
+
 
 class ModelStatus(Enum):
     """
@@ -72,7 +75,7 @@ class Model:
                 tensor_split=tensor_split,
                 chat_format=chat_template,
             )
-        
+
             # Store configuration
             self.config = {
                 "gpu_layers": gpu_layers,
@@ -87,7 +90,7 @@ class Model:
     def generate_response(
         self,
         prompt: str,
-        max_tokens: int = 50,
+        max_tokens: int | None = None,
         temperature: float = 0.1,
         top_p: float = 0.95,
         repeat_penalty: float = 1.1
@@ -127,7 +130,7 @@ class Model:
             return response["choices"][0]["message"]["content"]
             
         except Exception as e:
-            print(f"GPU inference error ({e.__class__.__name__}): {str(e)}")
+            logger.error(f"GPU inference error ({e.__class__.__name__}): {str(e)}")
             return f"({e.__class__.__name__}): {str(e)}"
 
     
@@ -286,7 +289,8 @@ class ModelManager:
         the application.
         """
         if ModelManager.local_model is not None:
-            ModelManager.local_model.model.close()
+            if ModelManager.local_model.model is not None:
+                ModelManager.local_model.model.close()
             del ModelManager.local_model
             ModelManager.local_model = None
-            
+        logging.debug(f"{ModelManager.local_model=}")

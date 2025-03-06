@@ -22,6 +22,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 import requests
+import logging
 
 from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle, DEFAULT_CONTEXT_WINDOW_SIZE
 from utils.file_utils import get_resource_path, get_file_path
@@ -29,6 +30,7 @@ from utils.utils import get_application_version
 from Model import ModelManager
 from utils.ip_utils import is_valid_url
 import multiprocessing
+from utils.log_config import logger
 
 
 class SettingsWindow():
@@ -107,7 +109,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_ARCHITECTURE.value: DEFAULT_WHISPER_ARCHITECTURE,
             SettingsKeys.WHISPER_BEAM_SIZE.value: 5,
             SettingsKeys.WHISPER_CPU_COUNT.value: multiprocessing.cpu_count(),
-            SettingsKeys.WHISPER_VAD_FILTER.value: False,
+            SettingsKeys.WHISPER_VAD_FILTER.value: True,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value: "float16",
             SettingsKeys.WHISPER_MODEL.value: "medium",
             "Current Mic": "None",
@@ -132,7 +134,7 @@ class SettingsWindow():
             "Post-Processing": "\n\nUsing the provided list of facts, review the SOAP note for accuracy. Verify that all details align with the information provided in the list of facts and ensure consistency throughout. Update or adjust the SOAP note as necessary to reflect the listed facts without offering opinions or subjective commentary. Ensure that the revised note excludes a \"Notes\" section and does not include a header for the SOAP note. Provide the revised note after making any necessary corrections.",
             "Show Scrub PHI": False,
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value: 180,
-            SettingsKeys.SILERO_SPEECH_THRESHOLD.value: 0.5,
+            SettingsKeys.SILERO_SPEECH_THRESHOLD.value: 0.75,
             SettingsKeys.USE_TRANSLATE_TASK.value: False,
             SettingsKeys.WHISPER_LANGUAGE_CODE.value: "None (Auto Detect)",
             SettingsKeys.Enable_Word_Count_Validation.value : True,  # Default to enabled
@@ -208,7 +210,7 @@ class SettingsWindow():
             # "BlankSpace", # Represents the whisper cuttoff
             SettingsKeys.WHISPER_BEAM_SIZE.value,
             SettingsKeys.WHISPER_CPU_COUNT.value,
-            SettingsKeys.WHISPER_VAD_FILTER.value,
+            # SettingsKeys.WHISPER_VAD_FILTER.value,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value,
             # left out for now, dont need users tinkering and default is good and tested.
             # SettingsKeys.SILERO_SPEECH_THRESHOLD.value, 
@@ -266,7 +268,7 @@ class SettingsWindow():
                     self.scribe_template_values.append(title)
                     self.scribe_template_mapping[title] = (aiscribe, aiscribe2)
         except FileNotFoundError:
-            print("options.txt not found, using default values.")
+            logger.info("options.txt not found, using default values.")
             # Fallback default options if file not found
             self.scribe_template_values = ["Settings Template"]
             self.scribe_template_mapping["Settings Template"] = (self.AISCRIBE, self.AISCRIBE2)
@@ -286,7 +288,7 @@ class SettingsWindow():
                 try:
                     settings = json.load(file)
                 except json.JSONDecodeError:
-                    print("Error loading settings file. Using default settings.")
+                    logger.error("Error loading settings file. Using default settings.")
                     return self.OPENAI_API_KEY
 
                 self.OPENAI_API_KEY = settings.get("openai_api_key", self.OPENAI_API_KEY)
@@ -305,7 +307,7 @@ class SettingsWindow():
 
                 return self.OPENAI_API_KEY
         except FileNotFoundError:
-            print("Settings file not found. Using default settings.")
+            logger.info("Settings file not found. Using default settings.")
             return self.OPENAI_API_KEY
 
     def save_settings_to_file(self):
@@ -395,7 +397,7 @@ class SettingsWindow():
         open(get_resource_path('settings.txt'), 'w').close()  
         open(get_resource_path('aiscribe.txt'), 'w').close()
         open(get_resource_path('aiscribe2.txt'), 'w').close()
-        print("Settings file cleared.")
+        logger.info("Settings file cleared.")
 
     def __keep_network_clear_settings(self):
         """
@@ -423,7 +425,7 @@ class SettingsWindow():
 
         # Update the settings with the network settings
         self.editable_settings.update(settings_to_keep)
-        print("Settings file cleared except network settings.")
+        logger.info("Settings file cleared except network settings.")
 
         # Save the settings to file
         self.save_settings_to_file()
@@ -458,7 +460,7 @@ class SettingsWindow():
             settings_window.destroy()
         except Exception as e:
             # Print any exception that occurs during file handling or window destruction.
-            print(f"Error clearing settings files: {e}")
+            logger.error(f"Error clearing settings files: {e}")
             messagebox.showerror("Error", "An error occurred while clearing settings. Please try again.")
 
     def get_available_models(self,endpoint=None):
@@ -482,7 +484,7 @@ class SettingsWindow():
 
         # url validate the endpoint
         if not is_valid_url(endpoint):
-            print("Invalid LLM Endpoint")
+            logger.info("Invalid LLM Endpoint")
             return ["Invalid LLM Endpoint", "Custom"]
 
         try:
@@ -499,7 +501,7 @@ class SettingsWindow():
             return available_models
         except requests.RequestException as e:
             # messagebox.showerror("Error", f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.") 
-            print(e)
+            logger.error(str(e))
             return ["Failed to load models", "Custom"]
 
     def update_models_dropdown(self, dropdown, endpoint=None):
@@ -564,25 +566,25 @@ class SettingsWindow():
                  - reload_flag: True if new model should be loaded
         :rtype: tuple(bool, bool)
         """
-        # Check if old model and new model are different if they are reload and make sure new model is checked.
-        if old_model != new_model and new_use_local_llm == 1:
-            return True, True
-
-        # Load the model if check box is now selected
-        if old_use_local_llm == 0 and new_use_local_llm == 1:
-            return False, True
-
-        # Check if Local LLM was on and if turned off unload model.abs
-        if old_use_local_llm == 1 and new_use_local_llm == 0:
-            return True, False
-
-        if old_architecture != new_architecture and new_use_local_llm == 1:
-            return True, True
-
-        if int(old_context_window) != int(new_context_window) and new_use_local_llm == 1:
-            return True, True
-
-        return False, False
+        unload_flag = False
+        reload_flag = False
+        try:
+            if new_use_local_llm:
+                if any([
+                    old_use_local_llm != new_use_local_llm,
+                    old_model != new_model,
+                    old_architecture != new_architecture,
+                    int(old_context_window) != int(new_context_window)]
+                ):
+                    reload_flag = True
+            else:
+                unload_flag = True
+        # in case context_window value is invalid
+        except (ValueError, TypeError) as e:
+            logging.error(str(e))
+            logging.exception("Failed to determine reload/unload model")
+        logging.debug(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
+        return unload_flag, reload_flag
 
     def _create_settings_and_aiscribe_if_not_exist(self):
         """
@@ -593,19 +595,19 @@ class SettingsWindow():
             
             # If CUDA is available, set it as the default architecture to save in settings
             if Architectures.CUDA.label in architectures:
-                print("Settings file not found. Creating default settings file with CUDA architecture.")
+                logger.info("Settings file not found. Creating default settings file with CUDA architecture.")
                 self.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value] = Architectures.CUDA.label
                 self.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = Architectures.CUDA.label
             else:
-                print("Settings file not found. Creating default settings file.")
+                logger.info("Settings file not found. Creating default settings file.")
 
             self.save_settings_to_file()
         if not os.path.exists(get_resource_path('aiscribe.txt')):
-            print("AIScribe file not found. Creating default AIScribe file.")
+            logger.info("AIScribe file not found. Creating default AIScribe file.")
             with open(get_resource_path('aiscribe.txt'), 'w') as f:
                 f.write(self.AISCRIBE)
         if not os.path.exists(get_resource_path('aiscribe2.txt')):
-            print("AIScribe2 file not found. Creating default AIScribe2 file.")
+            logger.info("AIScribe2 file not found. Creating default AIScribe2 file.")
             with open(get_resource_path('aiscribe2.txt'), 'w') as f:
                 f.write(self.AISCRIBE2)
 

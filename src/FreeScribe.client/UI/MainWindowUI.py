@@ -1,11 +1,13 @@
 import tkinter as tk
 from tkinter import ttk
 import UI.MainWindow as mw
+from UI.ImageWindow import ImageWindow
 from UI.SettingsConstant import FeatureToggle
 from UI.SettingsWindowUI import SettingsWindowUI
 from UI.MarkdownWindow import MarkdownWindow
 from utils.file_utils import get_file_path
 from UI.DebugWindow import DebugPrintWindow
+from utils.log_config import logger
 
 DOCKER_CONTAINER_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker container status
 DOCKER_DESKTOP_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker Desktop status
@@ -278,6 +280,7 @@ class MainWindowUI:
         # Add Help menu
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="Help Guide", command=lambda: ImageWindow(self.root, "Help Guide", get_file_path('assets', 'help.png')))
         help_menu.add_command(label="Debug Window", command=lambda: DebugPrintWindow(self))
         help_menu.add_command(label="About", command=lambda: self._show_md_content(get_file_path('markdown','help','about.md'), 'About'))
 
@@ -363,18 +366,18 @@ class MainWindowUI:
         This method is intended to be run in a separate thread to periodically
         check the availability of the Docker client.
         """
-        print("Checking Docker availability in the background...")
+        logger.info("Checking Docker availability in the background...")
         if self.logic.container_manager.check_docker_availability():
             # Enable the Docker status bar UI elements if not enabled
             if not self.is_status_bar_enabled:
                 self.enable_docker_ui()
-            print("Docker client is available.")
+            logger.info("Docker client is available.")
         else:
             # Disable the Docker status bar UI elements if not disabled
             if self.is_status_bar_enabled:
                 self.disable_docker_ui()
 
-            print("Docker client is not available.")
+            logger.info("Docker client is not available.")
 
         self.current_docker_status_check_id = self.root.after(DOCKER_DESKTOP_CHECK_INTERVAL, self._background_availbility_docker_check)
 

@@ -20,6 +20,7 @@ Classes:
 """
 
 import json
+import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
@@ -682,10 +683,15 @@ class SettingsWindowUI:
         # send load event after the settings are saved
         if update_whisper_model_flag:
             self.main_window.root.event_generate("<<LoadSttModel>>")
+        # unload whisper model if switched to remote
+        if not self.settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
+            self.main_window.root.event_generate("<<UnloadSttModel>>")
         # unload / reload model after the settings are saved
         if local_model_unload_flag:
+            logging.debug("unloading ai model")
             ModelManager.unload_model()
         if local_model_reload_flag:
+            logging.debug("reloading ai model")
             ModelManager.start_model_threaded(self.settings, self.main_window.root)
 
         if self.settings.editable_settings["Use Docker Status Bar"] and self.main_window.docker_status_bar is None:
