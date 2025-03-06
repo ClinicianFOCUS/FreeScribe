@@ -4,6 +4,7 @@ import tkinter as tk
 from tkhtmlview import HTMLLabel
 from utils.file_utils import get_file_path
 from utils.utils import get_application_version
+import re
 
 class MarkdownWindow:
     """
@@ -23,12 +24,31 @@ class MarkdownWindow:
 
     def __init__(self, parent, title, file_path, callback=None):
         try:
-            with open(file_path, "r") as file:
-                content = md.markdown(file.read(), extensions=["extra", "smarty"])
+            # Open file with UTF-8 encoding
+            with open(file_path, "r", encoding='utf-8') as file:
+                content = file.read()
+                
+            # Custom image processing
+            content = self._process_markdown_images(content)
+            
+            # Convert to HTML
+            html_content = md.markdown(content, extensions=["extra", "smarty"])
+            
         except FileNotFoundError:
             print(f"File not found: {file_path}")
             messagebox.showerror("Error", "File not found")
             return
+        except UnicodeDecodeError:
+            # Fallback to system default encoding if UTF-8 fails
+            try:
+                with open(file_path, "r", encoding='cp1252') as file:
+                    content = file.read()
+                content = self._process_markdown_images(content)
+                html_content = md.markdown(content, extensions=["extra", "smarty"])
+            except Exception as e:
+                print(f"Error reading file: {e}")
+                messagebox.showerror("Error", "Error reading file")
+                return
 
         self.parent = parent
         self.window = Toplevel(parent)
@@ -38,11 +58,9 @@ class MarkdownWindow:
         self.window.iconbitmap(get_file_path('assets', 'logo.ico'))
 
         # Footer frame to hold checkbox and close button
-        footer_frame = tk.Frame(self.window,bg="lightgray")
+        footer_frame = tk.Frame(self.window, bg="lightgray")
         footer_frame.pack(side=tk.BOTTOM, fill="x")
-        # Add a version label to the footer
         version = get_application_version()
-        
 
         # Store parent's original mousewheel binding
         self.parent_mousewheel_binding = parent.bind_all("<MouseWheel>")
@@ -52,7 +70,7 @@ class MarkdownWindow:
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Create the HTMLLabel widget
-        self.html_label = HTMLLabel(frame, html=content)
+        self.html_label = HTMLLabel(frame, html=html_content)
         self.html_label.pack(side="left", fill="both", expand=True)
 
         # Create the scrollbar
@@ -112,6 +130,23 @@ class MarkdownWindow:
 
         # Bind the window close event
         self.window.protocol("WM_DELETE_WINDOW", self._on_window_close)
+
+    def _process_markdown_images(self, content):
+        """
+        Process markdown image tags to add size constraints.
+        """
+        # Regular expression to find markdown image tags
+        image_pattern = r'!$$(.*?)$$$$(.*?)$$'
+        
+        def replace_with_html(match):
+            alt_text = match.group(1)
+            image_path = match.group(2)
+            # Replace with HTML img tag with width constraint
+            return f'<img src="{image_path}" alt="{alt_text}" width="500" />'
+        
+        # Replace all markdown image tags with HTML img tags
+        processed_content = re.sub(image_pattern, replace_with_html, content)
+        return processed_content
 
     def _bind_mousewheel(self, event):
         """Bind mousewheel to HTMLLabel and temporarily unbind parent's mousewheel"""
