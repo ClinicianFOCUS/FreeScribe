@@ -1156,8 +1156,7 @@ def send_text_to_localmodel(edited_text):
         while ModelManager.local_model is None and timer < 30:
             timer += 0.1
             time.sleep(0.1)
-        
-
+    
     return ModelManager.local_model.generate_response(
         edited_text,
         max_tokens=int(app_settings.editable_settings["max_length"]),

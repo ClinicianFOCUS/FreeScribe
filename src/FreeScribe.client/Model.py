@@ -6,6 +6,11 @@ from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys, DEFAULT_CONTEXT_WINDOW_SIZE
 from enum import Enum
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 class ModelStatus(Enum):
     """
@@ -31,6 +36,11 @@ class Model:
         generate_response: Generates a text response based on an input prompt using
                         the specified sampling parameters.
         get_gpu_info: Returns the current GPU configuration and batch size details.
+
+    Note:
+        The best_of parameter allows generating multiple responses and selecting the best one
+        based on the sum of token log probabilities. When best_of > 1, the model will generate
+        multiple responses and return the one with the highest cumulative log probability.
     """
     def __init__(
         self,
@@ -42,7 +52,8 @@ class Model:
         tensor_split: Optional[list] = None,  # For multi-GPU setup
         n_batch: int = 512,    # Batch size for inference
         n_threads: Optional[int] = None,  # CPU threads when needed
-        seed: int = 1337
+        seed: int = 1337,
+        best_of: int = 1,
     ):
         """
         Initializes the GGUF model with GPU acceleration.
@@ -56,6 +67,7 @@ class Model:
             n_batch: Batch size for inference
             n_threads: Number of CPU threads
             seed: Random seed for reproducibility
+            best_of: Number of responses to generate, then choose the best in terms of sum of token logprobs
         """
         try:
             # Set environment variables for GPU
@@ -71,6 +83,8 @@ class Model:
                 seed=seed,
                 tensor_split=tensor_split,
                 chat_format=chat_template,
+                # if logits_all is set to False, only the logprob of the last token is returned
+                logits_all=best_of > 1,
             )
         
             # Store configuration
@@ -78,19 +92,59 @@ class Model:
                 "gpu_layers": gpu_layers,
                 "main_gpu": main_gpu,
                 "context_size": context_size,
-                "n_batch": n_batch
+                "n_batch": n_batch,
+                "best_of": best_of,
             }
         except Exception as e:
             self.model = None
             raise e
-        
+    
     def generate_response(
         self,
         prompt: str,
         max_tokens: int = 50,
         temperature: float = 0.1,
         top_p: float = 0.95,
-        repeat_penalty: float = 1.1
+    ) -> str:
+        """
+        This method retains the original implementation of the generate_response method by setting best_of to 1
+        """
+        return self.generate_best_of_response(prompt, max_tokens, temperature, top_p, repeat_penalty=1.1, best_of=1)
+
+    def _select_best_response(self, responses: list, best_of: int) -> tuple[float, str]:
+        """
+        Selects the best response from a list of responses based on token log probabilities.
+        
+        Args:
+            responses: List of response dictionaries from the model
+            best_of: Number of responses to consider
+            
+        Returns:
+            Tuple containing (sum of log probabilities, selected response content)
+        """
+        if best_of <= 1:
+            return (0, responses[0]["choices"][0]["message"]["content"])
+            
+        result = []
+        for response in responses:
+            result.append((
+                sum(response["choices"][0]["logprobs"]["token_logprobs"]),
+                response["choices"][0]["message"]["content"]
+            ))
+        logger.debug(f"Result: {result}")
+        result.sort(key=lambda x: x[0])
+        logger.debug(f"Sorted Result: {result}")
+        return result[-1]
+
+    def generate_best_of_response(
+        self,
+        prompt: str,
+        max_tokens: int = 50,
+        temperature: float = 0.1,
+        top_p: float = 0.95,
+        repeat_penalty: float = 1.1,
+        # you can override the best_of setting here
+        best_of: int | None = None,
     ) -> str:
         """
         Generates a response using GPU-accelerated inference.
@@ -114,23 +168,37 @@ class Model:
                 "content": prompt}
             ]
 
-            response = self.model.create_chat_completion(
-                messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                repeat_penalty=repeat_penalty,
-            )
-
+            logprob_args = {}
+            _best_of = best_of or self.config.get("best_of") or 1
+            if _best_of > 1:
+                logprob_args = {
+                    "logprobs": True,
+                    "top_logprobs": 1,
+                }
+            
+            responses = []
+            for _ in range(_best_of):
+                response = self.model.create_chat_completion(
+                    messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    repeat_penalty=repeat_penalty,
+                    **logprob_args,
+                )
+                responses.append(response)
+            logger.debug(f"Responses: {responses}")
+            
+            response = self._select_best_response(responses, _best_of)
             # reset the model tokens
             self.model.reset()
-            return response["choices"][0]["message"]["content"]
+            logger.debug(f"Response: {response}")
+            return response[1]
             
         except Exception as e:
             print(f"GPU inference error ({e.__class__.__name__}): {str(e)}")
             return f"({e.__class__.__name__}): {str(e)}"
 
-    
     def get_gpu_info(self) -> Dict[str, Any]:
         """
         Returns information about the current GPU configuration.
@@ -216,7 +284,7 @@ class ModelManager:
                 gpu_layers = -1
 
             model_to_use = "gemma-2-2b-it-Q8_0.gguf"
-                
+
             model_path = f"./models/{model_to_use}"
             try:
                 context_size = app_settings.editable_settings.get(SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value) or DEFAULT_CONTEXT_WINDOW_SIZE
@@ -227,7 +295,8 @@ class ModelManager:
                     main_gpu=0,
                     n_batch=512,
                     n_threads=None,
-                    seed=1337
+                    seed=1337,
+                    best_of=app_settings.editable_settings[SettingsKeys.BEST_OF.value],
                 )
             except Exception as e:
                 # model doesnt exist
