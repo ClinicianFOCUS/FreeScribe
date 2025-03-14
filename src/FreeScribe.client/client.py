@@ -62,23 +62,23 @@ from UI.ScrubWindow import ScrubWindow
 from Model import ModelStatus
 from services.whisper_hallucination_cleaner import hallucination_cleaner
 
+dual = DualOutput()
+sys.stdout = dual
+sys.stderr = dual
 
 if os.environ.get("FREESCRIBE_DEBUG"):
     LOG_LEVEL = logging.DEBUG
 else:
     LOG_LEVEL = logging.INFO
 
+LOG_FORMAT = '[%(asctime)s] | %(levelname)s | %(name)s | %(threadName)s | [%(filename)s:%(lineno)d in %(funcName)s] | %(message)s'
 logging.basicConfig(
     level=LOG_LEVEL,
-    format='%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
+    format=LOG_FORMAT,
+    handlers=[logging.StreamHandler()],
 )
 
 logger = logging.getLogger(__name__)
-
-dual = DualOutput()
-sys.stdout = dual
-sys.stderr = dual
 
 APP_NAME = 'AI Medical Scribe'  # Application name
 APP_TASK_MANAGER_NAME = 'freescribe-client.exe'
@@ -1822,8 +1822,12 @@ def faster_whisper_transcribe(audio):
 
         # Only clean hallucinations if enabled in settings
         if app_settings.editable_settings[SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value]:
-            result = hallucination_cleaner.clean_text(result)
-            logger.debug(f"Cleaned result: {result}")
+            try:
+                result = hallucination_cleaner.clean_text(result)
+                logger.debug(f"Cleaned result: {result}")
+            except Exception as e:
+                # ignore the error as it should not break the transcription
+                logger.exception(f"Error during hallucination cleaning: {str(e)}")
         return result
     except Exception as e:
         logger.exception(f"Error during transcription: {str(e)}")
@@ -1996,6 +2000,9 @@ if app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
     # Inform the user that Local Whisper is being used for transcription
     print("Using Local Whisper for transcription.")
     root.after(100, lambda: (load_stt_model()))
+
+if app_settings.editable_settings[SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value]:
+    root.after(100, lambda: (window.setting_window.load_hallucination_cleaner()))
 
 # wait for both whisper and llm to be loaded before unlocking the settings button
 def await_models(timeout_length=60):
