@@ -168,11 +168,11 @@ Note: Available only if GPU selected while installing
 **Default**: `0.1`  
 **Type**: float
 
-### tfs
+<!-- ### tfs
 
 **Description**: Truncated frequency sampling parameter for controlling model output diversity.  
 **Default**: `0.97`  
-**Type**: float
+**Type**: float -->
 
 ### top_k
 

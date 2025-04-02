@@ -1108,7 +1108,6 @@ def send_text_to_api(edited_text):
             "temperature": float(app_settings.editable_settings["temperature"]),
             "top_p": float(app_settings.editable_settings["top_p"]),
             "top_k": int(app_settings.editable_settings["top_k"]),
-            "tfs": float(app_settings.editable_settings["tfs"]),
         }
 
         if app_settings.editable_settings["best_of"]:
@@ -1123,8 +1122,6 @@ def send_text_to_api(edited_text):
             "temperature": 0.1,
             "top_p": 0.4,
             "top_k": 30,
-            "best_of": 6,
-            "tfs": 0.97,
         }
 
         if app_settings.editable_settings["best_of"]:
