@@ -601,7 +601,7 @@ Function CheckSandboxiePlus
             ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Sandboxie-Plus_is1" "InstallLocation"
         ${EndIf}
 
-        ; No NVIDIA drivers detected - show error message
+        ; No Sandboxie-Plus detected - show error message
         ${If} $R0 == ""
             MessageBox MB_RETRYCANCEL "Sandboxie-Plus is not installed. Please install it first and try again." IDRETRY CheckSandboxie IDCANCEL CancelCreatingBoxedShortcut
         ${EndIf}
