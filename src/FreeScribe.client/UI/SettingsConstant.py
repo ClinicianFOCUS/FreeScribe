@@ -27,6 +27,7 @@ class SettingsKeys(Enum):
     Enable_Word_Count_Validation = "Enable Word Count Validation"
     Enable_AI_Conversation_Validation = "Enable AI Conversation Validation"
     ENABLE_HALLUCINATION_CLEAN = "Enable Hallucination Cleaning (Experimental)"
+    BEST_OF = "best_of"
 
 
 class Architectures(Enum):
