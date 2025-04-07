@@ -257,8 +257,8 @@ class SettingsWindowUI:
         
         for setting in self.settings.adv_whisper_settings:            
             if setting in self.widgets and self.widgets[setting].winfo_exists():
-                # Skip disabling Whisper Language Code
-                if setting == SettingsKeys.WHISPER_LANGUAGE_CODE.value:
+                # Skip disabling Whisper Language Code or Translate
+                if setting == SettingsKeys.WHISPER_LANGUAGE_CODE.value or setting == SettingsKeys.USE_TRANSLATE_TASK.value:
                     continue
                 
                 self.widgets[setting].config(state=inverted_state)
