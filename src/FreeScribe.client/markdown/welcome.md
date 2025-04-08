@@ -13,15 +13,12 @@ The FreeScribe project leverages advanced machine learning models to transcribe 
 - **🖥️ User-Friendly Interface**: Intuitive and easy-to-use interface for healthcare professionals.
 - **⚙️ Customizable Settings**: Customize the application settings to suit your workflow.
 
-## 🖥️ Interface Explanation
-
-![FreeScribe Interface](assets/intro_app_explanation.png)
 
 ## 👥 Discord Community
 
 Join our Discord community to connect with other users, get support, and collaborate on the AI Medical Scribe project. Our community is a great place to ask questions, share ideas, and stay updated on the latest developments.
 
-[Join our Discord Community](https://discord.gg/5VgNaZNa) 💬
+[Join our Discord Community](https://discord.gg/3JamHuHxvD) 💬
 
 ## 📜 License
 

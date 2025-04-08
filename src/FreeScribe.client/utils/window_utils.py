@@ -91,3 +91,20 @@ def add_min_max(window):
     windll.user32.SetWindowLongW(hwnd, GWL_STYLE, style)
     windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 
                                0x0027)
+    
+def _display_center_to_parent(window, parent, width=None, height=None):
+    # Get parent window dimensions and position
+    parent_x = parent.winfo_x()
+    parent_y = parent.winfo_y()
+    parent_width = parent.winfo_width()
+    parent_height = parent.winfo_height()
+
+    # Calculate the position for the settings window
+    window_width = width or window.winfo_width()
+    window_height = height or window.winfo_height()
+
+    center_x = parent_x + (parent_width - window_width) // 2
+    center_y = parent_y + (parent_height - window_height) // 2
+
+    # Apply the calculated position to the settings window
+    window.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")

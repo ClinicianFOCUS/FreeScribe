@@ -281,7 +281,7 @@ class MainWindowUI:
         # Add Help menu
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="Help Guide", command=lambda: ImageWindow(self.root, "Help Guide", get_file_path('assets', 'help.png')))
+        help_menu.add_command(label="Help Guide", command=lambda: ImageWindow(self.root, "Help Guide", get_file_path('assets', 'help.png'), width=1000, height=686))
         help_menu.add_command(label="Debug Window", command=lambda: DebugPrintWindow(self))
         help_menu.add_command(label="About", command=lambda: self._show_md_content(get_file_path('markdown','help','about.md'), 'About'))
 

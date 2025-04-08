@@ -19,7 +19,7 @@ Discord Community
 
 Join our Discord community to connect with other users, get support, and collaborate on the AI Medical Scribe project. Our community is a great place to ask questions, share ideas, and stay updated on the latest developments.
 
-`Join our Discord Community <https://discord.gg/5VgNaZNa>`_ (`discord.gg/6DnPENSn <https://discord.gg/5VgNaZNa>`_)
+`Join our Discord Community <https://discord.gg/3JamHuHxvD>`_ (`discord.gg/6DnPENSn <https://discord.gg/3JamHuHxvD>`_)
 
 Features
 --------

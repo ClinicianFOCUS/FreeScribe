@@ -88,4 +88,4 @@ Workflow Example
 Additional Help
 ---------------
 
-For further details, visit the discord for support `Join our Discord Community <https://discord.gg/5VgNaZNa>`_ (`discord.gg/6DnPENSn <https://discord.gg/5VgNaZNa>`_).
+For further details, visit the discord for support `Join our Discord Community <https://discord.gg/3JamHuHxvD>`_ (`discord.gg/6DnPENSn <https://discord.gg/3JamHuHxvD>`_).

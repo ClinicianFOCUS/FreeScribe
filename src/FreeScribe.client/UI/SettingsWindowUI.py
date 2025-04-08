@@ -19,12 +19,12 @@ Classes:
     SettingsWindowUI: Manages the settings window UI.
 """
 
-import json
 import logging
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import threading
-from Model import Model, ModelManager
+from Model import ModelManager
+from services.whisper_hallucination_cleaner import load_hallucination_cleaner_model
 from utils.file_utils import get_file_path
 from utils.utils import get_application_version
 from UI.MarkdownWindow import MarkdownWindow
@@ -33,6 +33,7 @@ from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from UI.Widgets.PopupBox import PopupBox
 from utils.system_utils import get_system_memory, get_system_vram
 from DataModels import WhisperModelEnum
+logger = logging.getLogger(__name__)
 
 LONG_ENTRY_WIDTH = 30
 SHORT_ENTRY_WIDTH = 20
@@ -234,8 +235,17 @@ class SettingsWindowUI:
         left_frame = ttk.Frame(self.whisper_settings_frame)
         left_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
-        right_frame = ttk.Frame(self.whisper_settings_frame)
-        right_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
+
+        right_frame = tk.Frame(self.whisper_settings_frame)
+        right_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nsew")
+
+        self.whisper_settings_frame.columnconfigure(0, weight=1)
+        self.whisper_settings_frame.columnconfigure(1, weight=1)
+
+        left_frame.columnconfigure(0, weight=3)  # Give weight to the label column
+        left_frame.columnconfigure(1, weight=9)  # Give more weight to the dropdown column
+        right_frame.columnconfigure(0, weight=3)  # Give weight to the label column
+        right_frame.columnconfigure(1, weight=9)  # Give more weight to the dropdown column
 
         left_row = 0
         right_row = 0
@@ -257,7 +267,7 @@ class SettingsWindowUI:
         
         # Create the whisper model dropdown selection with recommendations
         tk.Label(left_frame, text=SettingsKeys.WHISPER_MODEL.value).grid(row=3, column=0, padx=0, pady=5, sticky="w")
-        
+
         # Generate model list with recommendations
         whisper_models_display, whisper_models_values, whisper_model_mapping = self.generate_whisper_model_list(system_ram, system_vram)
         
@@ -278,7 +288,7 @@ class SettingsWindowUI:
             self.selected_whisper_model.set(actual_value)
         
         self.whisper_models_drop_down.bind("<<ComboboxSelected>>", update_whisper_model_value)
-        
+
         try:
             # Try to set the whisper model dropdown to the current model
             current_model = self.settings.editable_settings[SettingsKeys.WHISPER_MODEL.value]
@@ -303,14 +313,14 @@ class SettingsWindowUI:
         self.whisper_architecture_label = tk.Label(left_frame, text=SettingsKeys.WHISPER_ARCHITECTURE.value)
         self.whisper_architecture_label.grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         whisper_architecture_options = self.settings.get_available_architectures()
-        self.whisper_architecture_dropdown = ttk.Combobox(left_frame, values=whisper_architecture_options, width=SHORT_ENTRY_WIDTH, state="readonly")
+        self.whisper_architecture_dropdown = ttk.Combobox(left_frame, values=whisper_architecture_options, state="readonly")
         if self.settings.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value] in whisper_architecture_options:
             self.whisper_architecture_dropdown.current(whisper_architecture_options.index(self.settings.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value]))
         else:
             # Default cpu
             self.whisper_architecture_dropdown.set(SettingsWindow.DEFAULT_WHISPER_ARCHITECTURE)
         
-        self.whisper_architecture_dropdown.grid(row=left_row, column=1, padx=0, pady=5, sticky="w")
+        self.whisper_architecture_dropdown.grid(row=left_row, column=1, padx=0, pady=5, sticky="ew")
         self.settings.editable_settings_entries[SettingsKeys.WHISPER_ARCHITECTURE.value] = self.whisper_architecture_dropdown
 
         # remove architecture dropdown if architecture only has one option
@@ -345,14 +355,20 @@ class SettingsWindowUI:
         Settings alternate between left and right columns for even distribution.
         """
         # Create left and right frames for the two columns
-        left_frame = ttk.Frame(self.llm_settings_frame)
-        left_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
-        
-        right_frame = ttk.Frame(self.llm_settings_frame)
-        right_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
+        left_frame = tk.Frame(self.llm_settings_frame)
+        left_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
+
+        right_frame = tk.Frame(self.llm_settings_frame)
+        right_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nsew")
 
         self.llm_settings_frame.columnconfigure(0, weight=1)
         self.llm_settings_frame.columnconfigure(1, weight=1)
+
+        left_frame.columnconfigure(0, weight=3)  # Give weight to the label column
+        left_frame.columnconfigure(1, weight=9)  # Give more weight to the dropdown column
+
+        right_frame.columnconfigure(0, weight=3)  # Give weight to the label column
+        right_frame.columnconfigure(1, weight=9)  # Give more weight to the dropdown column
 
         left_row = 0
         right_row = 0
@@ -370,14 +386,15 @@ class SettingsWindowUI:
         self.local_architecture_label = tk.Label(left_frame, text=SettingsKeys.LLM_ARCHITECTURE.value)
         self.local_architecture_label.grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         architecture_options = self.settings.get_available_architectures()
-        self.architecture_dropdown = ttk.Combobox(left_frame, values=architecture_options, width=LONG_ENTRY_WIDTH, state="readonly")
+        self.architecture_dropdown = ttk.Combobox(left_frame, values=architecture_options, state="readonly")
         if self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] in architecture_options:
             self.architecture_dropdown.current(architecture_options.index(self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value]))
         else:
             # Default cpu
             self.architecture_dropdown.set(Architectures.CPU.label)
 
-        self.architecture_dropdown.grid(row=left_row, column=1, padx=0, pady=5, sticky="w")
+        self.architecture_dropdown.grid(row=left_row, column=1, padx=0, pady=5, sticky="ew")
+
 
         # hide architecture dropdown if architecture only has one option
         if len(architecture_options) == 1:
@@ -390,8 +407,8 @@ class SettingsWindowUI:
         # 5. Models (Left Column)
         tk.Label(left_frame, text=SettingsKeys.LOCAL_LLM_MODEL.value).grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         models_drop_down_options = []
-        self.models_drop_down = ttk.Combobox(left_frame, values=models_drop_down_options, width=LONG_ENTRY_WIDTH, state="readonly")
-        self.models_drop_down.grid(row=left_row, column=1, padx=0, pady=5, sticky="w")
+        self.models_drop_down = ttk.Combobox(left_frame, values=models_drop_down_options, state="readonly")
+        self.models_drop_down.grid(row=left_row, column=1, padx=0, pady=5, sticky="ew")
         self.models_drop_down.bind('<<ComboboxSelected>>', self.on_model_selection_change)
         thread = threading.Thread(target=self.settings.update_models_dropdown, args=(self.models_drop_down,))
         thread.start()
@@ -410,10 +427,11 @@ class SettingsWindowUI:
         right_frame, right_row = self.create_editable_settings(right_frame, self.settings.llm_settings, padx=0, pady=0)
 
         # 2. OpenAI API Key (Right Column)
+        # Then modify your existing code
         tk.Label(right_frame, text=SettingsKeys.LLM_SERVER_API_KEY.value).grid(row=right_row, column=0, padx=0, pady=5, sticky="w")
-        self.openai_api_key_entry = tk.Entry(right_frame, width=LONG_ENTRY_WIDTH)
+        self.openai_api_key_entry = tk.Entry(right_frame)  # Remove fixed width
         self.openai_api_key_entry.insert(0, self.settings.OPENAI_API_KEY)
-        self.openai_api_key_entry.grid(row=right_row, column=1, columnspan=2, padx=0, pady=5, sticky="w")
+        self.openai_api_key_entry.grid(row=right_row, column=1, columnspan=2, padx=0, pady=5, sticky="ew")  # Changed to "ew
         
         right_row += 1
 
@@ -679,8 +697,17 @@ class SettingsWindowUI:
             start_row (int): The starting row for placing the settings.
         """
         
+        # Configure the parent frame to expand
+        frame.columnconfigure(0, weight=1)
+        
+        # Create inner frame that will expand to fill parent
         i_frame = ttk.Frame(frame)
-        i_frame.grid(row=0, column=0, padx=padx, pady=pady, sticky="nw")
+        i_frame.grid(row=0, column=0, columnspan=2,padx=padx, pady=pady, sticky="ew")
+        
+        # Configure the inner frame's columns
+        i_frame.columnconfigure(0, weight=1)  # Give weight to the label column
+        i_frame.columnconfigure(1, weight=3)  # Give more weight to the dropdown column
+        
         row = self._process_column(i_frame, settings_set, start_row)
         return i_frame, row
 
@@ -742,6 +769,8 @@ class SettingsWindowUI:
 
         # delay update, or the update thread might be reading old settings value
         update_whisper_model_flag = self.settings.update_whisper_model()
+
+        load_hallucination_cleaner_model(self.main_window.root, self.settings)
 
         if FeatureToggle.PRE_PROCESSING is True:
             self.settings.editable_settings["Pre-Processing"] = self.preprocess_text.get("1.0", "end-1c") # end-1c removes the trailing newline
@@ -879,9 +908,9 @@ class SettingsWindowUI:
         """
         tk.Label(frame, text=label).grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
         value = self.settings.editable_settings[setting_name]
-        entry = tk.Entry(frame, width=LONG_ENTRY_WIDTH)
+        entry = tk.Entry(frame)
         entry.insert(0, str(value))
-        entry.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
+        entry.grid(row=row_idx, column=1, padx=0, pady=5, sticky="ew")
         self.settings.editable_settings_entries[setting_name] = entry
         return entry
 
@@ -979,6 +1008,7 @@ class SettingsWindowUI:
         canvas.bind('<Leave>', lambda e: canvas.unbind_all("<MouseWheel>"))
 
         return scrollable_frame      
+
     def close_window(self):
         """
         Cleans up the settings window.
