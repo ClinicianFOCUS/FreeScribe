@@ -131,6 +131,10 @@ class SettingsWindowUI:
         
         self.create_buttons()
 
+        # Ensures correct UI states for Whisper and AI settings when the settings window is first opened. based on the SettingsKeys.LOCAL_WHISPER.value and SettingsKeys.LOCAL_LLM.value checkbox once all widgets are created
+        self.toggle_remote_whisper_settings()
+        self.toggle_remote_llm_settings()
+
     def _display_center_to_parent(self):
         # Get parent window dimensions and position
         parent_x = self.root.winfo_x()
@@ -239,11 +243,10 @@ class SettingsWindowUI:
 
         left_row += 1
 
-        # set the state of the whisper settings based on the SettingsKeys.LOCAL_WHISPER.value checkbox once all widgets are created
-        self.toggle_remote_whisper_settings()
 
     def toggle_remote_whisper_settings(self):
         current_state = self.settings.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get()
+        inverted_state = "disabled" if current_state == 0 else "normal"
         
         for setting in self.settings.whisper_settings:
             if setting in [SettingsKeys.WHISPER_REAL_TIME.value, "BlankSpace"]:
@@ -252,8 +255,15 @@ class SettingsWindowUI:
             state = "normal" if current_state == 0 else "disabled"
             self.widgets[setting].config(state=state)
         
+        for setting in self.settings.adv_whisper_settings:            
+            if setting in self.widgets and self.widgets[setting].winfo_exists():
+                # Skip disabling Whisper Language Code or Translate
+                if setting == SettingsKeys.WHISPER_LANGUAGE_CODE.value or setting == SettingsKeys.USE_TRANSLATE_TASK.value:
+                    continue
+                
+                self.widgets[setting].config(state=inverted_state)
+        
         # set the local option to disabled on switch to remote
-        inverted_state = "disabled" if current_state == 0 else "normal"
         self.whisper_models_drop_down.config(state=inverted_state)
         self.whisper_architecture_dropdown.config(state=inverted_state)
 
@@ -354,13 +364,12 @@ class SettingsWindowUI:
 
         # set the state of the llm settings based on the local llm checkbox once all widgets are created
         self.settings_opened = True
-        self.toggle_remote_llm_settings()
- 
+        
     def toggle_remote_llm_settings(self):
         current_state = self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM.value].get()
         
         state = "normal" if current_state == 0 else "disabled"
-
+        inverted_state = "disabled" if current_state == 0 else "normal"
 
         # toggle all manual settings based on the local llm checkbox
         self.openai_api_key_entry.config(state=state)
@@ -371,8 +380,16 @@ class SettingsWindowUI:
                 continue
             
             self.widgets[setting].config(state=state)
+        
+        ai_context_settings = [SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value]
+        for setting in ai_context_settings:            
+            if setting in self.widgets and self.widgets[setting].winfo_exists():
+                try:
+                    self.widgets[setting].config(state=inverted_state)
+                except KeyError:
+                    print(f"Warning: Setting '{setting}' not found in widgets.")
 
-        inverted_state = "disabled" if current_state == 0 else "normal"
+
         self.architecture_dropdown.config(state=inverted_state)
         
         #flag used for determining if window was just opened so we dont spam the API.
