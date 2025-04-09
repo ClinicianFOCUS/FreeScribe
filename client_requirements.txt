@@ -60,6 +60,7 @@ tqdm==4.66.5
 typing_extensions==4.12.2
 tzdata==2024.2
 tzlocal==5.2
+transformers==4.49.0
 urllib3==2.2.3
 docker==7.1.0
 markdown==3.7
@@ -69,4 +70,5 @@ faster-whisper==1.1.0
 psutil==6.1.0
 Pillow==10.2.0
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
+librosa==0.11.0
 en_core_sci_md @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_md-0.5.4.tar.gz

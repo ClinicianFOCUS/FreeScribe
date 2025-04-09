@@ -24,6 +24,8 @@ import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
+
+import UI.Helpers
 from Model import Model, ModelManager
 from utils.file_utils import get_file_path
 from utils.utils import get_application_version
@@ -31,7 +33,8 @@ from UI.MarkdownWindow import MarkdownWindow
 from UI.SettingsWindow import SettingsWindow
 from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from UI.Widgets.PopupBox import PopupBox
-
+import utils.whisper.Constants
+from utils.whisper.WhisperModel import unload_stt_model
 
 LONG_ENTRY_WIDTH = 30
 SHORT_ENTRY_WIDTH = 20
@@ -87,11 +90,16 @@ class SettingsWindowUI:
         """
         self.settings_window = tk.Toplevel()
         self.settings_window.title("Settings")
-        self.settings_window.geometry("775x400")  # Set initial window size
-        self.settings_window.minsize(775, 400)    # Set minimum window size
+        if utils.system.is_windows():
+            self.settings_window.geometry("775x400")  # Set initial window size
+            self.settings_window.minsize(775, 400)    # Set minimum window size
+        else:
+            self.settings_window.geometry("1050x500")
+            self.settings_window.minsize(1050, 500)
+
         self.settings_window.resizable(True, True)
         self.settings_window.grab_set()
-        self.settings_window.iconbitmap(get_file_path('assets','logo.ico'))
+        UI.Helpers.set_window_icon(self.settings_window)
 
         self._display_center_to_parent()
 
@@ -203,7 +211,7 @@ class SettingsWindowUI:
         left_row, right_row = self.create_editable_settings_col(left_frame, right_frame, left_row, right_row, self.settings.whisper_settings)
         # create the whisper model dropdown slection
         tk.Label(left_frame, text=SettingsKeys.WHISPER_MODEL.value).grid(row=3, column=0, padx=0, pady=5, sticky="w")
-        whisper_models_drop_down_options = ["medium", "small", "tiny", "tiny.en", "base", "base.en", "small.en", "medium.en", "large"]
+        whisper_models_drop_down_options = utils.whisper.Constants.WhisperModels.get_all_labels()
         self.whisper_models_drop_down = ttk.Combobox(left_frame, values=whisper_models_drop_down_options, width=SHORT_ENTRY_WIDTH)
         self.whisper_models_drop_down.grid(row=3, column=1, padx=0, pady=5, sticky="w")
 
@@ -533,12 +541,13 @@ class SettingsWindowUI:
             "• Conversation will be inserted after this\n\n"
             "⚠️ Modify with caution as it affects AI output quality"
         )
+
+        font_size = 9 if utils.system.is_windows() else 14
         tk.Label(
             self.advanced_settings_frame,
             text=pre_explanation,
             justify="left",
-            font=("Arial", 9),
-            fg="#272927"
+            font=("Arial", font_size),
         ).grid(row=text_row1, column=1, padx=(10, 0), pady=5, sticky="nw")
 
         # Post convo instruction
@@ -559,8 +568,8 @@ class SettingsWindowUI:
             self.advanced_settings_frame,
             text=post_explanation,
             justify="left",           
-            font=("Arial", 9),
-            fg="#272927"
+            font=("Arial", font_size),
+
         ).grid(row=text_row2, column=1, padx=(10, 0), pady=5, sticky="nw")
 
         if FeatureToggle.PRE_PROCESSING is True:
@@ -655,6 +664,8 @@ class SettingsWindowUI:
             self.architecture_dropdown.get(),
             self.settings.editable_settings[SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value],
             self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value].get(),
+            self.settings.editable_settings_entries[SettingsKeys.USE_LOW_MEM_MODE.value].get(),
+            self.settings.editable_settings[SettingsKeys.USE_LOW_MEM_MODE.value]
         )
 
         if self.get_selected_model() not in ["Loading models...", "Failed to load models"]:
@@ -694,6 +705,11 @@ class SettingsWindowUI:
         if local_model_reload_flag:
             logging.debug("reloading ai model")
             ModelManager.start_model_threaded(self.settings, self.main_window.root)
+
+        # check if we should unload the model
+        # unload models if low mem is now on
+        if self.settings.editable_settings_entries[SettingsKeys.USE_LOW_MEM_MODE.value].get():
+            unload_stt_model()
 
         if self.settings.editable_settings["Use Docker Status Bar"] and self.main_window.docker_status_bar is None:
             self.main_window.create_docker_status_bar()
@@ -751,16 +767,17 @@ class SettingsWindowUI:
         note_frame = tk.Frame(self.general_settings_frame)
         note_frame.grid(padx=10, pady=5, sticky="w")
 
+        font_size = 12 if utils.system.is_windows() else 14
         # Add the red * label
-        star_label = tk.Label(note_frame, text="*", fg="red", font=("Arial", 10, "bold"))
+        star_label = tk.Label(note_frame, text="*", fg="red", font=("Arial", font_size, "bold"))
         star_label.grid(row=0, column=0, sticky="w")
 
-        # Add the rest of the text in black (bold and underlined)
+        font_size = 9 if utils.system.is_windows() else 12
+        # Add the rest of the text in black (bold)
         note_label = tk.Label(
             note_frame,
             text=note_text,
-            fg="black",  # Set text color to black
-            font=("Arial", 8, "bold underline"),  # Set font to bold and underlined
+            font=("Arial", font_size, "bold"),  # Set font to bold
             wraplength=400,
             justify="left"
         )

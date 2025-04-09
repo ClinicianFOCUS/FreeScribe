@@ -1,0 +1,56 @@
+app-id: io.github.clinicianfocus.FreeScribe
+runtime: org.gnome.Platform
+runtime-version: "48"
+sdk: org.gnome.Sdk
+command: freescribe
+build-options:
+  build-args:
+    - --share=network
+finish-args:
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --device=all
+  - --share=ipc
+  - --socket=pulseaudio
+  - --env=DISPLAY=:99
+modules:
+  - name: python310
+    builddir: true
+    buildsystem: autotools
+    config-opts:
+      - --exec-prefix=/app
+      - --enable-shared
+    sources:
+      - type: archive
+        url: https://www.python.org/ftp/python/3.10.16/Python-3.10.16.tar.xz
+        sha256: bfb249609990220491a1b92850a07135ed0831e41738cf681d63cf01b2a8fbd1
+  - name: portaudio
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://github.com/PortAudio/portaudio/archive/refs/tags/v19.7.0.tar.gz
+        sha256: 5af29ba58bbdbb7bbcefaaecc77ec8fc413f0db6f4c4e286c40c3e1b83174fa0
+  - name: python3_setuptools
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --prefix=/app pip
+      - pip3 install --no-deps --prefix=/app wheel setuptools
+  - name: freescribe
+    buildsystem: simple
+    build-commands:
+      - pip3 install --extra-index-url https://download.pytorch.org/whl/cpu --prefix=/app -r flatpak/requirements_cpu.txt
+      - mkdir -p /app/bin
+      - echo '#!/usr/bin/env python3.10' > /app/bin/freescribe
+      - echo 'import sys; sys.path.append("/app/lib/python3.10/site-packages/FreeScribe_client")' >> /app/bin/freescribe
+      - cat src/FreeScribe.client/client.py >> /app/bin/freescribe
+      - chmod +x /app/bin/freescribe
+      - mkdir -p /app/lib/python3.10/site-packages/FreeScribe_client
+      - cp -r src/FreeScribe.client/* /app/lib/python3.10/site-packages/FreeScribe_client/
+      - mkdir -p /app/share/applications
+      - mkdir -p /app/share/icons/hicolor/256x256/apps
+      - cp src/FreeScribe.client/assets/logo.svg /app/share/icons/hicolor/256x256/apps/io.github.clinicianfocus.FreeScribe.svg
+    sources:
+      - type: dir
+        path: .. 

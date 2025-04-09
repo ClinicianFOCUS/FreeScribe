@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import Toplevel, messagebox
 from PIL import Image, ImageTk
+
+import UI.Helpers
 from utils.file_utils import get_file_path
 
 class ImageWindow:
@@ -36,8 +38,8 @@ class ImageWindow:
             # Create window and load image
             self.window = Toplevel(parent)
             self.window.title(title)
-            self.window.iconbitmap(get_file_path('assets', 'logo.ico'))
-            
+            UI.Helpers.set_window_icon(self.window)
+
             # Load image
             self.image = Image.open(image_path)
             self.photo = ImageTk.PhotoImage(self.image)

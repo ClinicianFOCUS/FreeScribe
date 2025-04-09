@@ -1,4 +1,5 @@
---index-url https://abetlen.github.io/llama-cpp-python/whl/cu121 --extra-index-url https://pypi.org/simple
+# --index-url http://localhost:8080/simple
+# --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu # --extra-index-url https://pypi.org/simple
 altgraph==0.17.4
 annotated-types==0.7.0
 anyio==4.6.0
@@ -54,8 +55,9 @@ sympy==1.13.3
 textblob==0.15.3
 threadpoolctl==3.5.0
 tiktoken==0.7.0
-torch==2.2.2
-torchaudio==2.2.2
+# --extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+torchaudio==2.2.2+cpu
 tqdm==4.66.5
 typing_extensions==4.12.2
 tzdata==2024.2
@@ -66,13 +68,10 @@ docker==7.1.0
 markdown==3.7
 tkhtmlview==0.3.1 
 llama-cpp-python==v0.2.90
+av==14.2.0
 faster-whisper==1.1.0
-nvidia-cudnn-cu12==9.5.0.50
-nvidia-cuda-runtime-cu12==12.4.127
-nvidia-cuda-nvrtc-cu12==12.4.127
-nvidia-cublas-cu12==12.4.5.8
 psutil==6.1.0
 Pillow==10.2.0
+python-xlib==0.33
+# en_core_web_md @ http://localhost:8080/packages/en_core_web_md-3.7.1-py3-none-any.whl#sha256=6a0f857a2b4d219c6fa17d455f82430b365bf53171a2d919b9376e5dc9be032e
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
-librosa==0.11.0
-en_core_sci_md @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_md-0.5.4.tar.gz

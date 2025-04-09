@@ -29,8 +29,8 @@ from utils.file_utils import get_resource_path, get_file_path
 from utils.utils import get_application_version
 from utils.ip_utils import is_valid_url
 import multiprocessing
+import utils.whisper.Constants
 from utils.log_config import logger
-
 
 class SettingsWindow():
     """
@@ -111,7 +111,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_CPU_COUNT.value: multiprocessing.cpu_count(),
             SettingsKeys.WHISPER_VAD_FILTER.value: True,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value: "float16",
-            SettingsKeys.WHISPER_MODEL.value: "medium",
+            SettingsKeys.WHISPER_MODEL.value: utils.whisper.Constants.WhisperModels.SMALL_EN.label,
             "Current Mic": "None",
             SettingsKeys.WHISPER_REAL_TIME.value: True,
             "Real Time Audio Length": 3,
@@ -139,6 +139,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_LANGUAGE_CODE.value: "None (Auto Detect)",
             SettingsKeys.Enable_Word_Count_Validation.value : True,  # Default to enabled
             SettingsKeys.Enable_AI_Conversation_Validation.value : False,  # Default to disabled
+            SettingsKeys.USE_LOW_MEM_MODE.value: False,
             SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value : False,
             SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value: False,
             # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
@@ -236,6 +237,7 @@ class SettingsWindow():
         self.adv_general_settings = [
             # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
+            SettingsKeys.USE_LOW_MEM_MODE.value,
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
@@ -590,7 +592,7 @@ class SettingsWindow():
         self.main_window = window
 
     def load_or_unload_model(self, old_model, new_model, old_use_local_llm, new_use_local_llm, old_architecture, new_architecture,
-                             old_context_window, new_context_window):
+                             old_context_window, new_context_window, old_low_mem, new_low_mem):
         """
         Determine if the model needs to be loaded or unloaded based on settings changes.
 
@@ -690,6 +692,12 @@ class SettingsWindow():
         old_cpu_count = self.editable_settings[SettingsKeys.WHISPER_CPU_COUNT.value]
         old_compute_type = self.editable_settings[SettingsKeys.WHISPER_COMPUTE_TYPE.value]
 
+        new_low_mem = self.editable_settings_entries[SettingsKeys.USE_LOW_MEM_MODE.value].get()
+
+        # IF unchecked then we need to load the model
+        if bool(new_low_mem):
+            return False
+
         # loading the model after the window is closed to prevent the window from freezing
         # if Local Whisper is selected, compare the old model with the new model and reload the model if it has changed
         # if switched from remote to local whisper
@@ -704,3 +712,12 @@ class SettingsWindow():
         ):
             return True
         return False
+
+    def is_low_mem_mode(self):
+        """
+        Returns the value of the 'Use Low Memory Mode' setting.
+        
+        Returns:
+            bool: The value of the 'Use Low Memory Mode' setting
+        """
+        return self.editable_settings[SettingsKeys.USE_LOW_MEM_MODE.value]

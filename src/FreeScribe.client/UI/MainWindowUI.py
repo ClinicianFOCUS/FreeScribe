@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
+
+import UI.Helpers
 import UI.MainWindow as mw
 from UI.ImageWindow import ImageWindow
 from UI.SettingsConstant import FeatureToggle
@@ -35,7 +37,7 @@ class MainWindowUI:
         self.logic = mw.MainWindow(self.app_settings)  # Logic to control the container behavior
         self.scribe_template = None
         self.setting_window = SettingsWindowUI(self.app_settings, self, self.root)  # Settings window
-        self.root.iconbitmap(get_file_path('assets','logo.ico'))
+        UI.Helpers.set_window_icon(self.root)
         self.debug_window_open = False  # Flag to indicate if the debug window is open
 
         self.warning_bar = None # Warning bar
