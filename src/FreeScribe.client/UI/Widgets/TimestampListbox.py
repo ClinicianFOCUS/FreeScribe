@@ -1,6 +1,7 @@
 import logging
 import tkinter as tk
 import tkinter.messagebox as messagebox
+from utils.log_config import logger
 
 
 class TimestampListbox(tk.Listbox):
@@ -106,7 +107,7 @@ class TimestampListbox(tk.Listbox):
             messagebox.showwarning("Invalid Input", f"Invalid timestamp format: {str(e)}")
         except Exception as e:
             # Log unexpected errors and re-raise them
-            logging.error(f"Critical error while confirming timestamp edit: {str(e)}")
+            logger.error(f"Critical error while confirming timestamp edit: {str(e)}")
             raise  # Re-raise unexpected exceptions to prevent silent failures
 
     def cancel_edit(self):
@@ -131,5 +132,5 @@ class TimestampListbox(tk.Listbox):
             messagebox.showwarning("Invalid Input", f"Invalid timestamp format: {str(e)}")
         except Exception as e:
             # Log unexpected errors and re-raise them
-            logging.error(f"Critical error while confirming timestamp edit: {str(e)}")
+            logger.error(f"Critical error while confirming timestamp edit: {str(e)}")
             raise  # Re-raise unexpected exceptions to prevent silent failures

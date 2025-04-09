@@ -6,64 +6,10 @@ and a debug window interface built with tkinter.
 """
 
 import tkinter as tk
-import io
-import sys
-from datetime import datetime
-from collections import deque
+
+from utils.log_config import buffer_handler
 from utils.utils import bring_to_front
 
-class DualOutput:
-    buffer = None
-    MAX_BUFFER_SIZE = 2500  # Maximum number of lines in the buffer
-
-    def __init__(self):
-        """
-        Initialize the dual output handler.
-        
-        Creates a deque buffer with a max length and stores references to original stdout/stderr streams.
-        """
-        DualOutput.buffer = deque(maxlen=DualOutput.MAX_BUFFER_SIZE)  # Buffer with a fixed size
-        self.original_stdout = sys.stdout  # Save the original stdout
-        self.original_stderr = sys.stderr  # Save the original stderr
-
-    def write(self, message):
-        """
-        Write a message to both the buffer and original stdout.
-        
-        :param message: The message to be written
-        :type message: str
-        """
-        if message.strip():
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if "\n" in message:  # Handle multi-line messages
-                for line in message.splitlines():
-                    if line.strip():
-                        formatted_message = f"{timestamp} - {line}\n"
-                        DualOutput.buffer.append(formatted_message)
-            else:
-                formatted_message = f"{timestamp} - {message}"
-                DualOutput.buffer.append(formatted_message)
-        else:
-            DualOutput.buffer.append("\n")
-        if self.original_stdout is not None:
-            self.original_stdout.write(message)
-
-    def flush(self):
-        """
-        Flush the original stdout to ensure output is written immediately.
-        """
-        if self.original_stdout is not None:
-            self.original_stdout.flush()
-
-    @staticmethod
-    def get_buffer_content():
-        """
-        Retrieve all content stored in the buffer.
-        
-        :return: The complete buffer contents as a single string.
-        :rtype: str
-        """
-        return ''.join(DualOutput.buffer)
 
 class DebugPrintWindow:
     """
@@ -135,7 +81,7 @@ class DebugPrintWindow:
         Preserves scroll position when updating content and only updates
         if there are changes in the buffer.
         """
-        content = DualOutput.get_buffer_content()
+        content = buffer_handler.get_buffer_content()
         current_content = self.text_widget.get("1.0", tk.END).strip()
 
         if content != current_content:

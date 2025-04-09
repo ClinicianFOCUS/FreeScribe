@@ -1,3 +1,5 @@
+freescribe.log.*
+*.log
 .idea/
 __version__
 

@@ -13,30 +13,26 @@ and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and N
 
 import ctypes
 import io
-import logging
 import sys
 import gc
 import os
 from pathlib import Path
 import wave
 import threading
-import base64
 import json
 import datetime
 import re
 import time
 import queue
 import atexit
-import traceback
 import torch
 import pyaudio
 import requests
 import pyperclip
-import speech_recognition as sr # python package is named speechrecognition
 import scrubadub
 import numpy as np
 import tkinter as tk
-from tkinter import scrolledtext, ttk, filedialog
+from tkinter import ttk, filedialog
 import tkinter.messagebox as messagebox
 from faster_whisper import WhisperModel
 from UI.MainWindowUI import MainWindowUI
@@ -51,39 +47,24 @@ from utils.file_utils import get_file_path, get_resource_path
 from utils.OneInstance import OneInstance
 from utils.utils import get_application_version
 import utils.audio
-from UI.DebugWindow import DualOutput
+
 from UI.Widgets.MicrophoneTestFrame import MicrophoneTestFrame
-from utils.utils import window_has_running_instance, bring_to_front, close_mutex
+from utils.utils import close_mutex
 from utils.window_utils import remove_min_max, add_min_max
 from WhisperModel import TranscribeError
 from UI.Widgets.PopupBox import PopupBox
 from UI.Widgets.TimestampListbox import TimestampListbox
 from UI.ScrubWindow import ScrubWindow
+from utils.log_config import logger
 from Model import ModelStatus
 from services.whisper_hallucination_cleaner import hallucination_cleaner
 from utils.whisper_utils import validate_whisper_endpoint
+from services.factual_consistency import find_factual_inconsistency
 
-
-
-if os.environ.get("FREESCRIBE_DEBUG"):
-    LOG_LEVEL = logging.DEBUG
-else:
-    LOG_LEVEL = logging.INFO
-
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format='%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
-
-dual = DualOutput()
-sys.stdout = dual
-sys.stderr = dual
 
 APP_NAME = 'AI Medical Scribe'  # Application name
 APP_TASK_MANAGER_NAME = 'freescribe-client.exe'
+logger.info(f"{APP_NAME=} {APP_TASK_MANAGER_NAME=} {get_application_version()=}")
 
 # check if another instance of the application is already running.
 # if false, create a new instance of the application
@@ -106,10 +87,10 @@ def delete_temp_file(filename):
     file_path = get_resource_path(filename)
     if os.path.exists(file_path):
         try:
-            print(f"Deleting temporary file: {filename}")
+            logger.info(f"Deleting temporary file: {filename}")
             os.remove(file_path)
         except OSError as e:
-            print(f"Error deleting temporary file {filename}: {e}")
+            logger.error(f"Error deleting temporary file {filename}: {e}")
 
 def on_closing():
     delete_temp_file('recording.wav')
@@ -253,12 +234,12 @@ def threaded_check_stt_model():
     
     # Check if the task was canceled via task_cancel_var
     if task_cancel_var.get():
-        logging.debug(f"double checking canceled")
+        logger.debug("double checking canceled")
         return False
     return True
 
 def threaded_toggle_recording():
-    logging.debug(f"*** Toggle Recording - Recording status: {is_recording}, STT local model: {stt_local_model}")
+    logger.debug(f"*** Toggle Recording - Recording status: {is_recording}, STT local model: {stt_local_model}")
     ready_flag = threaded_check_stt_model()
     # there is no point start recording if we are using local STT model and it's not ready
     # if user chooses to cancel the double check process, we need to return and not start recording
@@ -269,11 +250,11 @@ def threaded_toggle_recording():
 
 
 def double_check_stt_model_loading(task_done_var, task_cancel_var):
-    print(f"*** Double Checking STT model - Model Current Status: {stt_local_model}")
+    logger.info(f"*** Double Checking STT model - Model Current Status: {stt_local_model}")
     stt_loading_window = None
     try:
         if is_recording:
-            print("*** Recording in progress, skipping double check")
+            logger.info("*** Recording in progress, skipping double check")
             return
         # if not app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
         #     print("*** Local Whisper is disabled, skipping double check")            
@@ -292,9 +273,11 @@ def double_check_stt_model_loading(task_done_var, task_cancel_var):
             )
             if not validation_succeeded:
                 task_cancel_var.set(True)                
+        if not app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
+            logger.info("*** Local Whisper is disabled, skipping double check")
             return
         if stt_local_model:
-            print("*** STT model already loaded, skipping double check")
+            logger.info("*** STT model already loaded, skipping double check")
             return
         # if using local whisper and model is not loaded, when starting recording
         if stt_model_loading_thread_lock.locked():
@@ -309,7 +292,7 @@ def double_check_stt_model_loading(task_done_var, task_cancel_var):
                 time.sleep(0.1)
                 if task_cancel_var.get():
                     # user cancel
-                    logging.debug(f"user canceled after {time.monotonic() - time_start} seconds")
+                    logger.debug(f"user canceled after {time.monotonic() - time_start} seconds")
                     return
                 if time.monotonic() - time_start > timeout:
                     messagebox.showerror("Error",
@@ -327,11 +310,11 @@ def double_check_stt_model_loading(task_done_var, task_cancel_var):
             t.join()
 
     except Exception as e:
-        logging.exception(str(e))
+        logger.exception(str(e))
         messagebox.showerror("Error",
                              f"An error occurred while loading Speech to Text model synchronously {type(e).__name__}: {e}")
     finally:
-        print(f"*** Double Checking STT model Complete - Model Current Status: {stt_local_model}")
+        logger.info(f"*** Double Checking STT model Complete - Model Current Status: {stt_local_model}")
         if stt_loading_window:
             stt_loading_window.destroy()
         task_done_var.set(True)
@@ -399,7 +382,7 @@ def open_microphone_stream():
     except (OSError, IOError) as e:
         # Log the error message
         # TODO System logger
-        print(f"An error occurred opening the stream({type(e).__name__}): {e}")
+        logger.error(f"An error occurred opening the stream({type(e).__name__}): {e}")
         return None, e
 
 def record_audio():
@@ -487,7 +470,7 @@ def record_audio():
         # Log the error message
         # TODO System logger
         # For now general catch on any problems
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
     finally:
         if stream:
             stream.stop_stream()
@@ -543,10 +526,10 @@ def realtime_text():
             if audio_data is None:
                 break
             if app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value] == True:
-                print("Real Time Audio to Text")
+                logger.info("Real Time Audio to Text")
                 audio_buffer = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768
                 if app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value] == True:
-                    print(f"Local Real Time Whisper {audio_queue.qsize()=}")
+                    logger.info(f"Local Real Time Whisper {audio_queue.qsize()=}")
                     if stt_local_model is None:
                         update_gui("Local Whisper model not loaded. Please check your settings.")
                         break
@@ -558,7 +541,7 @@ def realtime_text():
                     if not local_cancel_flag and not is_audio_processing_realtime_canceled.is_set():
                         update_gui(result)
                 else:
-                    print("Remote Real Time Whisper")
+                    logger.info("Remote Real Time Whisper")
                     buffer = io.BytesIO()
                     with wave.open(buffer, 'wb') as wf:
                         wf.setnchannels(CHANNELS)
@@ -584,13 +567,13 @@ def realtime_text():
                     try:
                         verify = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
 
-                        print("Sending audio to server")
-                        print("File informaton")
-                        print("File Size: ", len(buffer.getbuffer()), "bytes")
+                        logger.info("Sending audio to server")
+                        logger.info("File informaton")
+                        logger.info(f"File Size: {len(buffer.getbuffer())} bytes")
 
                         response = requests.post(app_settings.editable_settings[SettingsKeys.WHISPER_ENDPOINT.value], headers=headers,files=files, verify=verify, data=body)
                             
-                        print("Response from whisper with status code: ", response.status_code)
+                        logger.info(f"Response from whisper with status code: {response.status_code}")
 
                         if response.status_code == 200:
                             text = response.json()['text']
@@ -684,7 +667,7 @@ def toggle_recording():
                 except Exception as e:
                     # Log the error message
                     # TODO System logger
-                    print(f"An error occurred: {e}")
+                    logger.error(f"An error occurred: {e}")
                 finally:
                     REALTIME_TRANSCRIBE_THREAD_ID = None
 
@@ -713,7 +696,7 @@ def toggle_recording():
 
                 # check if we should print a message every 5 seconds 
                 if timeout_timer % 5 == 0:
-                    print(f"Waiting for audio processing to finish. Timeout after {timeout_length} seconds. Timer: {timeout_timer}s")
+                    logger.info(f"Waiting for audio processing to finish. Timeout after {timeout_length} seconds. Timer: {timeout_timer}s")
                 
                 # Wait for 100ms before checking again, to avoid busy waiting
                 time.sleep(0.1)
@@ -724,7 +707,7 @@ def toggle_recording():
 
         save_audio()
 
-        print("*** Recording Stopped")
+        logger.info("*** Recording Stopped")
         stop_flashing()
 
         if current_view == "full":
@@ -761,7 +744,7 @@ def cancel_processing():
     
     Sets the global flag to stop audio processing operations.
     """
-    print("Processing canceled.")
+    logger.info("Processing canceled.")
 
     if app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value]:
         is_audio_processing_realtime_canceled.set() # Flag to terminate processing
@@ -794,7 +777,7 @@ def reset_recording_status():
         except Exception as e:
             # Log the error message
             # TODO System logger
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
         finally:
             REALTIME_TRANSCRIBE_THREAD_ID = None
 
@@ -804,7 +787,7 @@ def reset_recording_status():
         except Exception as e:
             # Log the error message
             # TODO System logger
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
 
@@ -881,7 +864,7 @@ def send_audio_to_server():
         except Exception as e:
             # Log the error message
             #TODO Logging the message to system logger
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
             clear_application_press()
@@ -892,7 +875,7 @@ def send_audio_to_server():
     # Check if SettingsKeys.LOCAL_WHISPER is enabled in the editable settings
     if app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value] == True:
         # Inform the user that SettingsKeys.LOCAL_WHISPER.value is being used for transcription
-        print(f"Using {SettingsKeys.LOCAL_WHISPER.value} for transcription.")
+        logger.info(f"Using {SettingsKeys.LOCAL_WHISPER.value} for transcription.")
         # Configure the user input widget to be editable and clear its content
         user_input.scrolled_text.configure(state='normal')
         user_input.scrolled_text.delete("1.0", tk.END)
@@ -929,7 +912,7 @@ def send_audio_to_server():
         except Exception as e:
             # Log the error message
             # TODO: Add system eventlogger
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
 
             #log error to input window
             user_input.scrolled_text.configure(state='normal')
@@ -941,7 +924,7 @@ def send_audio_to_server():
             
     else:
         # Inform the user that Remote Whisper is being used for transcription
-        print("Using Remote Whisper for transcription.")
+        logger.info("Using Remote Whisper for transcription.")
 
         # Configure the user input widget to be editable and clear its content
         user_input.scrolled_text.configure(state='normal')
@@ -978,15 +961,15 @@ def send_audio_to_server():
             try:
                 verify = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
 
-                print("Sending audio to server")
-                print("File informaton")
-                print(f"File: {file_to_send}")
-                print("File Size: ", os.path.getsize(file_to_send))
+                logger.info("Sending audio to server")
+                logger.info("File informaton")
+                logger.info(f"File: {file_to_send}")
+                logger.info(f"File Size: {os.path.getsize(file_to_send)}")
 
                 # Send the request without verifying the SSL certificate
                 response = requests.post(app_settings.editable_settings[SettingsKeys.WHISPER_ENDPOINT.value], headers=headers, files=files, verify=verify, data=body)
 
-                print("Response from whisper with status code: ", response.status_code)
+                logger.info(f"Response from whisper with status code: {response.status_code}")
 
                 response.raise_for_status()
 
@@ -1003,7 +986,7 @@ def send_audio_to_server():
             except Exception as e:
                 # log error message
                 #TODO: Implment proper logging to system
-                print(f"An error occurred: {e}")
+                logger.error(f"An error occurred: {e}")
                 # Display an error message to the user
                 user_input.scrolled_text.configure(state='normal')
                 user_input.scrolled_text.delete("1.0", tk.END)
@@ -1030,7 +1013,7 @@ def kill_thread(thread_id):
     :raises ValueError: If the thread ID is invalid.
     :raises SystemError: If the operation fails due to an unexpected state.
     """
-    print("*** Attempting to kill thread with ID:", thread_id)
+    logger.info(f"*** Attempting to kill thread with ID: {thread_id}")
     # Call the C function `PyThreadState_SetAsyncExc` to asynchronously raise
     # an exception in the target thread's context.
     res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
@@ -1048,7 +1031,7 @@ def kill_thread(thread_id):
         ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, None)
         raise SystemError("PyThreadState_SetAsyncExc failed")
     
-    print("*** Killed thread with ID:", thread_id)
+    logger.info(f"*** Killed thread with ID: {thread_id}")
 
 def send_and_receive():
     global use_aiscribe, user_message
@@ -1147,7 +1130,7 @@ def send_text_to_api(edited_text):
         if app_settings.editable_settings["best_of"]:
             payload["best_of"] = int(app_settings.editable_settings["best_of"])
 
-        print(f"Error parsing settings: {e}. Using default settings.")
+        logger.info(f"Error parsing settings: {e}. Using default settings.")
 
     try:
 
@@ -1216,7 +1199,7 @@ def screen_input_with_llm(conversation):
     words = conversation.split()
     # Split the words into chunks
     chunks = [' '.join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
-    print(f"Total chunks count: {len(chunks)}")
+    logger.info(f"Total chunks count: {len(chunks)}")
     return any(process_chunk(chunk) for chunk in chunks)
 
 
@@ -1247,9 +1230,10 @@ def has_more_than_50_words(text: str) -> bool:
     # Split the text into words using whitespace as the delimiter
     words = text.split()        
     # Print the number of words
-    print(f"Number of words: {len(words)}")
+    logger.info(f"Number of words: {len(words)}")
     # Check if the number of words is greater than 50
     return len(words) > 50
+
 
 def display_screening_popup():
     """
@@ -1311,42 +1295,106 @@ def send_text_to_chatgpt(edited_text):
         return send_text_to_api(edited_text)
 
 def generate_note(formatted_message):
-            try:
-                if use_aiscribe:
-                    # If pre-processing is enabled
-                    if app_settings.editable_settings["Use Pre-Processing"]:
-                        #Generate Facts List
-                        list_of_facts = send_text_to_chatgpt(f"{app_settings.editable_settings['Pre-Processing']} {formatted_message}")
-                        
-                        #Make a note from the facts
-                        medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {list_of_facts} {app_settings.AISCRIBE2}")
+    """Generate a note from the formatted message.
+    
+    This function processes the input text and generates a medical note or AI response
+    based on application settings. It supports pre-processing, post-processing, and
+    factual consistency verification.
+    
+    :param formatted_message: The transcribed conversation text to generate a note from
+    :type formatted_message: str
+    
+    :returns: True if note generation was successful, False otherwise
+    :rtype: bool
+    
+    .. note::
+        The behavior of this function depends on several application settings:
+        - If 'use_aiscribe' is True, it generates a structured medical note
+        - If 'Use Pre-Processing' is enabled, it first generates a list of facts
+        - If 'Use Post-Processing' is enabled, it refines the generated note
+        - Factual consistency verification is performed on the final note
+    """
+    try:
+        summary = None
+        if use_aiscribe:
+            # If pre-processing is enabled
+            if app_settings.editable_settings["Use Pre-Processing"]:
+                #Generate Facts List
+                list_of_facts = send_text_to_chatgpt(f"{app_settings.editable_settings['Pre-Processing']} {formatted_message}")
 
-                        # If post-processing is enabled check the note over
-                        if app_settings.editable_settings["Use Post-Processing"]:
-                            post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nFacts:{list_of_facts}\nNotes:{medical_note}")
-                            update_gui_with_response(post_processed_note)
-                        else:
-                            update_gui_with_response(medical_note)
+                #Make a note from the facts
+                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {list_of_facts} {app_settings.AISCRIBE2}")
 
-                    else: # If pre-processing is not enabled thhen just generate the note
-                        medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}")
+                # If post-processing is enabled check the note over
+                if app_settings.editable_settings["Use Post-Processing"]:
+                    post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nFacts:{list_of_facts}\nNotes:{medical_note}")
+                    update_gui_with_response(post_processed_note)
+                    summary = post_processed_note
+                else:
+                    update_gui_with_response(medical_note)
+                    summary = medical_note
 
-                        if app_settings.editable_settings["Use Post-Processing"]:
-                            post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nNotes:{medical_note}")
-                            update_gui_with_response(post_processed_note)
-                        else:
-                            update_gui_with_response(medical_note)
-                else: # do not generate note just send text directly to AI 
-                    ai_response = send_text_to_chatgpt(formatted_message)
-                    update_gui_with_response(ai_response)
+            else: # If pre-processing is not enabled then just generate the note
+                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}")
 
-                return True
-            except Exception as e:
-                #Logg
-                #TODO: Implement proper logging to system event logger
-                print(f"An error occurred: {e}")
-                display_text(f"An error occurred: {e}")
-                return False
+                if app_settings.editable_settings["Use Post-Processing"]:
+                    post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nNotes:{medical_note}")
+                    update_gui_with_response(post_processed_note)
+                    summary = post_processed_note
+                else:
+                    update_gui_with_response(medical_note)
+                    summary = medical_note
+        else: # do not generate note just send text directly to AI
+            ai_response = send_text_to_chatgpt(formatted_message)
+            update_gui_with_response(ai_response)
+            summary = ai_response
+        check_and_warn_about_factual_consistency(formatted_message, summary)
+
+        return True
+    except Exception as e:
+        #TODO: Implement proper logging to system event logger
+        logger.error(f"An error occurred: {e}")
+        display_text(f"An error occurred: {e}")
+        return False
+
+def check_and_warn_about_factual_consistency(formatted_message: str, medical_note: str) -> None:
+    """Verify and warn about potential factual inconsistencies in generated medical notes.
+
+    This function checks the consistency between the original conversation and the generated
+    medical note using multiple verification methods. If inconsistencies are found, a warning 
+    dialog is shown to the user.
+
+    :param formatted_message: The original transcribed conversation text
+    :type formatted_message: str
+    :param medical_note: The generated medical note to verify
+    :type medical_note: str
+    :returns: None
+
+    .. note::
+        The verification is only performed if factual consistency checking is enabled
+        in the application settings.
+
+    .. warning::
+        Even if no inconsistencies are found, this does not guarantee the note is 100% accurate.
+        Always review generated notes carefully.
+    """
+    # Verify factual consistency
+    if not app_settings.editable_settings[SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value]:
+        return
+        
+    inconsistent_entities = find_factual_inconsistency(formatted_message, medical_note)
+    logger.info(f"Inconsistent entities: {inconsistent_entities}")
+    
+    if inconsistent_entities:
+        entities = '\n'.join(f'- {entity}' for entity in inconsistent_entities)
+        warning_message = (
+            "Heads-up: Potential inconsistencies detected in the generated note:\n\n"
+            "Entities not in original conversation found:\n"
+            f"{entities}"
+            "\n\nPlease review the note for accuracy."
+        )
+        messagebox.showwarning("Factual Consistency Heads-up", warning_message)
+
 
 def show_edit_transcription_popup(formatted_message):
     scrubber = scrubadub.Scrubber()
@@ -1398,7 +1446,7 @@ def generate_note_thread(text: str):
         except Exception as e:
             # Log the error message
             # TODO implment system logger
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
             stop_flashing()
@@ -1727,7 +1775,7 @@ def _load_stt_model_thread():
         stt_loading_window = LoadingWindow(root, title="Speech to Text", initial_text=f"Loading Speech to Text {model_name} model. Please wait.", 
                             note_text="Note: If this is the first time loading the model, it will be actively downloading and may take some time.\n We appreciate your patience!",on_cancel=on_cancel_whisper_load)
         window.disable_settings_menu()
-        print(f"Loading STT model: {model_name}")
+        logger.info(f"Loading STT model: {model_name}")
 
         try:
             unload_stt_model()
@@ -1747,16 +1795,17 @@ def _load_stt_model_thread():
                 compute_type=compute_type
             )
 
-            print("STT model loaded successfully.")
+            logger.info("STT model loaded successfully.")
         except Exception as e:
-            print(f"An error occurred while loading STT {type(e).__name__}: {e}")
+            logger.error(f"An error occurred while loading STT {type(e).__name__}: {e}")
             stt_local_model = None
             messagebox.showerror("Error", f"An error occurred while loading Speech to Text {type(e).__name__}: {e}")
         finally:
             window.enable_settings_menu()
             stt_loading_window.destroy()
-            print("Closing STT loading window.")
-        logging.debug(f"STT model status after loading: {stt_local_model=}")
+            logger.info("Closing STT loading window.")
+        logger.debug(f"STT model status after loading: {stt_local_model=}")
+
 
 def unload_stt_model(event=None):
     """
@@ -1767,14 +1816,15 @@ def unload_stt_model(event=None):
     """
     global stt_local_model
     if stt_local_model is not None:
-        print("Unloading STT model from device.")
+        logger.info("Unloading STT model from device.")
         # no risk of temporary "stt_local_model in globals() is False" with same gc effect
         stt_local_model = None
         gc.collect()
-        print("STT model unloaded successfully.")
+        logger.info("STT model unloaded successfully.")
     else:
-        print("STT model is already unloaded.")
-    logging.debug(f"STT model status after unloading: {stt_local_model=}")
+        logger.info("STT model is already unloaded.")
+    logger.debug(f"STT model status after unloading: {stt_local_model=}")
+
 
 def get_selected_whisper_architecture():
     """
@@ -1832,7 +1882,7 @@ def faster_whisper_transcribe(audio):
             **additional_kwargs
         )
         if type(audio) in [str, np.ndarray]:
-            print(f"took {time.monotonic() - start_time:.3f} seconds to process {len(audio)=} {type(audio)=} audio.")
+            logger.info(f"took {time.monotonic() - start_time:.3f} seconds to process {len(audio)=} {type(audio)=} audio.")
 
         result = "".join(f"{segment.text} " for segment in segments)
         logger.debug(f"Result: {result}")
@@ -1843,8 +1893,8 @@ def faster_whisper_transcribe(audio):
             logger.debug(f"Cleaned result: {result}")
         return result
     except Exception as e:
-        logger.exception(f"Error during transcription: {str(e)}")
         error_message = f"Transcription failed: {str(e)}"
+        logger.error(f"Error during transcription: {str(e)}")
         raise TranscribeError(error_message) from e
 
 def set_cuda_paths():
@@ -1989,6 +2039,7 @@ footer_frame.grid(row=100, column=0, columnspan=100, sticky="ew")  # Use grid in
 version = get_application_version()
 version_label = tk.Label(footer_frame, text=f"FreeScribe Client {version}",bg="lightgray",fg="black").pack(side="left", expand=True, padx=2, pady=5)
 
+
 window.update_aiscribe_texts(None)
 # Bind Alt+P to send_and_receive function
 root.bind('<Alt-p>', lambda event: pause_button.invoke())
@@ -2011,7 +2062,7 @@ if app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value]:
 
 if app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
     # Inform the user that Local Whisper is being used for transcription
-    print("Using Local Whisper for transcription.")
+    logger.info("Using Local Whisper for transcription.")
     root.after(100, lambda: (load_stt_model()))
 
 # wait for both whisper and llm to be loaded before unlocking the settings button
@@ -2028,7 +2079,7 @@ def await_models(timeout_length=60):
     """
     #if we cancel this thread then break out of the loop
     if cancel_await_thread.is_set():
-        print("*** Model loading cancelled. Enabling settings bar.")
+        logger.info("*** Model loading cancelled. Enabling settings bar.")
         #reset the flag
         cancel_await_thread.clear()
         #reset the settings bar
@@ -2049,14 +2100,14 @@ def await_models(timeout_length=60):
 
     # wait for both models to be loaded
     if not whisper_loaded or not llm_loaded:
-        print("Waiting for models to load...")
+        logger.info("Waiting for models to load...")
 
         # override the lock in case something else tried to edit
         window.disable_settings_menu()
 
         root.after(100, await_models)
     else:
-        print("*** Models loaded successfully on startup.")
+        logger.info("*** Models loaded successfully on startup.")
 
         # if error null out the model
         if ModelManager.local_model == ModelStatus.ERROR:
