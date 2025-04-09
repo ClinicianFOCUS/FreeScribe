@@ -72,4 +72,5 @@ nvidia-cuda-nvrtc-cu12==12.4.127
 nvidia-cublas-cu12==12.4.5.8
 psutil==6.1.0
 Pillow==10.2.0
+gputil==1.4.0
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
