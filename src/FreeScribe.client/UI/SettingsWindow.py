@@ -140,6 +140,7 @@ class SettingsWindow():
             SettingsKeys.Enable_AI_Conversation_Validation.value : False,  # Default to disabled
             SettingsKeys.WHISPER_PERFORMANCE_TEST_RESULTS.value: {},
             SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value : False,
+            SettingsKeys.ENABLE_FILE_LOGGER.value: False,
         }
 
     def __init__(self):
@@ -224,6 +225,10 @@ class SettingsWindow():
         self.adv_general_settings = [
             # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
+        ]
+
+        self.developer_settings = [
+            SettingsKeys.ENABLE_FILE_LOGGER.value,
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
@@ -585,7 +590,7 @@ class SettingsWindow():
         except (ValueError, TypeError) as e:
             logging.error(str(e))
             logging.exception("Failed to determine reload/unload model")
-        logging.debug(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
+        logging.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
         return unload_flag, reload_flag
 
     def _create_settings_and_aiscribe_if_not_exist(self):

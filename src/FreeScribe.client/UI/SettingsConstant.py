@@ -27,7 +27,7 @@ class SettingsKeys(Enum):
     Enable_AI_Conversation_Validation = "Enable AI Conversation Validation"
     WHISPER_PERFORMANCE_TEST_RESULTS = "Built-in Speech2Text Model Performance Test Results"
     ENABLE_HALLUCINATION_CLEAN = "Enable Hallucination Cleaning (Experimental)"
-
+    ENABLE_FILE_LOGGER = "Enable File Log"
 
 class Architectures(Enum):
     CPU = ("CPU", "cpu")

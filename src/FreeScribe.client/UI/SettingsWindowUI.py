@@ -23,9 +23,9 @@ import logging
 import tkinter as tk
 from tkinter import ttk
 import threading
-from Model import ModelManager
+from Model import Model, ModelManager
 from services.whisper_hallucination_cleaner import load_hallucination_cleaner_model
-from utils.file_utils import get_file_path
+from utils.file_utils import get_file_path, get_resource_path
 from utils.utils import get_application_version
 from UI.MarkdownWindow import MarkdownWindow
 from UI.SettingsWindow import SettingsWindow
@@ -33,6 +33,8 @@ from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from UI.Widgets.PopupBox import PopupBox
 from utils.system_utils import get_system_memory, get_system_vram
 from DataModels import WhisperModelEnum
+import utils.log_config
+from utils.log_config import logger
 logger = logging.getLogger(__name__)
 
 LONG_ENTRY_WIDTH = 30
@@ -132,6 +134,83 @@ class SettingsWindowUI:
             self.create_docker_settings()
         
         self.create_buttons()
+
+        # "Dev" settings tab for developer mode
+        self.settings_window.bind("<Control-slash>", self._enable_developer_mode)
+
+        # set the focus to this window
+        self.settings_window.focus_set()
+
+
+    def _enable_developer_mode(self, event):      
+        """
+        add a developer tab to the notebook
+        """
+        self.developer_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.developer_frame, text="Developer Settings")
+        self.create_developer_settings(self.developer_frame)
+        self.settings_window.unbind("<Control-slash>")
+        self.settings_window.bind("<Control-slash>", self._disable_developer_mode)
+        # select the developer tab automatically
+        self.notebook.select(self.developer_frame)
+
+    def _disable_developer_mode(self, event):
+        """
+        remove the developer tab from the notebook
+        """
+        self.notebook.forget(self.developer_frame)
+        self.settings_window.unbind("<Control-slash>")
+        self.settings_window.bind("<Control-slash>", self._enable_developer_mode)
+
+    def create_developer_settings(self, frame):
+        """
+        Creates the Developer settings UI elements.
+
+        This method creates and places UI elements for Developer settings.
+        """
+        row = 1
+        
+        #warning headers
+        row = self._create_section_header(
+            text="⚠️ Developer Settings - Do Not Modify", 
+            text_colour="red", 
+            frame=self.developer_frame, 
+            row=row)
+        row = self._create_section_header(
+            text="If you have accidentally accessed this menu please do not touch any of the settings below.", 
+            row=row, 
+            text_colour="red", 
+            frame=self.developer_frame) 
+
+        left_frame = ttk.Frame(self.developer_frame)
+        left_frame.grid(row=row, column=0, padx=10, pady=5, sticky="nw")
+        right_frame = ttk.Frame(self.developer_frame)
+        right_frame.grid(row=row, column=1, padx=10, pady=5, sticky="nw")
+
+        # load all settings from the developer settings        
+        left_row, right_row = self.create_editable_settings_col(left_frame, right_frame, 0, 0, self.settings.developer_settings)
+
+        # add custom handler for log file button, additional warning for PHI
+        def _on_file_logger_click(*args):
+            if self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].get() == 1:
+                # Give a disclaimer for potential PHI leak
+                result = messagebox.askokcancel(
+                    title="Warning",
+                    message="Enabling file logging may expose sensitive information such as patient PHI. Use with caution. The log file can be located at:\n" + get_resource_path('freescribe.log'),
+                    icon="warning"
+                )
+
+                # Check the result (True if OK was clicked, False if Cancel was clicked)
+                if not result:
+                    # User clicked Cancel - don't enable file logging
+                    logger.info("File logging disclaimer denied.")
+                    #uncheck the checkbox
+                    self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].set(0)
+                    self.widgets[SettingsKeys.ENABLE_FILE_LOGGER.value].config(variable=self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value])  # Disable the checkbox
+
+        # add a trace to the checkbox on change determine if we need to display disclaimer
+        self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].trace_add("write", _on_file_logger_click)
+        
 
     def _display_center_to_parent(self):
         # Get parent window dimensions and position
@@ -587,15 +666,15 @@ class SettingsWindowUI:
             text_area, row = self._create_text_area(label_text, text_content, row)
             return text_area, row
 
-        row = self._create_section_header("⚠️ Advanced Settings (For Advanced Users Only)", 0, text_colour="red")
+        row = self._create_section_header("⚠️ Advanced Settings (For Advanced Users Only)", 0, text_colour="red", frame=self.advanced_settings_frame)
         
         # General Settings
         if len(self.settings.adv_general_settings) > 0:
-            row = self._create_section_header("General Settings", row, text_colour="black")
+            row = self._create_section_header("General Settings", row, text_colour="black", frame=self.advanced_settings_frame)
             row = create_settings_columns(self.settings.adv_general_settings, row)
 
         # Whisper Settings
-        row = self._create_section_header("Whisper Settings", row, text_colour="black")
+        row = self._create_section_header("Whisper Settings", row, text_colour="black", frame=self.advanced_settings_frame)
         left_frame = ttk.Frame(self.advanced_settings_frame)
         left_frame.grid(row=row, column=0, padx=10, pady=5, sticky="nw")
         right_frame = ttk.Frame(self.advanced_settings_frame)
@@ -611,11 +690,11 @@ class SettingsWindowUI:
         row += 1
 
         # AI Settings
-        row = self._create_section_header("AI Settings", row, text_colour="black")
+        row = self._create_section_header("AI Settings", row, text_colour="black", frame=self.advanced_settings_frame)
         row = create_settings_columns(self.settings.adv_ai_settings, row)
         
         # Prompting Settings
-        row = self._create_section_header("Prompting Settings", row, text_colour="black")
+        row = self._create_section_header("Prompting Settings", row, text_colour="black", frame=self.advanced_settings_frame)
 
         # Pre convo instruction
         self.aiscribe_text, label_row1, text_row1, row = self._create_text_area(
@@ -763,6 +842,8 @@ class SettingsWindowUI:
             self.settings.editable_settings[SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value],
             self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value].get(),
         )
+        
+        self.__initialize_file_logger()
 
         if self.get_selected_model() not in ["Loading models...", "Failed to load models"]:
             self.settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value] = self.get_selected_model()
@@ -817,6 +898,19 @@ class SettingsWindowUI:
         if close_window:
             self.close_window()
 
+    def __initialize_file_logger(self):
+        # if un changed, do nothing
+        logger.info("Checking file logging setting...")
+        if self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].get() == self.settings.editable_settings[SettingsKeys.ENABLE_FILE_LOGGER.value]:
+            logger.info("File logging setting unchanged.")
+            return
+
+        if self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].get() == 1:
+            utils.log_config.add_file_handler(utils.log_config.logger, utils.log_config.formatter)
+            logger.info("File logging enabled.")
+        else:
+            utils.log_config.remove_file_handler(utils.log_config.logger)
+            logger.info("File logging disabled.")
 
     def reset_to_default(self, show_confirmation=True):
         """
@@ -914,7 +1008,7 @@ class SettingsWindowUI:
         self.settings.editable_settings_entries[setting_name] = entry
         return entry
 
-    def _create_section_header(self, text, row, text_colour="black"):
+    def _create_section_header(self, text, row, frame, text_colour="black"):
         """
         Creates a section header label in the advanced settings frame.
         
@@ -927,7 +1021,7 @@ class SettingsWindowUI:
             int: Next available grid row number
         """
         ttk.Label(
-            self.advanced_settings_frame, 
+            frame, 
             text=text,
             font=("TkDefaultFont", 10, "bold"),
             foreground=text_colour
