@@ -8,6 +8,11 @@ import utils.file_utils
 
 MAX_BUFFER_SIZE = 2500
 
+# Configure logging
+if os.environ.get("FREESCRIBE_DEBUG"):
+    LOG_LEVEL = logging.DEBUG
+else:
+    LOG_LEVEL = logging.INFO
 
 class BufferHandler(logging.Handler):
     """Custom handler that maintains an in-memory buffer of log records.
@@ -156,12 +161,6 @@ def remove_file_handler(log, file_name:str = "freescribe.log"):
 # Define custom level
 DIAGNOSE_LEVEL = 99
 addLoggingLevel("DIAG", DIAGNOSE_LEVEL)
-
-# Configure logging
-if os.environ.get("FREESCRIBE_DEBUG"):
-    LOG_LEVEL = logging.DEBUG
-else:
-    LOG_LEVEL = logging.INFO
 
 LOG_FORMAT = '[%(asctime)s] | %(levelname)s | %(name)s | %(threadName)s | [%(filename)s:%(lineno)d in %(funcName)s] | %(message)s'
 

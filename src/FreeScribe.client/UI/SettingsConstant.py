@@ -27,6 +27,8 @@ class SettingsKeys(Enum):
     Enable_AI_Conversation_Validation = "Enable AI Conversation Validation"
     ENABLE_HALLUCINATION_CLEAN = "Enable Hallucination Cleaning (Experimental)"
     ENABLE_FILE_LOGGER = "Enable File Log"
+    WHISPER_INITIAL_PROMPT = "Whisper Initial Prompt"
+
 
 class Architectures(Enum):
     CPU = ("CPU", "cpu")

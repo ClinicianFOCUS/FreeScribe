@@ -73,7 +73,7 @@ class SettingsWindow():
     STATE_FILES_DIR = "install_state"
     DEFAULT_WHISPER_ARCHITECTURE = Architectures.CPU.architecture_value
     DEFAULT_LLM_ARCHITECTURE = Architectures.CPU.architecture_value
-    AUTO_DETECT_LANGUAGE_CODES = ["", "auto", "Auto Detect", "None", "None (Auto Detect)"]
+    AUTO_DETECT_LANGUAGE_CODES = ["", " ","auto", "Auto Detect", "None", "None (Auto Detect)"]
 
     DEFAULT_SETTINGS_TABLE = {
             SettingsKeys.LOCAL_LLM_MODEL.value: "gemma2:2b-instruct-q8_0",
@@ -140,6 +140,7 @@ class SettingsWindow():
             SettingsKeys.Enable_AI_Conversation_Validation.value : False,  # Default to disabled
             SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value : False,
             SettingsKeys.ENABLE_FILE_LOGGER.value: False,
+            SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
         }
 
     def __init__(self):
@@ -228,6 +229,7 @@ class SettingsWindow():
 
         self.developer_settings = [
             SettingsKeys.ENABLE_FILE_LOGGER.value,
+            "BlankSpace", # Represents the Whisper Initial Prompt
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
