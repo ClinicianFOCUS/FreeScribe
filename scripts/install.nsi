@@ -519,6 +519,7 @@ Var DesktopShortcutCheckbox
 Var SandboxedDesktopShortcutCheckbox
 Var StartMenuCheckbox
 Var RunAppCheckbox
+Var RunSandboxedAppCheckbox
 Var /GLOBAL SandboxiePlusPath
 
 Function CustomizeFinishPage
@@ -531,27 +532,46 @@ Function CustomizeFinishPage
         Abort
     ${EndIf}
 
-    # Run App Checkbox
-    ${NSD_CreateCheckbox} 10u 10u 100% 12u "Run FreeScribe after installation"
-    Pop $RunAppCheckbox
-    ${NSD_SetState} $RunAppCheckbox ${BST_CHECKED}
-
     # Desktop Shortcut Checkbox
-    ${NSD_CreateCheckbox} 10u 30u 100% 12u "Create Desktop Shortcut"
+    ${NSD_CreateCheckbox} 10u 10u 100% 12u "Create Desktop Shortcut"
     Pop $DesktopShortcutCheckbox
     ${NSD_SetState} $DesktopShortcutCheckbox ${BST_CHECKED}
 
     # Desktop Shortcut Checkbox For Sandboxed Mode
-    ${NSD_CreateCheckbox} 10u 50u 100% 12u "Create Sandboxed Desktop Shortcut (Sandboxie-Plus Required)"
+    ${NSD_CreateCheckbox} 10u 30u 100% 12u "Create Sandboxed Desktop Shortcut (Sandboxie-Plus Required)"
     Pop $SandboxedDesktopShortcutCheckbox
     ${NSD_SetState} $SandboxedDesktopShortcutCheckbox ${BST_UNCHECKED}
 
     # Start Menu Checkbox
-    ${NSD_CreateCheckbox} 10u 70u 100% 12u "Add to Start Menu"
+    ${NSD_CreateCheckbox} 10u 50u 100% 12u "Add to Start Menu"
     Pop $StartMenuCheckbox
     ${NSD_SetState} $StartMenuCheckbox ${BST_CHECKED}
 
+    # Run App Checkbox
+    ${NSD_CreateCheckbox} 10u 70u 100% 12u "Run FreeScribe"
+    Pop $RunAppCheckbox
+    ${NSD_SetState} $RunAppCheckbox ${BST_CHECKED}
+
+    # Run App Checkbox
+    ${NSD_CreateCheckbox} 10u 90u 100% 12u "Run Sandboxed FreeScribe"
+    Pop $RunSandboxedAppCheckbox
+    ShowWindow $RunSandboxedAppCheckbox ${SW_HIDE}
+    ${NSD_SetState} $RunSandboxedAppCheckbox ${BST_UNCHECKED}
+
+    ${NSD_OnClick} $SandboxedDesktopShortcutCheckbox SandboxSelectionClicked
+
     nsDialogs::Show
+FunctionEnd
+
+Function SandboxSelectionClicked
+    Pop $0 ; Remove callback handle from stack
+    
+    ${NSD_GetState} $SandboxedDesktopShortcutCheckbox $0
+    ${If} $0 == ${BST_CHECKED}
+        ShowWindow $RunSandboxedAppCheckbox ${SW_SHOW}
+    ${Else}
+        ShowWindow $RunSandboxedAppCheckbox ${SW_HIDE}
+    ${EndIf}
 FunctionEnd
 
 Function RunApp
@@ -568,7 +588,7 @@ Function RunApp
         Goto SkipSandboxedDesktopShortcut
     Call CheckSandboxiePlus
     ; Create a shortcut for Sandboxed FreeScribe
-    CreateShortcut "$DESKTOP\SandboxedFreeScribe.lnk" "$SandboxiePlusPath\SandMan.exe" '/box:DefaultBox "$INSTDIR\freescribe-client.exe"' "$INSTDIR\freescribe-client.exe"
+    CreateShortcut "$DESKTOP\SandboxedFreeScribe.lnk" "$SandboxiePlusPath\SandMan.exe" '/box:FreeScribeBox "$INSTDIR\freescribe-client.exe"' "$INSTDIR\freescribe-client.exe"
     SkipSandboxedDesktopShortcut:
 
     # Check Start Menu
@@ -583,6 +603,12 @@ Function RunApp
     ${NSD_GetState} $RunAppCheckbox $0
     ${If} $0 == ${BST_CHECKED}
         Exec '"$INSTDIR\freescribe-client.exe"'
+    ${EndIf}
+
+    # Run the application in sandboxed mode if the checkbox is checked at the end
+    ${NSD_GetState} $RunSandboxedAppCheckbox $0
+    ${If} $0 == ${BST_CHECKED}
+        Exec '"$SandboxiePlusPath\SandMan.exe" /box:FreeScribeBox "$INSTDIR\freescribe-client.exe"'
     ${EndIf}
 FunctionEnd
 
