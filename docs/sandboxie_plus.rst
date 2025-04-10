@@ -41,4 +41,11 @@ How to change the allowed IP address and ports for allowing Sandboxed FreeScribe
   .. image:: images/highlight_sandbox_allowed_ip.jpg
       :width: 600
 
+Settings File Conflict after updating FreeScribe
+--------------------------------------------------
 
+If you encounter a settings file conflict when running Sandboxed FreeScribe after updating FreeScribe, follow these steps to resolve the issue:
+
+1. Open Sandboxie-Plus.
+2. Right click **"FreeScribeBox"** and select **"Remove Sandbox"**.
+3. Reimport the FreeScribe box as described in the installation steps above.
