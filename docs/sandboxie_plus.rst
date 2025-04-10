@@ -12,7 +12,7 @@ Installation and Configuration
 
 2. **Download Sandboxie-Plus Box for FreeScribe**
 
-  - Download zip file from link.
+  - Download zip file from here: `https://github.com/ClinicianFOCUS/FreeScribe/blob/main/sandboxie-plus/FreeScribeBox.7z`.
 
 3. **Import the downloaded FreeScribe box into Sandboxie-Plus**
 
