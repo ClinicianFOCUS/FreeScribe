@@ -67,12 +67,12 @@ class MicrophoneTestFrame:
             self.default_input_index = None
 
         device_count = self.p.get_device_count()
+        defaultHostApi = self.p.get_default_host_api_info()
         for i in range(device_count):
             device_info = self.p.get_device_info_by_index(i)
-            if device_info['maxInputChannels'] > 0:
+            if device_info['maxInputChannels'] > 0 and device_info['hostApi'] == defaultHostApi['index']:
                 device_name = device_info['name']
-                excluded_names = ["Virtual", "Output", "Wave Out", "What U Hear", "Aux", "Port"]
-                if not any(excluded_name.lower() in device_name.lower() for excluded_name in excluded_names) and device_name not in [name for _, name in self.mic_list]:
+                if device_name not in [name for _, name in self.mic_list]:
                     self.mic_list.append((i, device_name))
                     self.mic_mapping[device_name] = i
         # Load the selected microphone from settings if available

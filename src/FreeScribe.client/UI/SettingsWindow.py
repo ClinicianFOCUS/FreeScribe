@@ -22,6 +22,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 import requests
+import logging
 from typing import List, Any, Optional
 
 from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle, DEFAULT_CONTEXT_WINDOW_SIZE
