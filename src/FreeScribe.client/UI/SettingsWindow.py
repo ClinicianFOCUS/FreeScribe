@@ -22,14 +22,14 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 import requests
-import logging
+from typing import List, Any, Optional
 
 from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle, DEFAULT_CONTEXT_WINDOW_SIZE
 from utils.file_utils import get_resource_path, get_file_path
 from utils.utils import get_application_version
-from Model import ModelManager
 from utils.ip_utils import is_valid_url
 import multiprocessing
+from utils.log_config import logger
 
 
 class SettingsWindow():
@@ -50,6 +50,9 @@ class SettingsWindow():
     editable_settings : dict
         A dictionary containing user-editable settings such as model parameters, audio 
         settings, and real-time processing configurations.
+    
+    setting_types : dict
+        A dictionary mapping setting keys to their expected types (bool, int, or str).
     
     Methods
     -------
@@ -100,8 +103,6 @@ class SettingsWindow():
             "singleline": False,
             "frmttriminc": False,
             "frmtrmblln": False,
-            "best_of": 2,
-            "Use best_of": False,
             SettingsKeys.LOCAL_WHISPER.value: True,
             SettingsKeys.WHISPER_ENDPOINT.value: "https://localhost:2224/whisperaudio",
             SettingsKeys.WHISPER_SERVER_API_KEY.value: "",
@@ -139,19 +140,33 @@ class SettingsWindow():
             SettingsKeys.Enable_Word_Count_Validation.value : True,  # Default to enabled
             SettingsKeys.Enable_AI_Conversation_Validation.value : False,  # Default to disabled
             SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value : False,
+            SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value: False,
+            # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
+            SettingsKeys.BEST_OF.value: 1,
+            # Google Maps API settings
+            SettingsKeys.GOOGLE_MAPS_API_KEY.value: "",  # Will be set by user
         }
 
     def __init__(self):
         """Initializes the ApplicationSettings with default values."""
-
-
         self.OPENAI_API_KEY = "None"
         # self.API_STYLE = "OpenAI" # FUTURE FEATURE REVISION
         self.main_window = None
         self.scribe_template_values = []
         self.scribe_template_mapping = {}
-
         
+        # Initialize setting types dictionary
+        self.setting_types = {}
+        for key, value in self.DEFAULT_SETTINGS_TABLE.items():
+            if isinstance(value, bool):
+                self.setting_types[key] = bool
+            elif isinstance(value, int):
+                self.setting_types[key] = int
+            elif isinstance(value, float):
+                self.setting_types[key] = float
+            else:
+                self.setting_types[key] = str
+
         self.general_settings = [
             "Show Welcome Message",
             "Show Scrub PHI"
@@ -183,8 +198,6 @@ class SettingsWindow():
             # "use_memory",
             # "use_authors_note",
             # "use_world_info",
-            # "Use best_of",
-            # "best_of",
             # "max_context_length",
             # "max_length",
             # "rep_pen",
@@ -195,6 +208,7 @@ class SettingsWindow():
             # "top_a",
             "top_k",
             "top_p",
+            SettingsKeys.BEST_OF.value,
             # "typical",
             # "sampler_order",
             # "singleline",
@@ -202,7 +216,8 @@ class SettingsWindow():
             # "frmtrmblln",
             SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value,
             SettingsKeys.Enable_Word_Count_Validation.value,
-            SettingsKeys.Enable_AI_Conversation_Validation.value
+            SettingsKeys.Enable_AI_Conversation_Validation.value,
+            SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value,
         ]
 
         self.adv_whisper_settings = [
@@ -269,10 +284,45 @@ class SettingsWindow():
                     self.scribe_template_values.append(title)
                     self.scribe_template_mapping[title] = (aiscribe, aiscribe2)
         except FileNotFoundError:
-            print("options.txt not found, using default values.")
+            logger.info("options.txt not found, using default values.")
             # Fallback default options if file not found
             self.scribe_template_values = ["Settings Template"]
             self.scribe_template_mapping["Settings Template"] = (self.AISCRIBE, self.AISCRIBE2)
+
+    def convert_setting_value(self, setting: str, value: Any) -> Any:
+        """
+        Convert a setting value to the appropriate type based on the setting name.
+        
+        This helper method determines the correct type conversion for a setting value
+        based on the type information stored in setting_types.
+        
+        :param setting: The name of the setting
+        :type setting: str
+        :param value: The value to convert
+        :type value: Any
+        :returns: The converted value
+        :rtype: Any
+        """
+        if setting not in self.setting_types:
+            return value
+            
+        target_type = self.setting_types[setting]
+        
+        # If value is already the correct type, return it
+        if isinstance(value, target_type):
+            return value
+            
+        try:
+            if target_type == bool:
+                # Convert to boolean (handles both int and string representations)
+                return bool(int(value) if isinstance(value, str) else value)
+            elif target_type in (int, float):
+                return target_type(value)
+            else:
+                return str(value)
+        except (ValueError, TypeError):
+            logger.warning(f"Warning: Could not convert {setting} value to {target_type}")
+            return value
 
     def load_settings_from_file(self, filename='settings.txt'):
         """
@@ -289,26 +339,31 @@ class SettingsWindow():
                 try:
                     settings = json.load(file)
                 except json.JSONDecodeError:
-                    print("Error loading settings file. Using default settings.")
+                    logger.error("Error loading settings file. Using default settings.")
                     return self.OPENAI_API_KEY
 
                 self.OPENAI_API_KEY = settings.get("openai_api_key", self.OPENAI_API_KEY)
                 # self.API_STYLE = settings.get("api_style", self.API_STYLE) # FUTURE FEATURE REVISION
                 loaded_editable_settings = settings.get("editable_settings", {})
+                
                 for key, value in loaded_editable_settings.items():
                     if key in self.editable_settings:
-                        self.editable_settings[key] = value
+                        # Convert the value to the appropriate type based on the setting name
+                        self.editable_settings[key] = self.convert_setting_value(key, value)
 
                 if self.editable_settings["Use Docker Status Bar"] and self.main_window is not None:
                     self.main_window.create_docker_status_bar()
                 
                 if self.editable_settings["Enable Scribe Template"] and self.main_window is not None:
                     self.main_window.create_scribe_template()
-
-
+                
                 return self.OPENAI_API_KEY
         except FileNotFoundError:
-            print("Settings file not found. Using default settings.")
+            logger.info("Settings file not found. Using default settings.")
+            self.save_settings_to_file()
+            return self.OPENAI_API_KEY
+        except Exception as e:
+            logger.error(f"Error loading settings: {e}")
             return self.OPENAI_API_KEY
 
     def save_settings_to_file(self):
@@ -350,9 +405,8 @@ class SettingsWindow():
 
         for setting, entry in self.editable_settings_entries.items():     
             value = entry.get()
-            if setting in ["max_context_length", "max_length", "rep_pen_range", "top_k", SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value]:
-                value = int(value)
-            self.editable_settings[setting] = value
+            # Convert the value to the appropriate type based on the setting name
+            self.editable_settings[setting] = self.convert_setting_value(setting, value)
 
         self.save_settings_to_file()
 
@@ -398,7 +452,7 @@ class SettingsWindow():
         open(get_resource_path('settings.txt'), 'w').close()  
         open(get_resource_path('aiscribe.txt'), 'w').close()
         open(get_resource_path('aiscribe2.txt'), 'w').close()
-        print("Settings file cleared.")
+        logger.info("Settings file cleared.")
 
     def __keep_network_clear_settings(self):
         """
@@ -426,7 +480,7 @@ class SettingsWindow():
 
         # Update the settings with the network settings
         self.editable_settings.update(settings_to_keep)
-        print("Settings file cleared except network settings.")
+        logger.info("Settings file cleared except network settings.")
 
         # Save the settings to file
         self.save_settings_to_file()
@@ -461,7 +515,7 @@ class SettingsWindow():
             settings_window.destroy()
         except Exception as e:
             # Print any exception that occurs during file handling or window destruction.
-            print(f"Error clearing settings files: {e}")
+            logger.error(f"Error clearing settings files: {e}")
             messagebox.showerror("Error", "An error occurred while clearing settings. Please try again.")
 
     def get_available_models(self,endpoint=None):
@@ -485,7 +539,7 @@ class SettingsWindow():
 
         # url validate the endpoint
         if not is_valid_url(endpoint):
-            print("Invalid LLM Endpoint")
+            logger.info("Invalid LLM Endpoint")
             return ["Invalid LLM Endpoint", "Custom"]
 
         try:
@@ -502,7 +556,7 @@ class SettingsWindow():
             return available_models
         except requests.RequestException as e:
             # messagebox.showerror("Error", f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.") 
-            print(e)
+            logger.error(str(e))
             return ["Failed to load models", "Custom"]
 
     def update_models_dropdown(self, dropdown, endpoint=None):
@@ -582,9 +636,8 @@ class SettingsWindow():
                 unload_flag = True
         # in case context_window value is invalid
         except (ValueError, TypeError) as e:
-            logging.error(str(e))
-            logging.exception("Failed to determine reload/unload model")
-        logging.debug(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
+            logger.exception(f"Failed to determine reload/unload model: {str(e)}")
+        logger.debug(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
         return unload_flag, reload_flag
 
     def _create_settings_and_aiscribe_if_not_exist(self):
@@ -596,19 +649,19 @@ class SettingsWindow():
             
             # If CUDA is available, set it as the default architecture to save in settings
             if Architectures.CUDA.label in architectures:
-                print("Settings file not found. Creating default settings file with CUDA architecture.")
+                logger.info("Settings file not found. Creating default settings file with CUDA architecture.")
                 self.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value] = Architectures.CUDA.label
                 self.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = Architectures.CUDA.label
             else:
-                print("Settings file not found. Creating default settings file.")
+                logger.info("Settings file not found. Creating default settings file.")
 
             self.save_settings_to_file()
         if not os.path.exists(get_resource_path('aiscribe.txt')):
-            print("AIScribe file not found. Creating default AIScribe file.")
+            logger.info("AIScribe file not found. Creating default AIScribe file.")
             with open(get_resource_path('aiscribe.txt'), 'w') as f:
                 f.write(self.AISCRIBE)
         if not os.path.exists(get_resource_path('aiscribe2.txt')):
-            print("AIScribe2 file not found. Creating default AIScribe2 file.")
+            logger.info("AIScribe2 file not found. Creating default AIScribe2 file.")
             with open(get_resource_path('aiscribe2.txt'), 'w') as f:
                 f.write(self.AISCRIBE2)
 

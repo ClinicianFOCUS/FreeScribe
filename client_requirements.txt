@@ -13,6 +13,7 @@ exceptiongroup==1.2.2
 Faker==30.0.0
 filelock==3.16.1
 fsspec==2024.9.0
+googlemaps==4.10.0
 h11==0.14.0
 httpcore==1.0.5
 httpx==0.27.2
@@ -33,6 +34,7 @@ pefile==2024.8.26
 phonenumbers==8.13.46
 PyAudio==0.2.14
 pydantic==2.9.2
+pydantic_ai==0.0.42
 pydantic_core==2.23.4
 pyinstaller==6.10.0
 pyinstaller-hooks-contrib==2024.8
@@ -69,3 +71,4 @@ faster-whisper==1.1.0
 psutil==6.1.0
 Pillow==10.2.0
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
+en_core_sci_md @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_md-0.5.4.tar.gz

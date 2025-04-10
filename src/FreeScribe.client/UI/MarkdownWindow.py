@@ -4,7 +4,9 @@ import tkinter as tk
 from tkhtmlview import HTMLLabel
 from utils.file_utils import get_file_path
 from utils.utils import get_application_version
+from utils.log_config import logger
 import re
+
 
 class MarkdownWindow:
     """
@@ -35,7 +37,7 @@ class MarkdownWindow:
             html_content = md.markdown(content, extensions=["extra", "smarty"])
             
         except FileNotFoundError:
-            print(f"File not found: {file_path}")
+            logger.error(f"File not found: {file_path}")
             messagebox.showerror("Error", "File not found")
             return
         except UnicodeDecodeError:
@@ -46,7 +48,7 @@ class MarkdownWindow:
                 content = self._process_markdown_images(content)
                 html_content = md.markdown(content, extensions=["extra", "smarty"])
             except Exception as e:
-                print(f"Error reading file: {e}")
+                logger.error(f"Error reading file: {e}")
                 messagebox.showerror("Error", "Error reading file")
                 return
 

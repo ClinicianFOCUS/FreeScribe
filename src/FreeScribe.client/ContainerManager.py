@@ -15,10 +15,13 @@ import docker
 import asyncio
 import time
 
+from utils.log_config import logger
+
+
 class ContainerState(Enum):
     CONTAINER_STOPPED = "ContainerStopped"
     CONTAINER_STARTED = "ContainerStarted"
-    
+
 class ContainerManager:
     """
     Manages Docker containers by starting and stopping them.
@@ -107,7 +110,7 @@ class ContainerManager:
         try:
             container = self.client.containers.get(container_name)
             container.stop()
-            print(f"Container {container_name} stopped successfully.")
+            logger.info(f"Container {container_name} stopped successfully.")
             return ContainerState.CONTAINER_STOPPED
         except docker.errors.NotFound as e:
             raise docker.errors.NotFound(f"Container {container_name} not found.") from e
@@ -132,13 +135,13 @@ class ContainerManager:
             return status == "running"
 
         except docker.errors.NotFound:
-            print(f"Container {container_name} not found.")
+            logger.error(f"Container {container_name} not found.")
             return False
         except docker.errors.APIError as e:
-            print(f"An error occurred while checking the container status: {e}")
+            logger.error(f"An error occurred while checking the container status: {e}")
             return False
         except Exception as e:
-            print(f"An error occurred while checking the container status: {e}")
+            logger.error(f"An error occurred while checking the container status: {e}")
             return False
 
     def set_status_icon_color(self, widget, status: ContainerState):

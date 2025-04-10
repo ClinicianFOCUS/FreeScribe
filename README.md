@@ -1,4 +1,7 @@
 # FreeScribe
+<p>
+  <a href="https://github.com/ClinicianFOCUS/FreeScribe"><img src="https://img.shields.io/badge/python-3.10-blue" alt="FreeScribe"></a>
+</p>
 
 ## Introduction
 

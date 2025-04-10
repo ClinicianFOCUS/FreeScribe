@@ -39,6 +39,7 @@ def get_resource_path(filename: str) -> str:
     else:
         return os.path.abspath(filename)
 
+
 def _get_user_data_dir() -> str:
     """
     Get the user data directory for the current platform.
@@ -56,5 +57,5 @@ def _get_user_data_dir() -> str:
         path = os.environ.get("XDG_DATA_HOME", "")
         if not path.strip():
             path = os.path.expanduser("~/.local/share") 
-        return self._append_app_name_and_version(path)
+        return path
 

@@ -188,7 +188,7 @@ Note: Available only if GPU selected while installing
 
 ### AI Context Window
 
-**Description**: Specify the Context Window Size.
+**Description**: Specify the Context Window Size (in tokens).
 **Default**: `4096`  
 **Type**: string
 

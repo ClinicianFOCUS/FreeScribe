@@ -460,8 +460,9 @@ class SettingsWindowUI:
                 row += 1
                 continue
 
-            value = self.settings.editable_settings[setting_name]
-            if value in [True, False]:
+            boolean_settings = [key for key, type_value in self.settings.setting_types.items() 
+                            if type_value == bool]
+            if setting_name in boolean_settings:
                 self.widgets[setting_name] = self._create_checkbox(frame, setting_name, setting_name, row)
             else:
                 self.widgets[setting_name] = self._create_entry(frame, setting_name, setting_name, row)
@@ -494,6 +495,26 @@ class SettingsWindowUI:
         if len(self.settings.adv_general_settings) > 0:
             row = self._create_section_header("General Settings", row, text_colour="black")
             row = create_settings_columns(self.settings.adv_general_settings, row)
+
+        # Google Maps Integration
+        row = self._create_section_header("Google Maps Integration", row, text_colour="black")
+        maps_frame = ttk.LabelFrame(self.advanced_settings_frame, text="API Configuration")
+        maps_frame.grid(row=row, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
+        
+        ttk.Label(maps_frame, text="API Key:").grid(row=0, column=0, padx=5, pady=5)
+        maps_key_entry = ttk.Entry(maps_frame, show="*")  # Hide API key
+        maps_key_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        maps_key_entry.insert(0, self.settings.editable_settings[SettingsKeys.GOOGLE_MAPS_API_KEY.value])
+        
+        def toggle_key_visibility():
+            current = maps_key_entry.cget("show")
+            maps_key_entry.configure(show="" if current == "*" else "*")
+        
+        ttk.Button(maps_frame, text="👁", width=3, command=toggle_key_visibility).grid(row=0, column=2, padx=5, pady=5)
+        
+        maps_frame.grid_columnconfigure(1, weight=1)  # Make the entry expand horizontally
+        self.widgets[SettingsKeys.GOOGLE_MAPS_API_KEY.value] = maps_key_entry
+        row += 1
 
         # Whisper Settings
         row = self._create_section_header("Whisper Settings", row, text_colour="black")
@@ -671,6 +692,9 @@ class SettingsWindowUI:
         # save architecture
         self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = self.architecture_dropdown.get()
 
+        # Save Google Maps API key
+        self.settings.editable_settings[SettingsKeys.GOOGLE_MAPS_API_KEY.value] = self.widgets[SettingsKeys.GOOGLE_MAPS_API_KEY.value].get()
+
         self.settings.save_settings(
             self.openai_api_key_entry.get(),
             self.aiscribe_text.get("1.0", "end-1c"), # end-1c removes the trailing newline
@@ -778,7 +802,9 @@ class SettingsWindowUI:
             row_idx (int): The row index at which to place the checkbox.
         """
         tk.Label(frame, text=label).grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
-        value = tk.IntVar(value=int(self.settings.editable_settings[setting_name]))
+        # Convert to bool to ensure proper type
+        current_value = bool(self.settings.editable_settings[setting_name])
+        value = tk.BooleanVar(value=current_value)
         checkbox = tk.Checkbutton(frame, variable=value)
         checkbox.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
         self.settings.editable_settings_entries[setting_name] = value
@@ -798,6 +824,11 @@ class SettingsWindowUI:
         """
         tk.Label(frame, text=label).grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
         value = self.settings.editable_settings[setting_name]
+        
+        # Convert the value to the appropriate type using the helper method
+        if hasattr(self.settings, 'convert_setting_value'):
+            value = self.settings.convert_setting_value(setting_name, value)
+        
         entry = tk.Entry(frame, width=LONG_ENTRY_WIDTH)
         entry.insert(0, str(value))
         entry.grid(row=row_idx, column=1, padx=0, pady=5, sticky="w")
