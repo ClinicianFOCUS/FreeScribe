@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import Toplevel
+from utils.file_utils import get_file_path
 
 class PopupBox:
     """
@@ -39,6 +40,10 @@ class PopupBox:
         self.response = None
         # Create a top-level window for the popup
         self.dialog = Toplevel(parent)
+
+        # Set the window icon
+        self.dialog.iconbitmap(get_file_path('assets', 'logo.ico'))
+
         # Make the exit button behave like the specified button
         delete_window_action = None
         if delete_window_button_action == 1:
@@ -123,3 +128,5 @@ class PopupBox:
         """
         self.response = "button_3"
         self.dialog.destroy()
+
+

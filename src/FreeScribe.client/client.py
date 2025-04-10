@@ -58,6 +58,7 @@ from UI.ScrubWindow import ScrubWindow
 from utils.log_config import logger
 from Model import ModelStatus
 from services.whisper_hallucination_cleaner import hallucination_cleaner
+from utils.whisper_utils import validate_whisper_endpoint
 from services.factual_consistency import find_factual_inconsistency
 
 
@@ -255,6 +256,23 @@ def double_check_stt_model_loading(task_done_var, task_cancel_var):
         if is_recording:
             logger.info("*** Recording in progress, skipping double check")
             return
+        # if not app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
+        #     print("*** Local Whisper is disabled, skipping double check")            
+        #     return
+        if not app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:        
+            whisper_endpoint = app_settings.editable_settings[SettingsKeys.WHISPER_ENDPOINT.value]
+            whisper_verify_ssl = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
+            whisper_api_key = app_settings.editable_settings[SettingsKeys.WHISPER_SERVER_API_KEY.value]
+            # Validate speech-to-text endpoint connectivity
+            validation_succeeded = validate_whisper_endpoint(
+                settings=root,
+                parent_window=root,
+                endpoint_url=whisper_endpoint,
+                verify_ssl=whisper_verify_ssl,
+                api_key=whisper_api_key
+            )
+            if not validation_succeeded:
+                task_cancel_var.set(True)                
         if not app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
             logger.info("*** Local Whisper is disabled, skipping double check")
             return

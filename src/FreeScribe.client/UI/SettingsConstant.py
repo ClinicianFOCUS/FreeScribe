@@ -23,6 +23,7 @@ class SettingsKeys(Enum):
     LOCAL_LLM_CONTEXT_WINDOW = "AI Context Window"
     LLM_ENDPOINT = "AI Server Endpoint"
     LLM_SERVER_API_KEY = "AI Server API Key"
+    LLM_SELF_SIGNED_CERT = "AI Server Self-Signed Certificates"
     Enable_Word_Count_Validation = "Enable Word Count Validation"
     Enable_AI_Conversation_Validation = "Enable AI Conversation Validation"
     ENABLE_HALLUCINATION_CLEAN = "Enable Hallucination Cleaning (Experimental)"

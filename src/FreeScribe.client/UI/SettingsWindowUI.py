@@ -19,6 +19,8 @@ Classes:
     SettingsWindowUI: Manages the settings window UI.
 """
 
+import threading
+import time
 import json
 import logging
 import tkinter as tk
@@ -31,6 +33,9 @@ from UI.MarkdownWindow import MarkdownWindow
 from UI.SettingsWindow import SettingsWindow
 from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from UI.Widgets.PopupBox import PopupBox
+from utils.whisper_utils import validate_whisper_endpoint
+from utils.llm_utils import validate_llm_endpoint
+
 
 
 LONG_ENTRY_WIDTH = 30
@@ -468,6 +473,7 @@ class SettingsWindowUI:
                 self.widgets[setting_name] = self._create_entry(frame, setting_name, setting_name, row)
             row += 1
         return row
+    
 
     def create_advanced_settings(self):
         """Creates the advanced settings UI elements with a structured layout."""
@@ -657,6 +663,8 @@ class SettingsWindowUI:
         Uses our markdown window class to display a markdown with help
         """
         MarkdownWindow(self.settings_window, "Help", get_file_path('markdown','help','settings.md'))
+    
+
 
     def save_settings(self, close_window=True):
         """
@@ -665,6 +673,41 @@ class SettingsWindowUI:
         This method retrieves the values from the UI elements and calls the
         `save_settings` method of the `settings` object to save the settings.
         """
+        validation_succeeded = True
+        
+        # Validate Whisper (Speech-to-Text) endpoint if using remote service
+        if not self.settings.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get():
+            whisper_endpoint = self.settings.editable_settings_entries[SettingsKeys.WHISPER_ENDPOINT.value].get()
+            whisper_verify_ssl = not self.settings.editable_settings_entries[SettingsKeys.S2T_SELF_SIGNED_CERT.value].get()
+            whisper_api_key = self.settings.editable_settings_entries[SettingsKeys.WHISPER_SERVER_API_KEY.value].get()
+            
+            # Validate speech-to-text endpoint connectivity
+            validation_succeeded = validate_whisper_endpoint(
+                settings=self.settings,
+                parent_window=self.settings_window,
+                endpoint_url=whisper_endpoint,
+                verify_ssl=whisper_verify_ssl,
+                api_key=whisper_api_key
+            )
+        
+        # Validate LLM endpoint if using remote service
+        if validation_succeeded and not self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM.value].get():
+            llm_endpoint = self.settings.editable_settings_entries[SettingsKeys.LLM_ENDPOINT.value].get()
+            llm_verify_ssl = not self.settings.editable_settings_entries[SettingsKeys.LLM_SELF_SIGNED_CERT.value].get()
+            llm_api_key = self.openai_api_key_entry.get()
+            
+            # Validate language model endpoint connectivity
+            validation_succeeded = validate_llm_endpoint(
+                settings=self.settings,
+                parent_window=self.settings_window,
+                endpoint_url=llm_endpoint,
+                verify_ssl=llm_verify_ssl,
+                api_key=llm_api_key
+            )
+        
+        if not validation_succeeded:
+            return
+        
         # delay actual unload/reload till settings are actually saved
         local_model_unload_flag, local_model_reload_flag = self.settings.load_or_unload_model(
             self.settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value],
