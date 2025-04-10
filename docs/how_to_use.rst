@@ -11,7 +11,7 @@ Follow these step-by-step instructions to install FreeScribe on your computer:
 Prerequisite:
 -------------
 
-1. Download Sandboxie-plus from the official website: `https://sandboxie-plus.com/downloads/` (Only needed if running FreeScribe in sandbox).
+1. Download Sandboxie-plus from the official website: `https://sandboxie-plus.com/downloads/` (Only needed if running FreeScribe in sandbox). For more details, refer to :doc:`sandboxie_plus`.
 
 Step 1: License Agreement
 --------------------------
