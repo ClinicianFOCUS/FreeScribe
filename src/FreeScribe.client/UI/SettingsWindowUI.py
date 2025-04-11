@@ -675,6 +675,8 @@ class SettingsWindowUI:
             self.architecture_dropdown.get(),
             self.settings.editable_settings[SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value],
             self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value].get(),
+            self.settings.editable_settings[SettingsKeys.BEST_OF.value],
+            self.settings.editable_settings_entries[SettingsKeys.BEST_OF.value].get(),
         )
 
         if self.get_selected_model() not in ["Loading models...", "Failed to load models"]:
