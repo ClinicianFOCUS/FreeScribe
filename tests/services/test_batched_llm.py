@@ -165,23 +165,22 @@ class TestBatchedLLM:
         mock_llama_cpp.llama_batch_free = MagicMock()
         mock_llama_cpp.llama_free = MagicMock()
 
-        try:
-            # Call cleanup
-            llm.cleanup()
+        # Call cleanup
+        llm.cleanup()
 
-            # Verify attributes are reset
-            assert llm.batch is None
-            assert llm.smpl is None
-            assert llm.ctx is None
-            assert llm.model is None
+        # Verify attributes are reset
+        assert llm.batch is None
+        assert llm.smpl is None
+        assert llm.ctx is None
+        assert llm.model is None
 
-            # Verify cleanup functions were called
-            mock_llama_cpp.llama_batch_free.assert_called_once()
-            mock_llama_cpp.llama_free.assert_called_once()
-        finally:
-            # Restore original functions
-            mock_llama_cpp.llama_batch_free = original_batch_free
-            mock_llama_cpp.llama_free = original_free
+        # Verify cleanup functions were called
+        mock_llama_cpp.llama_batch_free.assert_called_once()
+        mock_llama_cpp.llama_free.assert_called_once()
+
+        # Restore original functions
+        mock_llama_cpp.llama_batch_free = original_batch_free
+        mock_llama_cpp.llama_free = original_free
 
     def test_token_to_piece(self, mock_llama_cpp, batched_llm):
         """Test token to piece conversion."""
@@ -249,39 +248,18 @@ class TestBatchedLLM:
 
     def test_tokenize(self, mock_llama_cpp):
         """Test text tokenization."""
-        # Create a new instance to avoid the patched tokenize method
-        llm = BatchedLLM("mock_model_path.gguf")
+        # Create a new instance with a direct mock of the tokenize method
+        with patch.object(BatchedLLM, 'tokenize', return_value=[1, 2, 3, 4, 5]) as mock_tokenize:
+            llm = BatchedLLM("mock_model_path.gguf")
 
-        # Create a proper mock for the token buffer
-        class MockTokenBuffer(ctypes.Array):
-            _length_ = 1024
-            _type_ = ctypes.c_int
+            # Call the tokenize method
+            tokens = llm.tokenize("Test text")
 
-            def __getitem__(self, index):
-                if 0 <= index < 5:
-                    return index + 1
-                return 0
+            # Verify the method was called with the correct argument
+            mock_tokenize.assert_called_once_with("Test text")
 
-        # Create a mock implementation for llama_tokenize
-        def mock_tokenize_impl(*args, **kwargs):
-            return 5  # Return the number of tokens
-
-        # Save the original implementation
-        original_tokenize = mock_llama_cpp.llama_tokenize
-        # Replace with our implementation
-        mock_llama_cpp.llama_tokenize = mock_tokenize_impl
-
-        # Patch the tokenize method to return our expected result
-        with patch.object(BatchedLLM, 'tokenize', return_value=[1, 2, 3, 4, 5]):
-            try:
-                # Call the tokenize method
-                tokens = llm.tokenize("Test text")
-
-                # Verify the result
-                assert tokens == [1, 2, 3, 4, 5]
-            finally:
-                # Restore the original implementation
-                mock_llama_cpp.llama_tokenize = original_tokenize
+            # Verify the result
+            assert tokens == [1, 2, 3, 4, 5]
 
     def test_setup_sampler(self, mock_llama_cpp, batched_llm):
         """Test sampler chain setup."""
@@ -336,41 +314,36 @@ class TestBatchedLLM:
         # Verify the batch size is correct
         assert batch_size > 0
 
-    def test_handle_encoder_decoder(self, mock_llama_cpp, batched_llm):
-        """Test the _handle_encoder_decoder helper method."""
+    def test_handle_encoder_decoder_non_encoder_model(self, mock_llama_cpp, batched_llm):
+        """Test the _handle_encoder_decoder helper method with a non-encoder model."""
         # Make sure batch is properly initialized
         assert batched_llm.batch is not None
 
-        # Create a custom implementation of _handle_encoder_decoder
-        def mock_handle_encoder_decoder_impl():
-            # Just check if the model has an encoder and call encode if it does
-            if mock_llama_cpp.llama_model_has_encoder(batched_llm.model):
-                mock_llama_cpp.llama_encode(batched_llm.ctx, batched_llm.batch)
-                batched_llm.batch.n_tokens = 0  # Clear the batch
+        # Set up the mock to indicate this is not an encoder-decoder model
+        mock_llama_cpp.llama_model_has_encoder.return_value = False
 
-        # Patch the method directly
-        with patch.object(batched_llm, '_handle_encoder_decoder', side_effect=mock_handle_encoder_decoder_impl) as mock_method:
-            # Test when the model is not an encoder-decoder
-            mock_llama_cpp.llama_model_has_encoder.return_value = False
-            batched_llm._handle_encoder_decoder()
+        # Call the method
+        batched_llm._handle_encoder_decoder()
 
-            # Verify encode was not called
-            mock_llama_cpp.llama_encode.assert_not_called()
+        # Verify encode was not called
+        mock_llama_cpp.llama_encode.assert_not_called()
 
-            # Test when the model is an encoder-decoder
-            mock_llama_cpp.llama_model_has_encoder.return_value = True
+    def test_handle_encoder_decoder_with_encoder_model(self, mock_llama_cpp, batched_llm):
+        """Test the _handle_encoder_decoder helper method with an encoder model."""
+        # Make sure batch is properly initialized
+        assert batched_llm.batch is not None
 
-            # Reset the encode mock to track new calls
-            mock_llama_cpp.llama_encode = MagicMock(return_value=0)
+        # Set up the mock to indicate this is an encoder-decoder model
+        mock_llama_cpp.llama_model_has_encoder.return_value = True
 
-            # Call the method
-            batched_llm._handle_encoder_decoder()
+        # Set up the encode mock
+        mock_llama_cpp.llama_encode = MagicMock(return_value=0)
 
-            # Verify encode was called
-            mock_llama_cpp.llama_encode.assert_called_once()
+        # Call the method
+        batched_llm._handle_encoder_decoder()
 
-            # Verify the method was called twice
-            assert mock_method.call_count == 2
+        # Verify encode was called
+        mock_llama_cpp.llama_encode.assert_called_once()
 
     def test_sample_token(self, mock_llama_cpp, batched_llm):
         """Test the _sample_token helper method."""
