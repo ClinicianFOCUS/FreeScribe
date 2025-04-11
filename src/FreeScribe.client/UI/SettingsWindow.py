@@ -592,7 +592,7 @@ class SettingsWindow():
         self.main_window = window
 
     def load_or_unload_model(self, old_model, new_model, old_use_local_llm, new_use_local_llm, old_architecture, new_architecture,
-                             old_context_window, new_context_window):
+                             old_context_window, new_context_window, old_best_of, new_best_of):
         """
         Determine if the model needs to be loaded or unloaded based on settings changes.
 
@@ -629,8 +629,9 @@ class SettingsWindow():
                     old_use_local_llm != new_use_local_llm,
                     old_model != new_model,
                     old_architecture != new_architecture,
-                    int(old_context_window) != int(new_context_window)]
-                ):
+                    int(old_context_window) != int(new_context_window),
+                    int(old_best_of) != int(new_best_of)
+                ]):
                     reload_flag = True
             else:
                 unload_flag = True
