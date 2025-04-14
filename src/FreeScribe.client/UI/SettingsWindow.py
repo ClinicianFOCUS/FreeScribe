@@ -701,7 +701,7 @@ class SettingsWindow():
         if self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get() and (
                 old_model != self.editable_settings_entries[SettingsKeys.WHISPER_MODEL.value].get() or
                 old_whisper_architecture != self.editable_settings_entries[SettingsKeys.WHISPER_ARCHITECTURE.value].get() or
-                old_cpu_count != self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get() or
+                int(old_cpu_count) != int(self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get()) or
                 old_compute_type != self.editable_settings_entries[SettingsKeys.WHISPER_COMPUTE_TYPE.value].get()
         ):
             return True
