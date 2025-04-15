@@ -33,6 +33,14 @@ class MicrophoneTestFrame:
         self.stream = None  # Persistent audio stream
         self.is_stream_active = False  # Track if the stream is active
 
+        # Style colours for the volume meter segments
+        self.style_colours = {
+            'green': '#2ecc71',
+            'yellow': '#f1c40f',
+            'red': '#e74c3c',
+            'inactive': '#95a5a6'
+        }
+
         self.setting_window = SettingsWindowUI(self.app_settings, self, self.root)  # Settings window
 
         # Create a frame for the microphone test
@@ -102,10 +110,6 @@ class MicrophoneTestFrame:
         style = ttk.Style()
         style.configure('Disabled.TFrame', background='lightgray')  # Gray background for disabled state 
         style.configure('Mic.TCombobox', padding=(5, 5, 5, 5))
-        style.configure('Green.TFrame', background='#2ecc71')
-        style.configure('Yellow.TFrame', background='#f1c40f')
-        style.configure('Red.TFrame', background='#e74c3c')
-        style.configure('Inactive.TFrame', background='#95a5a6')
 
         # Dropdown for microphone selection
         mic_options = [f"{name}" for _, name in self.mic_list]
@@ -149,7 +153,7 @@ class MicrophoneTestFrame:
         self.SEGMENT_COUNT = 20
         self.segments = []
         for i in range(self.SEGMENT_COUNT):
-            segment = ttk.Frame(self.segments_frame, width=10, height=20)
+            segment = tk.Frame(self.segments_frame, width=10, height=20)
             segment.grid(row=0, column=i, padx=1)
             segment.grid_propagate(False)
             self.segments.append(segment)
@@ -157,6 +161,7 @@ class MicrophoneTestFrame:
         # Status label for feedback
         self.status_label = ttk.Label(self.frame, text="Microphone: Ready", foreground="green")
         self.status_label.grid(row=2, column=0, pady=(0, 0), padx=(10, 0), sticky='nsew')
+        self.on_dropdown_click(None)
 
     def initialize_selected_microphone(self):
         """
@@ -317,14 +322,14 @@ class MicrophoneTestFrame:
                 if i < active_segments:
                     # Adjusted threshold for green
                     if i < self.SEGMENT_COUNT * 0.4:  
-                        segment.configure(style='Green.TFrame')
+                        segment.configure(bg=self.style_colours['green'])
                         # Adjusted threshold for yellow
                     elif i < self.SEGMENT_COUNT * 0.7:
-                        segment.configure(style='Yellow.TFrame')
+                        segment.configure(bg=self.style_colours['yellow'])
                     else:
-                        segment.configure(style='Red.TFrame')
+                        segment.configure(bg=self.style_colours['red'])
                 else:
-                    segment.configure(style='Inactive.TFrame')
+                    segment.configure(bg=self.style_colours['inactive'])
 
         except OSError as e:
             # Handle both Stream closed and Unanticipated host error
@@ -338,7 +343,7 @@ class MicrophoneTestFrame:
             self.is_stream_active = False
             self.stream = None
             for segment in self.segments:
-                segment.configure(style='Inactive.TFrame')
+                segment.configure(bg=self.style_colours['inactive'])
 
         self.frame.after(50, self.update_volume_meter)
 
@@ -362,18 +367,31 @@ class MicrophoneTestFrame:
             enabled (bool): If True, enable the microphone test state. If False, disable it.
 
         Notes:
-            - For `ttk.Frame` or `tk.Frame` segments, the original style is stored before applying 
-            the disabled style. This allows the original style to be restored when re-enabled.
-            - The `_frame_original_styles` dictionary is used to store the original styles of frames.
-
-        Example:
-            >>> self.set_mic_test_state(True)  # Enable microphone test state
-            >>> self.set_mic_test_state(False) # Disable microphone test state
+            - For macOS compatibility, we use a combination of 'state' for ttk widgets and direct
+            property changes for standard tk widgets
+            - For tk.Frame segments, we update background color and other properties directly
+            - The `_frame_original_styles` dictionary is used to store the original properties
         """
-        self.mic_dropdown.state(['!disabled' if enabled else 'disabled'])
-        self.status_label.state(['!disabled' if enabled else 'disabled'])         
-        for segment in self.segments: 
-            if isinstance(segment, (ttk.Frame, tk.Frame)):
+        # Handle the microphone dropdown (ttk widget)
+        if hasattr(self.mic_dropdown, 'state'):
+            self.mic_dropdown.state(['!disabled'] if enabled else ['disabled'])
+        else:
+            self.mic_dropdown.configure(state='normal' if enabled else 'disabled')
+
+        # Handle the status label
+        if hasattr(self.status_label, 'state'):
+            self.status_label.state(['!disabled'] if enabled else ['disabled'])
+        else:
+            self.status_label.configure(state='normal' if enabled else 'disabled')
+            
+        # Initialize the storage dictionary if it doesn't exist
+        if not hasattr(self, '_frame_original_styles'):
+            self._frame_original_styles = {}
+            
+        # Handle segments
+        for segment in self.segments:
+            if isinstance(segment, ttk.Frame):
+                # Handle ttk.Frame
                 if enabled:
                     # Restore original style if it exists
                     original_style = self._frame_original_styles.get(segment, '')
@@ -384,8 +402,35 @@ class MicrophoneTestFrame:
                     if segment not in self._frame_original_styles:
                         self._frame_original_styles[segment] = current_style
                     segment.configure(style='Disabled.TFrame')
+            elif isinstance(segment, tk.Frame):
+                # Handle tk.Frame differently since macOS can have issues with ttk styling
+                if enabled:
+                    # Restore original properties
+                    if segment in self._frame_original_styles:
+                        properties = self._frame_original_styles[segment]
+                        segment.configure(**properties)
+                else:
+                    # Store original properties
+                    properties = {
+                        'bg': segment.cget('bg'),
+                        'highlightbackground': segment.cget('highlightbackground') if 'highlightbackground' in segment.keys() else None,
+                        'highlightcolor': segment.cget('highlightcolor') if 'highlightcolor' in segment.keys() else None
+                    }
+                    self._frame_original_styles[segment] = {k: v for k, v in properties.items() if v is not None}
+                    
+                    # Apply disabled appearance
+                    segment.configure(bg=self.style_colours.get('inactive', '#cccccc'))
+                    if 'highlightbackground' in segment.keys():
+                        segment.configure(highlightbackground='#cccccc')
+                    if 'highlightcolor' in segment.keys():
+                        segment.configure(highlightcolor='#cccccc')
             else:
-                segment.state(['!disabled' if enabled else 'disabled'])  
+                # Handle other ttk widgets
+                if hasattr(segment, 'state'):
+                    segment.state(['!disabled'] if enabled else ['disabled'])
+                else:
+                    # Handle regular tk widgets
+                    segment.configure(state='normal' if enabled else 'disabled')
 
     def __del__(self):
         """

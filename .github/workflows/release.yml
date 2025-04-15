@@ -31,7 +31,7 @@ jobs:
       # Create CUDA-enabled executable
       - name: Install CUDA-enabled llama_cpp
         run: |
-          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cu124 --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
+          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cu124 --extra-index-url https://pypi.org/simple llama-cpp-python==v0.3.8
 
       - name: Instal CUDA drivers for NVIDIA install
         run: |
@@ -46,7 +46,7 @@ jobs:
 
       - name: Run PyInstaller for NVIDIA
         run: |
-          pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\NVIDIA_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --add-data "C:\hostedtoolcache\windows\Python\3.10.11\x64\lib\site-packages\nvidia:nvidia-drivers" --name freescribe-client-nvidia --icon=.\src\FreeScribe.client\assets\logo.ico --noconsole .\src\FreeScribe.client\client.py
+          pyinstaller --runtime-hook=.\scripts\runtime_hooks\hook-runtime.py --additional-hooks-dir=.\scripts\hooks --hidden-import=en_core_web_md --hidden-import=en_core_sci_md --add-data ".\scripts\NVIDIA_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --add-data "C:\hostedtoolcache\windows\Python\3.10.11\x64\lib\site-packages\nvidia:nvidia-drivers" --name freescribe-client-nvidia --icon=.\src\FreeScribe.client\assets\logo.ico --noconsole .\src\FreeScribe.client\client.py
 
       # Create CPU-only executable
       - name: Uninstall CUDA-enabled llama_cpp (if necessary) and install CPU-only llama_cpp
@@ -56,17 +56,129 @@ jobs:
           pip uninstall nvidia-cuda-nvrtc-cu12==12.4.127
           pip uninstall nvidia-cublas-cu12==12.4.5.8
           pip uninstall -y llama-cpp-python
-          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
+          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --extra-index-url https://pypi.org/simple llama-cpp-python==v0.3.8
 
       - name: Run PyInstaller for CPU-only
         run: |
-          pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\CPU_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --name freescribe-client-cpu --icon=.\src\FreeScribe.client\assets\logo.ico --noconsole .\src\FreeScribe.client\client.py
+          pyinstaller --runtime-hook=.\scripts\runtime_hooks\hook-runtime.py --additional-hooks-dir=.\scripts\hooks --hidden-import=en_core_web_md --hidden-import=en_core_sci_md --add-data ".\scripts\CPU_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --name freescribe-client-cpu --icon=.\src\FreeScribe.client\assets\logo.ico --noconsole .\src\FreeScribe.client\client.py
 
       - name: Set up NSIS
         uses: joncloud/makensis-action@1c9f4bf2ea0c771147db31a2f3a7f5d8705c0105
         with:
           script-file: .\scripts\install.nsi
           additional-plugin-paths: "./scripts/nsis-plugins"
+
+      - name: Rename Installer
+        run: |
+          mv dist/FreeScribeInstaller.exe dist/FreeScribeInstaller_windows.exe
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_windows.exe
+          path: dist/FreeScribeInstaller_windows.exe
+
+  
+  build-macos-intel:
+    runs-on: macos-13
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "**/client_requirements_mac.txt"
+
+      - name: Install PortAudio
+        run: |
+          brew install portaudio
+
+      - name: Install requirements
+        run: |
+          pip install -r client_requirements_mac.txt
+      
+      - name: Install ffmpeg
+        run: |
+          brew install ffmpeg
+
+      - name: Build macOS app
+        run: |
+          ./build-mac.sh
+      
+      - name: Build PKG installer
+        run: |
+          ./build-pkg.sh --arch x86_64
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_x86_64.pkg
+          path: dist/FreeScribeInstaller_x86_64.pkg
+  
+  build-macos-arm:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "**/client_requirements_mac.txt"
+
+      - name: Install PortAudio
+        run: |
+          brew install portaudio
+
+      - name: Install requirements
+        run: |
+          pip install -r client_requirements_mac.txt
+
+      - name: Install ffmpeg
+        run: |
+          brew install ffmpeg
+
+      - name: Build macOS app
+        run: |
+          ./build-mac.sh
+      
+      - name: Build PKG installer
+        run: |
+          ./build-pkg.sh --arch arm64
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_arm64.pkg
+          path: dist/FreeScribeInstaller_arm64.pkg
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos-intel, build-macos-arm]
+    steps:
+      - name: Download Windows Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: FreeScribeInstaller_windows.exe
+
+      - name: Download Intel Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: FreeScribeInstaller_x86_64.pkg
+
+      - name: Download ARM Installer
+        uses: actions/download-artifact@v4
+        with:
+          name: FreeScribeInstaller_arm64.pkg
 
       - name: Check if alpha or RC release
         id: check_alpha
@@ -78,14 +190,14 @@ jobs:
           }
         shell: pwsh
 
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Upload Installer
+        id: upload-installer
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
           body: |
             ## What's Changed
             ${{ steps.changelog.outputs.CHANGELOG }}
@@ -93,14 +205,7 @@ jobs:
             For full changelog, see [the commits since last release](${{ github.server_url }}/${{ github.repository }}/compare/${{ steps.changelog.last_tag }}...${{ github.ref }})
           draft: false
           prerelease: ${{ steps.check_alpha.outputs.is_alpha == 'true' }}
-
-      - name: Upload Installer
-        id: upload-installer
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{steps.create_release.outputs.upload_url}}
-          asset_path: dist/FreeScribeInstaller.exe
-          asset_name: FreeScribeInstaller_windows.exe
-          asset_content_type: application/octet-stream
+          files: |
+            FreeScribeInstaller_x86_64.pkg
+            FreeScribeInstaller_arm64.pkg
+            FreeScribeInstaller_windows.exe

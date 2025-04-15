@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import scrolledtext
+
+import UI.Helpers
 from utils.file_utils import get_file_path
 
 class ScrubWindow:
@@ -17,7 +19,7 @@ class ScrubWindow:
         popup = tk.Toplevel(parent)
         popup.title("Scrub PHI Prior to GPT")
         popup.grab_set()  # Make the popup modal
-        popup.iconbitmap(get_file_path('assets', 'logo.ico'))  # Set the window icon
+        UI.Helpers.set_window_icon(popup)
 
         # Create a scrolled text area
         text_area = scrolledtext.ScrolledText(popup, height=20, width=80)

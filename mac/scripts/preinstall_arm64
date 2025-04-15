@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Detect real architecture (even if running under Rosetta)
+ARCH=$(sysctl -n hw.machine)
+TRANSLATED=$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)
+
+echo "Detected architecture: $ARCH" >> /tmp/FreeScribeInstall.log
+echo "Rosetta translation detected: $TRANSLATED" >> /tmp/FreeScribeInstall.log
+
+# If running under Rosetta, force correct detection
+if [[ "$TRANSLATED" -eq 1 ]]; then
+    echo "Running under Rosetta. Forcing architecture to ARM64." >> /tmp/FreeScribeInstall.log
+    ARCH="arm64"
+fi
+
+# Architecture check
+if [[ "$ARCH" == "arm64" ]]; then
+    echo "Installation proceeding on ARM64 system." >> /tmp/FreeScribeInstall.log
+    exit 0
+else
+    osascript -e 'display dialog "Error: This package requires an ARM64 system." buttons {"OK"} default button "OK" with icon stop with title "FreeScribe"'
+    echo "Error: This package requires an ARM64 system." >> /tmp/FreeScribeInstall.log
+    exit 1
+fi

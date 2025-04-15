@@ -2,12 +2,15 @@ from llama_cpp import Llama
 import os
 from typing import Optional, Dict, Any
 import threading
-import logging
 from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys, DEFAULT_CONTEXT_WINDOW_SIZE
 from utils.log_config import logger
 from enum import Enum
+import torch
+import utils.system
+from utils.file_utils import get_resource_path, is_flatpak
+
 
 
 class ModelStatus(Enum):
@@ -24,7 +27,7 @@ class Model:
     This class provides an interface to initialize a language model with specific configurations
     for GPU acceleration, generate responses based on a text prompt, and retrieve GPU settings.
     The class is configured to support multi-GPU setups and custom configurations for batch size,
-    context window, and sampling settings. 
+    context window, and sampling settings.
 
     Attributes:
         model: Instance of the Llama model configured with specified GPU and context parameters.
@@ -35,6 +38,7 @@ class Model:
                         the specified sampling parameters.
         get_gpu_info: Returns the current GPU configuration and batch size details.
     """
+
     def __init__(
         self,
         model_path: str,
@@ -49,7 +53,7 @@ class Model:
     ):
         """
         Initializes the GGUF model with GPU acceleration.
-        
+
         Args:
             model_path: Path to the model file
             context_size: Size of the context window
@@ -63,7 +67,7 @@ class Model:
         try:
             # Set environment variables for GPU
             os.environ["CUDA_VISIBLE_DEVICES"] = str(main_gpu)
-            
+
             # Initialize model with GPU settings
             self.model = Llama(
                 model_path=model_path,
@@ -86,7 +90,7 @@ class Model:
         except Exception as e:
             self.model = None
             raise e
-        
+
     def generate_response(
         self,
         prompt: str,
@@ -97,14 +101,14 @@ class Model:
     ) -> str:
         """
         Generates a response using GPU-accelerated inference.
-        
+
         Args:
             prompt: Input text prompt
             max_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature (higher = more random)
             top_p: Top-p sampling threshold
             repeat_penalty: Penalty for repeating tokens
-            
+
         Returns:
             Generated text response
         """
@@ -113,8 +117,8 @@ class Model:
 
             # Message template for chat completion
             messages = [
-                {"role": "user", 
-                "content": prompt}
+                {"role": "user",
+                 "content": prompt}
             ]
 
             response = self.model.create_chat_completion(
@@ -128,12 +132,11 @@ class Model:
             # reset the model tokens
             self.model.reset()
             return response["choices"][0]["message"]["content"]
-            
+
         except Exception as e:
             logger.error(f"GPU inference error ({e.__class__.__name__}): {str(e)}")
             return f"({e.__class__.__name__}): {str(e)}"
 
-    
     def get_gpu_info(self) -> Dict[str, Any]:
         """
         Returns information about the current GPU configuration.
@@ -151,12 +154,13 @@ class Model:
         """
         self.model.close()
         self.model = None
-    
+
     def __del__(self):
         """Cleanup GPU memory on deletion"""
         if self.model is not None:
             self.model.close()
         self.model = None
+
 
 class ModelManager:
     """
@@ -186,7 +190,7 @@ class ModelManager:
 
         Raises:
             ValueError: If the specified model file cannot be loaded
-        
+
         Note:
             The method uses threading to avoid blocking the UI while loading the model.
             GPU layers are set to -1 for CUDA architecture and 0 for CPU.
@@ -209,7 +213,7 @@ class ModelManager:
         def load_model():
             """
             Internal function to handle the actual model loading process.
-            
+
             Determines the model file based on settings and initializes the Llama instance
             with appropriate parameters.
             """
@@ -218,11 +222,19 @@ class ModelManager:
             if app_settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] == "CUDA (Nvidia GPU)":
                 gpu_layers = -1
 
+            if torch.backends.mps.is_available():
+                gpu_layers = -1
+
             model_to_use = "gemma-2-2b-it-Q8_0.gguf"
-                
-            model_path = f"./models/{model_to_use}"
+
+            if utils.system.is_macos() or is_flatpak():
+                model_path = get_resource_path(filename=f"models/{model_to_use}", shared=True)
+            else:
+                model_path = f"./models/{model_to_use}"
+
             try:
-                context_size = app_settings.editable_settings.get(SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value) or DEFAULT_CONTEXT_WINDOW_SIZE
+                context_size = app_settings.editable_settings.get(
+                    SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value) or DEFAULT_CONTEXT_WINDOW_SIZE
                 ModelManager.local_model = Model(
                     model_path,
                     context_size=context_size,
@@ -234,8 +246,15 @@ class ModelManager:
                 )
             except Exception as e:
                 # model doesnt exist
-                #TODO: Logo to system log
-                messagebox.showerror("Model Error", f"Model failed to load. Please ensure you have a valid model selected in the settings. Currently trying to load: {os.path.abspath(model_path)}. Error received ({e.__class__.__name__}): {str(e)}")
+                # TODO: Logo to system log
+                local_exception = e
+                def show_error(exception):
+                    messagebox.showerror(
+                        "Model Error",
+                        f"Model failed to load. Please ensure you have a valid model selected in the settings. Currently trying to load: {os.path.abspath(model_path)}. Error received ({exception.__class__.__name__}): {str(exception)}")
+                
+                root.after(100, lambda: show_error(local_exception))
+
                 ModelManager.local_model = ModelStatus.ERROR
 
         thread = threading.Thread(target=load_model)
@@ -258,7 +277,6 @@ class ModelManager:
 
         root.after(500, lambda: check_thread_status(thread, loading_window, root))
 
-
     @staticmethod
     def start_model_threaded(settings, root_window):
         """
@@ -270,8 +288,8 @@ class ModelManager:
         :type root_window: tkinter.Tk
         :return: The created thread instance
         :rtype: threading.Thread
-        
-        This method creates and starts a new thread that runs the model's start 
+
+        This method creates and starts a new thread that runs the model's start
         function with the provided settings and root window reference. The model
         is accessed through ModelManager's local_model attribute.
         """
@@ -293,4 +311,4 @@ class ModelManager:
                 ModelManager.local_model.model.close()
             del ModelManager.local_model
             ModelManager.local_model = None
-        logging.debug(f"{ModelManager.local_model=}")
+        logger.debug(f"{ModelManager.local_model=}")

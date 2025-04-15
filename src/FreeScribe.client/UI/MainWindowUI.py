@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
+
+import UI.Helpers
 import UI.MainWindow as mw
 from UI.ImageWindow import ImageWindow
 from UI.SettingsConstant import FeatureToggle
@@ -39,7 +41,7 @@ class MainWindowUI:
         self.logic = mw.MainWindow(self.app_settings)  # Logic to control the container behavior
         self.scribe_template = None
         self.setting_window = SettingsWindowUI(self.app_settings, self, self.root)  # Settings window
-        self.root.iconbitmap(get_file_path('assets','logo.ico'))
+        UI.Helpers.set_window_icon(self.root)
         self.debug_window_open = False  # Flag to indicate if the debug window is open
 
         self.warning_bar = None # Warning bar
@@ -296,7 +298,7 @@ class MainWindowUI:
         # Add Help menu
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="Help Guide", command=lambda: ImageWindow(self.root, "Help Guide", get_file_path('assets', 'help.png')))
+        help_menu.add_command(label="Help Guide", command=lambda: ImageWindow(self.root, "Help Guide", get_file_path('assets', 'help.png'), width=1000, height=686))
         help_menu.add_command(label="Debug Window", command=lambda: DebugPrintWindow(self))
         help_menu.add_command(label="About", command=lambda: self._show_md_content(get_file_path('markdown','help','about.md'), 'About'))
 

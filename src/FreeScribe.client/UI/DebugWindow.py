@@ -6,7 +6,6 @@ and a debug window interface built with tkinter.
 """
 
 import tkinter as tk
-
 from utils.log_config import buffer_handler
 from utils.utils import bring_to_front
 
@@ -28,7 +27,7 @@ class DebugPrintWindow:
         """
         self.parent = parent
         if self.parent.debug_window_open:
-            bring_to_front("Debug Output")
+            OneInstance.bring_to_front("Debug Output")
             return
         self.parent.debug_window_open = True
         self.window = tk.Toplevel(parent.root)

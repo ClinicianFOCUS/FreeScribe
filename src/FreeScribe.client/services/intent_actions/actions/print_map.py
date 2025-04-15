@@ -35,6 +35,10 @@ class PrintMapAction(BaseAction):
             
         if not google_maps_api_key:
             google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        
+        if not google_maps_api_key:
+            # TODO: Add disable logic
+            return
             
         # Initialize Google Maps client
         self.gmaps = googlemaps.Client(key=google_maps_api_key)

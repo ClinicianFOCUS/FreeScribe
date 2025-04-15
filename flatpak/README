@@ -1,0 +1,7 @@
+# Note
+1. You should run `build-flatpak.sh` from root folder (FreeScribe):
+```bash
+./flatpak/build-flatpak.sh
+```
+
+2. Prebuilt wheel of llama-cpp-python depend on musl libc, but flatpak has glibc, so we need to build it from source.

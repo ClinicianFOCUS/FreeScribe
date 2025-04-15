@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=FreeScribe
+Comment=AI Medical Scribe Application
+Exec=freescribe
+Icon=io.github.clinicianfocus.FreeScribe
+Terminal=false
+Type=Application
+Categories=Office;MedicalSoftware;
+StartupWMClass=FreeScribe 

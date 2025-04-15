@@ -1,5 +1,12 @@
+.cursorignore
+.flatpak-builder/
+.python-version
+build-dir/
+repo/
+
 freescribe.log.*
 *.log
+
 .idea/
 __version__
 
@@ -16,6 +23,7 @@ output
 client.spec
 .aider*
 .DS_Store
+install_state
 
 realtime.wav
 src/FreeScribe.client/models
@@ -23,5 +31,10 @@ freescribe-client.spec
 freescribe-client-cpu.spec
 freescribe-client-nvidia.spec
 scripts/FreeScribeInstaller.exe
-
+launch.json
 _build
+/mac/scripts/preinstall
+
+freescribe.log
+
+freescribe.log

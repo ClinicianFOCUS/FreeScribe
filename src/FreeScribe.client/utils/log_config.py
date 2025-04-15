@@ -1,8 +1,10 @@
-import io
 import os
+import io
 import sys
 import logging
 from collections import deque
+import utils.file_utils
+
 
 MAX_BUFFER_SIZE = 2500
 
@@ -16,11 +18,11 @@ class BufferHandler(logging.Handler):
     :param capacity: Maximum number of records to store (default: 2500)
     :type capacity: int
     """
-    
+
     def __init__(self, capacity=MAX_BUFFER_SIZE):
         super().__init__()
         self.buffer = deque(maxlen=capacity)
-        
+
     def emit(self, record):
         """Store the log record in the buffer.
         
@@ -52,7 +54,7 @@ class LoggingStream(io.StringIO):
     :param level: Logging level to use for messages (e.g., logging.INFO)
     :type level: int
     """
-    
+
     def __init__(self, level):
         super().__init__()
         self.level = level
@@ -75,7 +77,7 @@ class LoggingStream(io.StringIO):
             except UnicodeDecodeError:
                 # Fallback to replace invalid characters
                 message = message.decode(self._encoding, errors='replace')
-        
+
         message = message.strip()
         if message:
             for line in message.splitlines():
@@ -128,6 +130,29 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
     setattr(logging.getLoggerClass(), methodName, logForLevel)
     setattr(logging, methodName, logToRoot)
 
+def add_file_handler(log, format:logging.Formatter, file_name:str = "freescribe.log", level:int = logging.DEBUG):
+    """Add a file handler to the logger.
+    
+    This function creates a file handler for logging and sets its level and formatter.
+    The log file is named 'freescribe.log' and is located in the current working directory.
+    """
+    log_file = utils.file_utils.get_resource_path(file_name)
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(LOG_LEVEL)
+    file_handler.setFormatter(format)
+    log.addHandler(file_handler)
+    log.info(f"File Log Path: {log_file}")
+
+def remove_file_handler(log, file_name:str = "freescribe.log"):
+    """Remove the file handler from the logger.
+    
+    This function removes the file handler associated with the specified log file name.
+    """
+    log_file = utils.file_utils.get_resource_path(file_name)
+    for handler in log.handlers:
+        if isinstance(handler, logging.FileHandler) and handler.baseFilename == log_file:
+            log.removeHandler(handler)
+            break
 
 # Define custom level
 DIAGNOSE_LEVEL = 99
