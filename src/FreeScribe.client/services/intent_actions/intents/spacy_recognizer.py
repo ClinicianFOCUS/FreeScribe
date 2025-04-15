@@ -195,6 +195,13 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         :raises Exception: If initialization fails
         """
         try:
+            if not spacy.util.is_package(self.model_name):
+                logger.info(f"Downloading spaCy model {self.model_name}...")
+                spacy.cli.download(self.model_name)
+        except Exception as e:
+            logger.exception(f"Failed to download spaCy model {str(e)}")
+            return
+        try:
             self.nlp = spacy.load(self.model_name)
             self.matcher = Matcher(self.nlp.vocab)
             
