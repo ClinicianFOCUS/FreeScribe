@@ -114,7 +114,7 @@ class SettingsWindow():
             "Current Mic": "None",
             SettingsKeys.WHISPER_REAL_TIME.value: True,
             "Real Time Audio Length": 3,
-            "Real Time Silence Length": 1,
+            "Real Time Silence Length": 1.1,
             "Silence cut-off": 0.035,
             "LLM Container Name": "ollama",
             "LLM Caddy Container Name": "caddy-ollama",
@@ -213,6 +213,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_CPU_COUNT.value,
             # SettingsKeys.WHISPER_VAD_FILTER.value,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value,
+            "Real Time Audio Length",
             # left out for now, dont need users tinkering and default is good and tested.
             # SettingsKeys.SILERO_SPEECH_THRESHOLD.value, 
             SettingsKeys.USE_TRANSLATE_TASK.value,
@@ -228,6 +229,7 @@ class SettingsWindow():
 
         self.developer_settings = [
             SettingsKeys.ENABLE_FILE_LOGGER.value,
+            "Real Time Silence Length",
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
