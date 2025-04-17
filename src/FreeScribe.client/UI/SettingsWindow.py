@@ -125,7 +125,7 @@ class SettingsWindow():
             "Use Docker Status Bar": False,
             "Show Welcome Message": True,
             "Enable Scribe Template": False,
-            "Use Pre-Processing": FeatureToggle.PRE_PROCESSING,
+            SettingsKeys.USE_PRE_PROCESSING.value: False,
             "Use Post-Processing": FeatureToggle.POST_PROCESSING,
             "AI Server Self-Signed Certificates": False,
             SettingsKeys.S2T_SELF_SIGNED_CERT.value: False,
@@ -203,7 +203,8 @@ class SettingsWindow():
             # "frmtrmblln",
             SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value,
             SettingsKeys.Enable_Word_Count_Validation.value,
-            SettingsKeys.Enable_AI_Conversation_Validation.value
+            SettingsKeys.Enable_AI_Conversation_Validation.value,
+            SettingsKeys.USE_PRE_PROCESSING.value,
         ]
 
         self.adv_whisper_settings = [

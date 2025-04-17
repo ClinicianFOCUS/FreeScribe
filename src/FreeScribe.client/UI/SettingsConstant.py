@@ -27,6 +27,7 @@ class SettingsKeys(Enum):
     Enable_AI_Conversation_Validation = "Enable AI Conversation Validation"
     ENABLE_HALLUCINATION_CLEAN = "Enable Hallucination Cleaning (Experimental)"
     ENABLE_FILE_LOGGER = "Enable File Log"
+    USE_PRE_PROCESSING = "Use Pre-Processing"
 
 class Architectures(Enum):
     CPU = ("CPU", "cpu")
@@ -45,7 +46,7 @@ class FeatureToggle:
     DOCKER_SETTINGS_TAB = False
     DOCKER_STATUS_BAR = False
     POST_PROCESSING = False
-    PRE_PROCESSING = False
+    PRE_PROCESSING = True
 
 
 DEFAULT_CONTEXT_WINDOW_SIZE = 4096

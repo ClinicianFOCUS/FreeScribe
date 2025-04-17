@@ -1291,7 +1291,7 @@ def generate_note(formatted_message):
             try:
                 if use_aiscribe:
                     # If pre-processing is enabled
-                    if app_settings.editable_settings["Use Pre-Processing"]:
+                    if app_settings.editable_settings[SettingsKeys.USE_PRE_PROCESSING.value]:
                         #Generate Facts List
                         list_of_facts = send_text_to_chatgpt(f"{app_settings.editable_settings['Pre-Processing']} {formatted_message}")
                         
