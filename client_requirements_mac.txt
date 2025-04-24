@@ -83,4 +83,5 @@ tzlocal==5.2
 urllib3==2.2.3
 spacy==3.7.5
 librosa==0.11.0
+python-xlib==0.33
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl

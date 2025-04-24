@@ -34,3 +34,5 @@ scripts/FreeScribeInstaller.exe
 
 _build
 /mac/scripts/preinstall
+
+env

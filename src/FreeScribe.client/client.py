@@ -61,6 +61,7 @@ from Model import ModelStatus
 from services.whisper_hallucination_cleaner import hallucination_cleaner
 from utils.whisper.WhisperModel import load_stt_model, faster_whisper_transcribe, is_whisper_valid, is_whisper_lock, load_model_with_loading_screen, unload_stt_model, get_model_from_settings
 from services.factual_consistency import find_factual_inconsistency
+import logging
 
 APP_NAME = 'AI Medical Scribe'  # Application name
 if utils.system.is_windows():
