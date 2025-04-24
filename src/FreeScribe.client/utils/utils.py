@@ -1,5 +1,6 @@
 from utils.file_utils import get_file_path
 from utils.log_config import logger
+import logging
 
 # Define the mutex name and error code
 MUTEX_NAME = 'Global\\FreeScribe_Instance'
