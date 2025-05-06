@@ -1280,7 +1280,7 @@ def threaded_screen_input(user_message, screen_return):
     input_return = screen_input(user_message)
     screen_return.set(input_return)
 
-def send_text_to_chatgpt(edited_text): 
+def send_text_to_chatgpt(edited_text):
     if app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value]:
         return send_text_to_localmodel(edited_text)
     else:
