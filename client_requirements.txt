@@ -68,4 +68,5 @@ llama-cpp-python==v0.2.90
 faster-whisper==1.1.0
 psutil==6.1.0
 Pillow==10.2.0
+gputil==1.4.0
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl

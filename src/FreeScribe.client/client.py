@@ -1729,6 +1729,8 @@ def _load_stt_model_thread():
                 cpu_threads=int(app_settings.editable_settings[SettingsKeys.WHISPER_CPU_COUNT.value]),
                 compute_type=compute_type
             )
+            # function to check the model selected is optimal for the system specifications           
+            benchmark_model()
 
             print("STT model loaded successfully.")
         except Exception as e:
@@ -1861,6 +1863,62 @@ def set_cuda_paths():
         current_value = os.environ.get(env_var, '')
         new_value = os.pathsep.join(paths_to_add + ([current_value] if current_value else []))
         os.environ[env_var] = new_value
+
+def benchmark_model():
+    """
+    Benchmarks the performance of the currently selected Whisper model.
+
+    This function measures the time taken to transcribe a predefined audio clip
+    using the currently selected Whisper model. The results are stored in the
+    application's settings, allowing for performance tracking and model comparison.
+
+    If the model's performance is not optimal (transcription time exceeds 10 seconds for the 10 sec audio),
+    a message is displayed to the user suggesting they consider a different model.
+
+    Returns:
+        None. The function updates application settings and displays a message box.
+    """
+    test_audio_path = get_resource_path(get_file_path('assets', 'whisper_test_10sec.wav'))
+    current_model = app_settings.editable_settings.get(SettingsKeys.WHISPER_MODEL.value)
+    if not current_model:
+        messagebox.showerror("Error", "No model selected.")
+        return
+
+    test_results = app_settings.editable_settings.get(SettingsKeys.WHISPER_PERFORMANCE_TEST_RESULTS.value, {}).get(current_model, [])
+
+    def perform_test():
+        start_time = time.monotonic()
+        try:
+            result = faster_whisper_transcribe(test_audio_path)
+            end_time = time.monotonic()
+            time_taken = end_time - start_time
+            return time_taken
+        except Exception as e:
+            messagebox.showerror("Model Test Error", f"An error occurred during the test: {e}")
+            return None
+
+    if test_results:
+        last_time_taken = test_results[-1]
+        if last_time_taken >= 10:
+            message = (
+                f"The current model '{current_model}' performance is not optimal.\n"
+                "Please consider selecting a different model for better results."
+            )
+            messagebox.showinfo("Model Performance Alert", message)
+    else:
+        time_taken = perform_test()
+        if time_taken is None:
+            return
+
+        test_results.append(time_taken) # Append the new result
+        app_settings.editable_settings[SettingsKeys.WHISPER_PERFORMANCE_TEST_RESULTS.value][current_model] = test_results #update settings.
+
+        if time_taken >= 10:
+            message = (
+                f"The current model '{current_model}' performance is not optimal.\n"
+                "Please consider selecting a different model for better results."
+            )
+            messagebox.showinfo("Model Performance Alert", message)
 
 # Configure grid weights for scalability
 root.grid_columnconfigure(0, weight=1, minsize= 10)
