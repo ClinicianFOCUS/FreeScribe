@@ -33,6 +33,8 @@ from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle
 from UI.Widgets.PopupBox import PopupBox
 import utils.log_config
 from utils.log_config import logger
+from constants.whisper_languages import WHISPER_LANGUAGE_CODES
+
 
 logger = logging.getLogger(__name__)
 
@@ -608,8 +610,22 @@ class SettingsWindowUI:
         left_frame.grid(row=row, column=0, padx=10, pady=5, sticky="nw")
         right_frame = ttk.Frame(self.advanced_settings_frame)
         right_frame.grid(row=row, column=1, padx=10, pady=5, sticky="nw")
-        
-        self.create_editable_settings_col(left_frame, right_frame, 0, 0, self.settings.adv_whisper_settings)
+
+        # Create all whisper settings except language code (we'll handle that specially)
+        whisper_settings = [s for s in self.settings.adv_whisper_settings if s != SettingsKeys.WHISPER_LANGUAGE_CODE.value]
+        self.create_editable_settings_col(left_frame, right_frame, 0, 0, whisper_settings)
+
+        # Whisper Language Code Dropdown
+        tk.Label(left_frame, text=SettingsKeys.WHISPER_LANGUAGE_CODE.value).grid(row=len(whisper_settings), column=0, padx=0,
+pady=5, sticky="w")
+        self.whisper_language_dropdown = ttk.Combobox(left_frame, values=WHISPER_LANGUAGE_CODES, state="readonly")
+        current_lang = self.settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value]
+        if current_lang in WHISPER_LANGUAGE_CODES:
+            self.whisper_language_dropdown.current(WHISPER_LANGUAGE_CODES.index(current_lang))
+        else:
+            self.whisper_language_dropdown.set(current_lang)  # Fallback to current value if not in list
+        self.whisper_language_dropdown.grid(row=len(whisper_settings), column=1, padx=0, pady=5, sticky="ew")
+        self.settings.editable_settings_entries[SettingsKeys.WHISPER_LANGUAGE_CODE.value] = self.whisper_language_dropdown
         
         # # Audio meter
         # tk.Label(left_frame, text="Whisper Audio Cutoff").grid(row=1, column=0, padx=0, pady=0, sticky="w")
