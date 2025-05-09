@@ -51,13 +51,16 @@ from utils.ip_utils import is_private_ip
 from utils.file_utils import get_file_path, get_resource_path
 from utils.OneInstance import OneInstance
 from utils.utils import get_application_version
+import utils.AESCryptoUtils as AESCryptoUtils
 import utils.audio
+import utils.AESCryptoUtils as AESCryptoUtils
 import utils.system
 from UI.Widgets.MicrophoneTestFrame import MicrophoneTestFrame
 from utils.windows_utils import remove_min_max, add_min_max
 from WhisperModel import TranscribeError
 from UI.Widgets.PopupBox import PopupBox
 from UI.Widgets.TimestampListbox import TimestampListbox
+from UI.RecordingsManager import RecordingsManager
 from UI.ScrubWindow import ScrubWindow
 from utils.log_config import logger
 from Model import ModelStatus
@@ -117,10 +120,84 @@ def on_closing():
     delete_temp_file('realtime.wav')
     app_manager.cleanup()
 
-
 # Register the cleanup function to be called on exit
 atexit.register(on_closing)
 
+def update_store_notes_locally_ui(event=None):
+        global warning_label        
+        """
+        Updates the UI components based on the 'Store Notes Locally' setting.
+        """
+        if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+            # Loads all existing notes
+            load_notes_history()
+            warning_label.grid_remove()
+        else:
+            # Clear all existing notes
+            warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+            clear_all_notes()
+
+def load_notes_history():
+    """
+    Loads the temporary notes from a local .txt file containing encrypted JSON data and populates the response_history list.
+    """
+    notes_file_path = get_resource_path('notes_history.txt')
+    try:
+        with open(notes_file_path, 'r') as file:
+            encrypted_data = file.read()
+        
+        # Decrypt the JSON data
+        json_data = AESCryptoUtils.AESCryptoUtilsClass.decrypt(encrypted_data)
+
+        notes_data = json.loads(json_data)
+        for entry in notes_data:
+            timestamp = entry["timestamp"]
+            user_message = entry["user_message"]
+            response_text = entry["response_text"]
+            response_history.append((timestamp, user_message, response_text))
+        populate_ui_with_notes()
+        logger.info(f"Temporary notes loaded from {notes_file_path}")
+    except FileNotFoundError:
+        logger.info(f"No temporary notes file found at {notes_file_path}")
+    except Exception as e:
+        logger.error(f"Error loading temporary notes: {e}")
+
+def populate_ui_with_notes():
+    """
+    Populates the UI components with the data from response_history.
+    """
+    global IS_FIRST_LOG
+    IS_FIRST_LOG = False
+
+    timestamp_listbox.delete(0, tk.END)
+    for time, user_msg, response in response_history:
+        timestamp_listbox.insert(tk.END, time)
+
+def clear_all_notes():
+    """
+    Clears all temporary notes from the UI and the .txt file.
+    """
+    global response_history
+    response_history = []  # Clear the response history list
+
+    # Clear the timestamp listbox
+    timestamp_listbox.delete(0, tk.END)
+
+    # Clear the response display
+    response_display.scrolled_text.configure(state='normal')
+    response_display.scrolled_text.delete("1.0", tk.END)
+    response_display.scrolled_text.insert(tk.END, "Medical Note")
+    response_display.scrolled_text.config(fg='grey')
+    response_display.scrolled_text.configure(state='disabled')
+
+    # Clear the contents of the .txt file
+    notes_file_path = get_resource_path('notes_history.txt')
+    try:
+        with open(notes_file_path, 'w') as file:
+            file.write("")  # Write an empty string to clear the file
+        logger.info(f"Temporary notes file cleared: {notes_file_path}")
+    except Exception as e:
+        logger.error(f"Error clearing temporary notes file: {e}")
 
 # This runs before on_closing, if not confirmed, nothing should be changed
 def confirm_exit_and_destroy():
@@ -154,6 +231,9 @@ root.protocol("WM_DELETE_WINDOW", confirm_exit_and_destroy)
 
 # settings logic
 app_settings = SettingsWindow()
+
+if app_settings.editable_settings[SettingsKeys.ENABLE_FILE_LOGGER.value]:
+    utils.log_config.add_file_handler(utils.log_config.logger, format=utils.log_config.AESEncryptedFormatter())
 
 #  create our ui elements and settings config
 window = MainWindowUI(root, app_settings)
@@ -193,6 +273,7 @@ silent_warning_duration = 0
 is_audio_processing_realtime_canceled = threading.Event()
 is_audio_processing_whole_canceled = threading.Event()
 cancel_await_thread = threading.Event()
+
 
 # Constants
 if utils.system.is_linux():
@@ -414,6 +495,7 @@ def record_audio():
     global is_paused, frames, audio_queue, silent_warning_duration
 
     try:
+        recording_id = f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         current_chunk = []
         silent_duration = 0
         record_duration = 0
@@ -462,6 +544,10 @@ def record_audio():
                     if app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value] and current_chunk:
                         padded_audio = utils.audio.pad_audio_chunk(current_chunk, pad_seconds=0.5)
                         audio_queue.put(b''.join(padded_audio))
+                    
+                    if app_settings.editable_settings[SettingsKeys.STORE_RECORDINGS_LOCALLY.value]:
+                        # Encrypt the audio chunk and save it to a file
+                        utils.audio.encrypt_audio_chunk(b''.join(current_chunk), filepath=recording_id)
 
                     # Carry over the last .1 seconds of audio to the next one so next speech does not start abruptly or in middle of a word
                     carry_over_chunk = current_chunk[-int(0.1 * RATE / CHUNK):]
@@ -479,6 +565,8 @@ def record_audio():
 
         # Send any remaining audio chunk when recording stops
         if current_chunk:
+            if app_settings.editable_settings[SettingsKeys.STORE_RECORDINGS_LOCALLY.value]:
+                utils.audio.encrypt_audio_chunk(b''.join(current_chunk), filepath=recording_id)
             audio_queue.put(b''.join(current_chunk))
     except Exception as e:
         # Log the error message
@@ -589,6 +677,9 @@ def realtime_text():
                     if app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value] not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
                         body["language_code"] = app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value]
 
+                    if app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value].strip() not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
+                        body['initial_prompt'] = app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value].strip()
+
                     try:
                         verify = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
 
@@ -673,6 +764,8 @@ def toggle_recording():
             loading_screen.destroy()
             
         disable_recording_ui_elements()
+        # reset generate button state
+        send_button.config(text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
         REALTIME_TRANSCRIBE_THREAD_ID = realtime_thread.ident
         
         def _start_recording_ui():
@@ -820,6 +913,8 @@ def clear_application_press():
     """Resets the application state by clearing text fields and recording status."""
     reset_recording_status()  # Reset recording-related variables
     clear_all_text_fields()  # Clear UI text areas
+    # change re generate button to generate button
+    send_button.config(text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
 
 
 def reset_recording_status():
@@ -1055,6 +1150,9 @@ def send_audio_to_server():
             if app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value] not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
                 body["language_code"] = app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value]
 
+            if app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value] not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
+                body['initial_prompt'] = app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value]
+
             try:
                 verify = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
 
@@ -1146,6 +1244,27 @@ def send_and_receive():
     display_text(NOTE_CREATION)
     threaded_handle_message(user_message)
 
+def save_notes_history():
+    """
+    Saves the temporary notes to a local .txt file in encrypted JSON format.
+    """
+    notes_file_path = get_resource_path('notes_history.txt')
+    try:
+        # Convert response_history to a list of dictionaries
+        notes_data = [
+            {"timestamp": timestamp, "user_message": user_message, "response_text": response_text}
+            for timestamp, user_message, response_text in response_history
+        ]
+        json_data = json.dumps(notes_data, indent=4)
+        
+        # Encrypt the JSON data
+        encrypted_data = AESCryptoUtils.AESCryptoUtilsClass.encrypt(json_data)
+        
+        with open(notes_file_path, 'w') as file:
+            file.write(encrypted_data)
+        logger.info(f"Temporary notes saved to {notes_file_path}")
+    except Exception as e:
+        logger.error(f"Error saving temporary notes: {e}")
 
 def display_text(text):
     def _display_text():
@@ -1169,6 +1288,8 @@ def update_gui_with_response(response_text):
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     response_history.insert(0, (timestamp, user_message, response_text))
+    if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+        save_notes_history()
 
     # Update the timestamp listbox
     timestamp_listbox.delete(0, tk.END)
@@ -1193,6 +1314,8 @@ def show_response(event):
     selection = event.widget.curselection()
     if selection:
         index = selection[0]
+        # set the regenerate note button
+        send_button.config(text="Regenerate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
         transcript_text = response_history[index][1]
         response_text = response_history[index][2]
         user_input.scrolled_text.configure(state='normal')
@@ -1461,7 +1584,6 @@ def generate_note(formatted_message):
                 else:
                     update_gui_with_response(medical_note)
                     summary = medical_note
-
             else: # If pre-processing is not enabled then just generate the note
                 medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}")
 
@@ -1615,6 +1737,8 @@ def generate_note_thread(text: str):
         else:
             loading_window.destroy()
             stop_flashing()
+            # switch generate note button to "Regenerate Note"
+            send_button.config(text="Regenerate Note")
 
     root.after(500, lambda: check_thread_status(thread, loading_window))
 
@@ -1978,6 +2102,7 @@ history_frame.grid_rowconfigure(3, weight=1)
 system_font = tk.font.nametofont("TkDefaultFont")
 base_size = system_font.cget("size")
 scaled_size = int(base_size * 0.9)  # 90% of system font size
+
 # Add warning label
 warning_label = tk.Label(history_frame,
                          text="Temporary Note History will be cleared when app closes",
@@ -1988,13 +2113,24 @@ warning_label = tk.Label(history_frame,
                          )
 warning_label.grid(row=3, column=0, sticky='ew', pady=(0, 5))
 
-
 # Add the timestamp listbox
 timestamp_listbox = TimestampListbox(history_frame, height=30, exportselection=False, response_history=response_history)
 timestamp_listbox.grid(row=0, column=0, rowspan=3, sticky='nsew')
 timestamp_listbox.bind('<<ListboxSelect>>', show_response)
 timestamp_listbox.insert(tk.END, "Temporary Note History")
 
+warning_label = tk.Label(history_frame,
+                            text="Temporary Note History will be cleared when app closes",
+                            # fg="red",
+                            # wraplength=200,
+                            justify="left",
+                            font=tk.font.Font(size=scaled_size),
+                            )
+
+if not app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+    warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+    
+    
 
 # Add microphone test frame
 mic_test = MicrophoneTestFrame(parent=history_frame, p=p, app_settings=app_settings, root=root)
@@ -2132,8 +2268,49 @@ def await_models(timeout_length=60):
 
 root.after(100, await_models)
 
-root.bind("<<LoadSttModel>>", lambda event: load_model_with_loading_screen(root=root, app_settings=app_settings))
-root.bind("<<UnloadSttModel>>", lambda e: unload_stt_model())
+root.bind("<<LoadSttModel>>", load_stt_model)
+root.bind("<<UnloadSttModel>>", unload_stt_model)
+root.bind("<<UpdateNoteHistoryUi>>", update_store_notes_locally_ui)
+
+def generate_note_bind(event, data: np.ndarray):
+    """
+    Generate a note based on the current user input and update the response display.
+
+    Args:
+        event: Optional event parameter for binding to tkinter events.
+    """
+    loading_window = LoadingWindow(root, "Transcribing Audio", "Transcribing Audio. Please wait.", on_cancel=clear_application_press)
+    
+    def action():
+        clear_application_press()
+
+        wav_data = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768
+
+        result = faster_whisper_transcribe(wav_data)
+
+        root.after(0, update_gui(result))
+
+    wrk_thrd = threading.Thread(target=action)
+    wrk_thrd.start()
+
+    def check_thread():
+        if wrk_thrd.is_alive():
+            root.after(100, check_thread)
+        else:
+            loading_window.destroy()
+            send_and_receive()
+
+    check_thread()
+
+                           
+root.bind("<<GenerateNote>>", lambda e: threading.Thread(target=lambda: generate_note_bind(e, RecordingsManager.last_selected_data)).start())
+
+if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+    # Load temporary notes from the file
+    load_notes_history()
+    # Populate the UI with the loaded notes
+    populate_ui_with_notes()
+
 
 root.mainloop()
 

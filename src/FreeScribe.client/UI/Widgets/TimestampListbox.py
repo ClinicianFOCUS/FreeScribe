@@ -34,7 +34,24 @@ class TimestampListbox(tk.Listbox):
         # Setup right-click menu
         self.menu = tk.Menu(self, tearoff=0)
         self.menu.add_command(label="Rename", command=self.start_edit)
+        self.menu.add_command(label="Delete", command=lambda: self.remove_entry(self.curselection()))
         self.bind("<Button-3>", self.on_right_click)
+    
+    def remove_entry(self, selection):
+        """Remove the selected entry from the Listbox and update response history.
+
+        :param selection: The index of the selected entry
+        :type selection: tuple
+        """
+        if not selection:
+            return
+
+        index = selection[0]
+        self.delete(index)
+
+        # Remove the corresponding entry from the response history
+        if index < len(self.response_history):
+            del self.response_history[index]
 
     def on_right_click(self, event):
         """Handle right-click events to show context menu.

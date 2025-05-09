@@ -77,7 +77,7 @@ class SettingsWindow():
     STATE_FILES_DIR = "install_state"
     DEFAULT_WHISPER_ARCHITECTURE = Architectures.CPU.architecture_value
     DEFAULT_LLM_ARCHITECTURE = Architectures.CPU.architecture_value
-    AUTO_DETECT_LANGUAGE_CODES = ["", "auto", "Auto Detect", "None", "None (Auto Detect)"]
+    AUTO_DETECT_LANGUAGE_CODES = ["", " ","auto", "Auto Detect", "None", "None (Auto Detect)"]
 
     DEFAULT_SETTINGS_TABLE = {
             SettingsKeys.LOCAL_LLM_MODEL.value: "gemma2:2b-instruct-q8_0",
@@ -116,7 +116,7 @@ class SettingsWindow():
             "Current Mic": "None",
             SettingsKeys.WHISPER_REAL_TIME.value: True,
             "Real Time Audio Length": 3,
-            "Real Time Silence Length": 1,
+            "Real Time Silence Length": 1.1,
             "Silence cut-off": 0.035,
             "LLM Container Name": "ollama",
             "LLM Caddy Container Name": "caddy-ollama",
@@ -127,7 +127,7 @@ class SettingsWindow():
             "Use Docker Status Bar": False,
             "Show Welcome Message": True,
             "Enable Scribe Template": False,
-            "Use Pre-Processing": FeatureToggle.PRE_PROCESSING,
+            SettingsKeys.USE_PRE_PROCESSING.value: False,
             "Use Post-Processing": FeatureToggle.POST_PROCESSING,
             "AI Server Self-Signed Certificates": False,
             SettingsKeys.S2T_SELF_SIGNED_CERT.value: False,
@@ -148,6 +148,11 @@ class SettingsWindow():
             # Google Maps API settings
             SettingsKeys.GOOGLE_MAPS_API_KEY.value: "",  # Will be set by user
             SettingsKeys.ENABLE_FILE_LOGGER.value: False,
+            SettingsKeys.STORE_NOTES_LOCALLY.value: False,
+            SettingsKeys.STORE_RECORDINGS_LOCALLY.value: False,
+            SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
+            # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
+            SettingsKeys.BEST_OF.value: 1,
         }
 
     def __init__(self):
@@ -172,7 +177,8 @@ class SettingsWindow():
 
         self.general_settings = [
             "Show Welcome Message",
-            "Show Scrub PHI"
+            "BlankSpace",
+            "Show Scrub PHI",      
         ]
 
         self.whisper_settings = [
@@ -220,6 +226,7 @@ class SettingsWindow():
             SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value,
             SettingsKeys.Enable_Word_Count_Validation.value,
             SettingsKeys.Enable_AI_Conversation_Validation.value,
+            SettingsKeys.USE_PRE_PROCESSING.value,
             SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value,
         ]
 
@@ -230,6 +237,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_CPU_COUNT.value,
             # SettingsKeys.WHISPER_VAD_FILTER.value,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value,
+            "Real Time Audio Length",
             # left out for now, dont need users tinkering and default is good and tested.
             # SettingsKeys.SILERO_SPEECH_THRESHOLD.value, 
             SettingsKeys.USE_TRANSLATE_TASK.value,
@@ -241,11 +249,15 @@ class SettingsWindow():
         self.adv_general_settings = [
             # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
+            SettingsKeys.STORE_RECORDINGS_LOCALLY.value,
+            SettingsKeys.STORE_NOTES_LOCALLY.value,
+            SettingsKeys.ENABLE_FILE_LOGGER.value,
             SettingsKeys.USE_LOW_MEM_MODE.value,
         ]
 
         self.developer_settings = [
-            SettingsKeys.ENABLE_FILE_LOGGER.value,
+            "Real Time Silence Length",
+            "BlankSpace", # Represents the Whisper Initial Prompt
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
@@ -329,7 +341,8 @@ class SettingsWindow():
             else:
                 return str(value)
         except (ValueError, TypeError):
-            logger.warning(f"Warning: Could not convert {setting} value to {target_type}")
+            logging.warning(f"Warning: Could not convert {setting} value to {target_type}")
+
             return value
 
     def load_settings_from_file(self, filename='settings.txt'):

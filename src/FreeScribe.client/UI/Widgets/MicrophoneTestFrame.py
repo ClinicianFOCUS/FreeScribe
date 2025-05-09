@@ -221,6 +221,7 @@ class MicrophoneTestFrame:
             self.status_label.config(text="Error: No microphones available", foreground="red")
             MicrophoneState.SELECTED_MICROPHONE_INDEX = None
             MicrophoneState.SELECTED_MICROPHONE_NAME = None
+
     def update_selected_microphone(self, selected_index):
         """
         Update the selected microphone index and name.

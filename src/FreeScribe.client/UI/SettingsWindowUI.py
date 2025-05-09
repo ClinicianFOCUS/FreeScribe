@@ -19,9 +19,10 @@ Classes:
     SettingsWindowUI: Manages the settings window UI.
 """
 
+import json
 import logging
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk , messagebox
 import threading
 
 import UI.Helpers
@@ -81,6 +82,8 @@ class SettingsWindowUI:
         self.docker_settings_frame = None
         self.basic_settings_frame = None
         self.advanced_settings_frame = None
+        self.display_notes_warning = True
+        self.developer_frame = None
         self.widgets = {}
         
 
@@ -118,6 +121,10 @@ class SettingsWindowUI:
         self.advanced_frame = ttk.Frame(self.notebook)
         self.docker_settings_frame = ttk.Frame(self.notebook)
 
+        # Create container frame that will hold the scrollable frame
+        self.developer_container = ttk.Frame(self.notebook)
+        self.developer_frame = self.add_scrollbar_to_frame(self.developer_container)
+
         self.notebook.add(self.general_settings_frame, text="General Settings")
         self.notebook.add(self.whisper_settings_frame, text="Speech-to-Text Settings (Whisper)")
         self.notebook.add(self.llm_settings_frame, text="AI Settings (LLM)")
@@ -135,6 +142,7 @@ class SettingsWindowUI:
         self.create_llm_settings()
         self.create_whisper_settings()
         self.create_advanced_settings()
+        self.create_developer_settings()
 
         if FeatureToggle.DOCKER_SETTINGS_TAB is True:
             self.notebook.add(self.docker_settings_frame, text="Docker Settings")
@@ -143,11 +151,12 @@ class SettingsWindowUI:
         self.create_buttons()
 
         # "Dev" settings tab for developer mode
-        self._enable_developer_mode(None)
+        # Create the menu then disable it so the ui elements have access
+        self.settings_window.bind("<Control-slash>", self._disable_developer_mode)
         self._disable_developer_mode(None)
-        self.settings_window.bind("<Control-slash>", self._enable_developer_mode)
 
         # set the focus to this window
+        self.notebook.select(self.general_settings_frame)
         self.settings_window.focus_set()
 
 
@@ -155,23 +164,24 @@ class SettingsWindowUI:
         """
         add a developer tab to the notebook
         """
-        self.developer_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.developer_frame, text="Developer Settings")
-        self.create_developer_settings(self.developer_frame)
+        if self.developer_container not in self.notebook.tabs():
+            self.notebook.add(self.developer_container, text="Developer Settings")
         self.settings_window.unbind("<Control-slash>")
         self.settings_window.bind("<Control-slash>", self._disable_developer_mode)
         # select the developer tab automatically
-        self.notebook.select(self.developer_frame)
+        self.notebook.select(self.developer_container)
 
     def _disable_developer_mode(self, event):
         """
         remove the developer tab from the notebook
         """
-        self.notebook.hide(self.developer_frame)
+        if self.developer_container in self.notebook.tabs():
+            self.notebook.forget(self.developer_container)
+
         self.settings_window.unbind("<Control-slash>")
         self.settings_window.bind("<Control-slash>", self._enable_developer_mode)
 
-    def create_developer_settings(self, frame):
+    def create_developer_settings(self):
         """
         Creates the Developer settings UI elements.
 
@@ -195,32 +205,41 @@ class SettingsWindowUI:
         left_frame.grid(row=row, column=0, padx=10, pady=5, sticky="nw")
         right_frame = ttk.Frame(self.developer_frame)
         right_frame.grid(row=row, column=1, padx=10, pady=5, sticky="nw")
+        
+        row += 1
 
         # load all settings from the developer settings        
         left_row, right_row = self.create_editable_settings_col(left_frame, right_frame, 0, 0, self.settings.developer_settings)
-
-        # add custom handler for log file button, additional warning for PHI
-        def _on_file_logger_click(*args):
-            if self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].get() == 1:
-                # Give a disclaimer for potential PHI leak
-                result = messagebox.askokcancel(
-                    title="Warning",
-                    message="Enabling file logging may expose sensitive information such as patient PHI. Use with caution. The log file can be located at:\n" + get_resource_path('freescribe.log'),
-                    icon="warning"
-                )
-
-                # Check the result (True if OK was clicked, False if Cancel was clicked)
-                if not result:
-                    # User clicked Cancel - don't enable file logging
-                    logger.info("File logging disclaimer denied.")
-                    #uncheck the checkbox
-                    self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].set(0)
-                    self.widgets[SettingsKeys.ENABLE_FILE_LOGGER.value].config(variable=self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value])  # Disable the checkbox
-
-        # add a trace to the checkbox on change determine if we need to display disclaimer
-        self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].trace_add("write", _on_file_logger_click)
         
+        if FeatureToggle.PRE_PROCESSING is True:
+            self.preprocess_text, label_row, text_row, row = self._create_text_area(
+                self.developer_frame, "Pre-Processing", self.settings.editable_settings["Pre-Processing"], row
+            )
 
+        row += 1
+
+        # Intial prompt text field
+        self.initial_prompt, label_row1, text_row1, row = self._create_text_area(
+            self.developer_frame, "Whisper Initial Prompt", self.settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value], row
+        )
+
+        # Explanation for Pre convo instruction
+        initial_prompt_explanation = (
+            "This is the initial Whisper prompt:\n\n"
+            "• Guides how Whisper interprets and processes audio input\n"
+            "• Defines transcription or translation format requirements\n"
+            "• Can help whisper identify new vocabulary\n\n"
+            "⚠️ Modify with caution as it influences the transcription/translation accuracy and quality"
+        )
+
+        tk.Label(
+            self.developer_frame,
+            text=initial_prompt_explanation,
+            justify="left",
+            font=("Arial", 9),
+            fg="#272927"
+        ).grid(row=text_row1, column=1, padx=(10, 0), pady=5, sticky="nw")
+        
     def _display_center_to_parent(self):
         # Get parent window dimensions and position
         parent_x = self.root.winfo_x()
@@ -586,15 +605,6 @@ class SettingsWindowUI:
             self.create_editable_settings_col(left_frame, right_frame, 0, 0, settings)
             return row + 1
 
-        def create_processing_section(label_text, setting_key, text_content, row):
-            frame = tk.Frame(self.advanced_settings_frame, width=800)
-            frame.grid(row=row, column=0, padx=10, pady=0, sticky="nw")
-            self._create_checkbox(frame, f"Use {label_text}", setting_key, 0)
-            row += 1
-            
-            text_area, row = self._create_text_area(label_text, text_content, row)
-            return text_area, row
-
         row = self._create_section_header("⚠️ Advanced Settings (For Advanced Users Only)", 0, text_colour="red", frame=self.advanced_settings_frame)
         
         # General Settings
@@ -647,7 +657,7 @@ class SettingsWindowUI:
 
         # Pre convo instruction
         self.aiscribe_text, label_row1, text_row1, row = self._create_text_area(
-            "Pre Conversation Instruction", self.settings.AISCRIBE, row
+            self.advanced_settings_frame, "Pre Conversation Instruction", self.settings.AISCRIBE, row
         )
 
         # Explanation for Pre convo instruction
@@ -670,7 +680,7 @@ class SettingsWindowUI:
 
         # Post convo instruction
         self.aiscribe2_text, label_row2, text_row2, row = self._create_text_area(
-            "Post Conversation Instruction", self.settings.AISCRIBE2, row
+            self.advanced_settings_frame, "Post Conversation Instruction", self.settings.AISCRIBE2, row
         )
 
         # Explanation for Post convo instruction
@@ -689,24 +699,98 @@ class SettingsWindowUI:
             font=("Arial", font_size),
 
         ).grid(row=text_row2, column=1, padx=(10, 0), pady=5, sticky="nw")
-
-        if FeatureToggle.PRE_PROCESSING is True:
-            # Processing Sections
-            self.preprocess_text, row = create_processing_section(
-                "Pre-Processing", 
-                "Use Pre-Processing",
-                self.settings.editable_settings["Pre-Processing"],
-                row
-            )
         
         if FeatureToggle.POST_PROCESSING is True:
-            self.postprocess_text, _ = create_processing_section(
+            self.postprocess_text, _ = self.__create_processing_section(
+                self.advanced_settings_frame,
                 "Post-Processing (Experimental. Use with caution.)",
                 "Use Post-Processing", 
                 self.settings.editable_settings["Post-Processing"],
                 row
             )
 
+        # add watchers for save encrypted files
+        self.settings.editable_settings_entries[SettingsKeys.STORE_RECORDINGS_LOCALLY.value].trace_add(
+            "write",
+            lambda *args: self.__display_encrypted_phi_warning(SettingsKeys.STORE_RECORDINGS_LOCALLY.value)
+        )
+
+        self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].trace_add(
+            "write",
+            lambda *args: self.__display_encrypted_phi_warning(SettingsKeys.ENABLE_FILE_LOGGER.value)
+        )
+
+        self.settings.editable_settings_entries[SettingsKeys.STORE_NOTES_LOCALLY.value].trace_add(
+            "write",
+            lambda *args: self.toggle_store_notes_locally()
+        )
+
+    def toggle_store_notes_locally(self):
+        """
+        Handle toggling the Store Notes Locally checkbox.
+        Shows a warning popup on the main window when attempting to disable this setting.
+        """
+        # Convert IntVar to boolean
+        current_value = bool(self.settings.editable_settings_entries[SettingsKeys.STORE_NOTES_LOCALLY.value].get())
+        
+        # If the checkbox was unchecked (value is now False), show the warning popup
+        if not current_value and self.display_notes_warning:
+            # Create a popup warning dialog on the main window
+            confirm = messagebox.askokcancel(
+                "Warning",
+                "Disabling Store Notes Locally (Encrypted) will delete the existing saved notes",
+                icon="warning",
+                parent=self.root  # Use the main window as the parent
+            )
+            
+            if confirm:
+                # User clicked Continue, keep the setting disabled
+                self.settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value] = False
+            else:
+                # User clicked Cancel, revert the checkbox to checked
+                self.settings.editable_settings_entries[SettingsKeys.STORE_NOTES_LOCALLY.value].set(1)
+                self.settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value] = True
+        else:
+            self.display_notes_warning = False  # Reset the flag to show the warning next time
+            self.__display_encrypted_phi_warning(SettingsKeys.STORE_NOTES_LOCALLY.value)
+
+        self.display_notes_warning = True  # Reset the flag to show the warning next time
+
+
+    def __display_encrypted_phi_warning(self, setting_name):
+        """
+        Displays a warning message for encrypted PHI files.
+        """
+        # Check if the setting is enabled (1)
+        if not self.settings.editable_settings_entries[setting_name].get():
+            return # No need to show the warning if the setting is disabled
+
+        warning_message = (
+            "⚠️ Warning: Encrypted PHI Data Storage",
+            "You are about to save encrypted Protected Health Information (PHI) to disk.",
+            "While this data is securely encrypted,  you should still exercise care in how you manage these files."
+            "Please ensure the file is stored in a secure location and access is appropriately restricted.",
+            "Do you still wish to proceed?",
+        )
+        result = tk.messagebox.askyesno(
+            "Warning",
+            "\n".join(warning_message),
+            icon="warning",
+        )
+
+        if not result:
+            print("User chose not to proceed with saving encrypted PHI data.")
+            self.settings.editable_settings_entries[setting_name].set(0)  # Disable the checkbox
+            self.widgets[setting_name].config(variable=self.settings.editable_settings_entries[setting_name])  # Disable the checkbox
+
+    def __create_processing_section(self, frame, label_text, setting_key, text_content, row):
+        button_frame = tk.Frame(frame, width=800)
+        button_frame.grid(row=row, column=0, padx=10, pady=0, sticky="nw")
+        self._create_checkbox(button_frame, f"Use {label_text}", setting_key, 0)
+        row += 1
+        
+        text_area, label_row, text_row, column_row = self._create_text_area(frame, label_text, text_content, row)
+        return text_area, row
 
     def create_docker_settings(self):
         """
@@ -814,8 +898,12 @@ class SettingsWindowUI:
         # save architecture
         self.settings.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = self.architecture_dropdown.get()
 
+        # save the intial prompt
+        self.settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value] = self.initial_prompt.get("1.0", "end-1c") # end-1c removes the trailing newline
+
         # Save Google Maps API key
         self.settings.editable_settings[SettingsKeys.GOOGLE_MAPS_API_KEY.value] = self.widgets[SettingsKeys.GOOGLE_MAPS_API_KEY.value].get()
+
 
         self.settings.save_settings(
             self.openai_api_key_entry.get(),
@@ -839,6 +927,10 @@ class SettingsWindowUI:
         if local_model_reload_flag:
             logger.debug("reloading ai model")
             ModelManager.start_model_threaded(self.settings, self.main_window.root)
+
+        #update the notes and Ui
+        self.main_window.root.event_generate("<<UpdateNoteHistoryUi>>")
+        self.main_window.root.event_generate("<<ProcessDataTab>>")
 
         # check if we should unload the model
         # unload models if low mem is now on
@@ -866,7 +958,7 @@ class SettingsWindowUI:
             return
 
         if self.settings.editable_settings_entries[SettingsKeys.ENABLE_FILE_LOGGER.value].get() == 1:
-            utils.log_config.add_file_handler(utils.log_config.logger, utils.log_config.formatter)
+            utils.log_config.add_file_handler(utils.log_config.logger, utils.log_config.AESEncryptedFormatter())
             logger.info("File logging enabled.")
         else:
             utils.log_config.remove_file_handler(utils.log_config.logger)
@@ -901,8 +993,19 @@ class SettingsWindowUI:
 
         This method creates and places UI elements for general settings.
         """
-        frame, row = self.create_editable_settings(self.general_settings_frame, self.settings.general_settings)
-        
+        # Create frames for a two-column layout
+        left_frame = ttk.Frame(self.general_settings_frame)
+        left_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nw")
+
+        right_frame = ttk.Frame(self.general_settings_frame)
+        right_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
+
+        left_row = 0
+        right_row = 0
+
+        # Create the rest of the general settings
+        left_row, right_row = self.create_editable_settings_col(left_frame, right_frame, left_row, right_row, self.settings.general_settings)
+
         # Add a note at the bottom of the general settings frame
         note_text = (
         "NOTE: To protect personal health information (PHI), we recommend using a local network.\n"
@@ -912,7 +1015,7 @@ class SettingsWindowUI:
 
         # Create a frame to hold the note labels
         note_frame = tk.Frame(self.general_settings_frame)
-        note_frame.grid(padx=10, pady=5, sticky="w")
+        note_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 
         font_size = 12 if utils.system.is_windows() else 14
         # Add the red * label
@@ -929,7 +1032,6 @@ class SettingsWindowUI:
             justify="left"
         )
         note_label.grid(row=0, column=1, sticky="w")
-
     def _create_checkbox(self, frame, label, setting_name, row_idx, setting_key=None):
         """
         Creates a checkbox in the given frame.
@@ -965,6 +1067,7 @@ class SettingsWindowUI:
         """
         tk.Label(frame, text=label).grid(row=row_idx, column=0, padx=0, pady=5, sticky="w")
         value = self.settings.editable_settings[setting_name]
+
         # Convert the value to the appropriate type using the helper method
         if hasattr(self.settings, 'convert_setting_value'):
             value = self.settings.convert_setting_value(setting_name, value)
@@ -997,7 +1100,7 @@ class SettingsWindowUI:
             sticky="w")
         return row + 1
 
-    def _create_text_area(self, label_text, text_content, row):
+    def _create_text_area(self, frame, label_text, text_content, row):
         """
         Creates a labeled text area widget in the advanced settings frame.
         
@@ -1010,11 +1113,11 @@ class SettingsWindowUI:
             tuple: (Text widget object, label_row, text_row, next_row)
         """
         label_row = row
-        tk.Label(self.advanced_settings_frame, text=label_text).grid(
+        tk.Label(frame, text=label_text).grid(
             row=label_row, column=0, padx=10, pady=5, sticky="w")
         
         text_row = row + 1
-        text_area = tk.Text(self.advanced_settings_frame, height=10, width=50)
+        text_area = tk.Text(frame, height=10, width=50)
         text_area.insert(tk.END, text_content)
         text_area.grid(row=text_row, column=0, padx=10, pady=5, sticky="w")
         
@@ -1039,10 +1142,6 @@ class SettingsWindowUI:
         Returns:
             tk.Frame: The scrollable frame.
         """
-        # Guard clause: return frame as is if it's not the advanced frame
-        if frame != self.advanced_frame:
-            return frame
-
         # Create scrollable frame components
         canvas = tk.Canvas(frame)
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
