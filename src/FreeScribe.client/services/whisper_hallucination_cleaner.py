@@ -152,7 +152,7 @@ class WhisperHallucinationCleaner:
             return f"Failed to load spaCy model. {e}"
         except Exception as e:
             error_msg = f"Failed to initialize spaCy model: {str(e)}"
-            self.logger.error(error_msg)
+            self.logger.exception(error_msg)
             return error_msg
 
     def unload_model(self):

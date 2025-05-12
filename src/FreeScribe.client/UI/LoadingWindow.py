@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from utils.file_utils import get_file_path
+from utils.log_config import logger
 
 class LoadingWindow:
     """
@@ -103,6 +104,7 @@ class LoadingWindow:
             self.popup.protocol("WM_DELETE_WINDOW", lambda: None)
         except Exception:
             # Enable the window on exception
+            logger.exception("Error creating LoadingWindow")
             if parent:
                 parent.wm_attributes('-disabled', False)
             raise
@@ -117,6 +119,7 @@ class LoadingWindow:
             try:
                 self.on_cancel()
             except Exception:
+                logger.exception("Error in on_cancel callback")
                 self.destroy()
 
         self.destroy()

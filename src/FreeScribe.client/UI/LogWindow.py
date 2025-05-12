@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 from utils.AESCryptoUtils import AESCryptoUtilsClass
 from utils.file_utils import get_resource_path
+from utils.log_config import logger
 import base64
 
 class LogWindow:
@@ -35,9 +36,11 @@ class LogWindow:
                     decrypted_text = AESCryptoUtilsClass.decrypt(enc_line)
                     self.text_widget.insert(tk.END, decrypted_text + "\n")
                 except Exception as line_err:
+                    logger.exception("Failed to decrypt line")
                     self.text_widget.insert(tk.END, f"[Failed to decrypt line]: {line_err}\n")
 
         except Exception as e:
+            logger.exception("Failed to load or decrypt log")
             messagebox.showerror("Error", f"Failed to load or decrypt log:\n{str(e)}")
 
     def copy_to_clipboard(self):
@@ -61,4 +64,5 @@ class LogWindow:
                     f.write(content)
                 messagebox.showinfo("Saved", f"File saved to:\n{file_path}")
             except Exception as e:
+                logger.exception("Failed to save file")
                 messagebox.showerror("Error", f"Failed to save file:\n{str(e)}")

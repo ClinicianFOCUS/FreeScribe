@@ -3,6 +3,7 @@ from tkinter import Toplevel, messagebox
 from PIL import Image, ImageTk
 from utils.file_utils import get_file_path
 import utils.window_utils
+from utils.log_config import logger
 
 class ImageWindow:
     """A window to display an image with scrollbars and zoom functionality.
@@ -96,6 +97,7 @@ class ImageWindow:
             
         except FileNotFoundError:
             messagebox.showerror("Error", f"Image file not found: {image_path}")
+            logger.exception("Image file not found")
             if hasattr(self, 'window'):
                 self.window.destroy()
 

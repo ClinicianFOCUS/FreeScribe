@@ -30,7 +30,7 @@ from utils.utils import get_application_version
 from Model import ModelManager
 from utils.ip_utils import is_valid_url
 import multiprocessing
-
+from utils.log_config import logger
 
 class SettingsWindow():
     """
@@ -304,7 +304,7 @@ class SettingsWindow():
                 try:
                     settings = json.load(file)
                 except json.JSONDecodeError:
-                    print("Error loading settings file. Using default settings.")
+                    logger.exception("Failed to decode JSON from settings file")
                     return self.OPENAI_API_KEY
 
                 self.OPENAI_API_KEY = settings.get("openai_api_key", self.OPENAI_API_KEY)
@@ -390,6 +390,7 @@ class SettingsWindow():
             with open(get_resource_path('aiscribe.txt'), 'r') as f:
                 return f.read()
         except FileNotFoundError:
+            logger.info("aiscribe.txt not found, using default value.")
             return None
 
     def load_aiscribe2_from_file(self):
@@ -403,6 +404,7 @@ class SettingsWindow():
             with open(get_resource_path('aiscribe2.txt'), 'r') as f:
                 return f.read()
         except FileNotFoundError:
+            logger.info("aiscribe2.txt not found, using default value.")
             return None
 
     def __clear_settings_file(self):
@@ -476,7 +478,7 @@ class SettingsWindow():
             settings_window.destroy()
         except Exception as e:
             # Print any exception that occurs during file handling or window destruction.
-            print(f"Error clearing settings files: {e}")
+            logger.exception("Failed to clear settings file")
             messagebox.showerror("Error", "An error occurred while clearing settings. Please try again.")
 
     def get_available_models(self,endpoint=None):
@@ -516,8 +518,7 @@ class SettingsWindow():
             available_models.append("Custom")
             return available_models
         except requests.RequestException as e:
-            # messagebox.showerror("Error", f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.") 
-            print(e)
+            logger.exception("Failed to fetch models from endpoint")
             return ["Failed to load models", "Custom"]
 
     def update_models_dropdown(self, dropdown, endpoint=None):
@@ -597,7 +598,6 @@ class SettingsWindow():
                 unload_flag = True
         # in case context_window value is invalid
         except (ValueError, TypeError) as e:
-            logging.error(str(e))
             logging.exception("Failed to determine reload/unload model")
         logging.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
         return unload_flag, reload_flag

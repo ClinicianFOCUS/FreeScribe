@@ -17,6 +17,7 @@ import utils.AESCryptoUtils as AESCryptoUtils
 import utils.audio
 from UI.SettingsConstant import SettingsKeys
 from UI.LoadingWindow import LoadingWindow
+from utils.log_config import logger
 
 class RecordingsManager:
     
@@ -150,6 +151,7 @@ class RecordingsManager:
             self.update_position()
 
         except Exception as e:
+            logger.exception("Error playing recording")
             messagebox.showerror("Error", f"Could not play recording: {str(e)}")
 
     def play_audio(self):
@@ -175,6 +177,7 @@ class RecordingsManager:
                 self.current_position += frames_written / self.wf.getframerate()
 
         except Exception as e:
+            logger.exception("Playback error")
             messagebox.showerror("Playback Error", f"Error during playback: {str(e)}")
         finally:
             self.stop_playback()
@@ -227,6 +230,7 @@ class RecordingsManager:
                 os.remove(decrypted_path)
             self.recordings_list.delete(selection[0])
         except Exception as e:
+            logger.exception("Error deleting recording")
             messagebox.showerror("Error", f"Could not delete recording: {str(e)}")
 
     def save_unencrypted(self):
@@ -249,6 +253,7 @@ class RecordingsManager:
                 with open(wav_path, 'rb') as src, open(save_path, 'wb') as dst:
                     dst.write(src.read())
             except Exception as e:
+                logger.exception("Error saving recording")
                 messagebox.showerror("Error", f"Could not save recording: {str(e)}")
 
     def update_time_label(self):
@@ -286,6 +291,7 @@ class RecordingsManager:
                 self.popup.destroy()
                 
             except Exception as e:
+                logger.exception("Error generating note")
                 messagebox.showerror("Error", f"Could not generate note: {str(e)}")
 
         self.parent.after(0, note_loading)

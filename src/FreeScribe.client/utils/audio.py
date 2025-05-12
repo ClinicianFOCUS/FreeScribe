@@ -87,7 +87,7 @@ def encrypt_audio_chunk(chunk, filepath: str = None):
                 encrypted_data = f.read()
                 existing_data = AESCryptoUtils.decrypt_bytes(encrypted_data)
         except Exception as e:
-            logger.error(f"Error reading existing file {filepath}: {str(e)}")
+            logger.exception(f"Error reading existing file {filepath}: {str(e)}")
             existing_data = None
     
     # Create in-memory WAV file combining existing and new data
@@ -170,11 +170,11 @@ def decrypt_whole_audio_file(filename: str):
         return wav_data
         
     except FileNotFoundError:
-        logger.error(f"File not found: {filepath}")
+        logger.exception(f"File not found: {filepath}")
         raise
     except wave.Error as e:
-        logger.error(f"Invalid WAV file format: {str(e)}")
+        logger.exception(f"Invalid WAV file format: {str(e)}")
         return np.array([], dtype=np.int16)
     except Exception as e:
-        logger.error(f"Error decrypting audio: {str(e)}")
+        logger.exception(f"Error decrypting audio: {str(e)}")
         raise

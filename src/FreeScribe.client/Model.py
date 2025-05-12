@@ -7,6 +7,7 @@ from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys, DEFAULT_CONTEXT_WINDOW_SIZE
 from enum import Enum
+from utils.log_config import logger
 
 class ModelStatus(Enum):
     """
@@ -83,6 +84,7 @@ class Model:
             }
         except Exception as e:
             self.model = None
+            logger.exception(f"Model initialization error: {e}")
             raise e
         
     def generate_response(
@@ -128,7 +130,7 @@ class Model:
             return response["choices"][0]["message"]["content"]
             
         except Exception as e:
-            print(f"GPU inference error ({e.__class__.__name__}): {str(e)}")
+            logger.exception(f"GPU inference error: {e}")
             return f"({e.__class__.__name__}): {str(e)}"
 
     
@@ -234,6 +236,7 @@ class ModelManager:
                 # model doesnt exist
                 #TODO: Logo to system log
                 messagebox.showerror("Model Error", f"Model failed to load. Please ensure you have a valid model selected in the settings. Currently trying to load: {os.path.abspath(model_path)}. Error received ({e.__class__.__name__}): {str(e)}")
+                logger.exception(f"Model loading error: {e}")
                 ModelManager.local_model = ModelStatus.ERROR
 
         thread = threading.Thread(target=load_model)
