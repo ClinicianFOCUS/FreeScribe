@@ -473,8 +473,8 @@ def record_audio():
         current_chunk = []
         silent_duration = 0        
         record_duration = 0
-        minimum_silent_duration = int(app_settings.editable_settings["Real Time Silence Length"])
-        minimum_audio_duration = int(app_settings.editable_settings["Real Time Audio Length"])
+        minimum_silent_duration = float(app_settings.editable_settings["Real Time Silence Length"])
+        minimum_audio_duration = float(app_settings.editable_settings["Real Time Audio Length"])
 
         stream, stream_exception = open_microphone_stream()
 
@@ -545,7 +545,7 @@ def record_audio():
         # Log the error message
         # TODO System logger
         # For now general catch on any problems
-        logger.error(f"An error occurred: {e}")
+        logger.exception(f"An error occurred: {e}")
     finally:
         if stream:
             stream.stop_stream()
