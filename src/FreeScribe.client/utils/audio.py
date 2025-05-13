@@ -17,6 +17,7 @@ import utils.file_utils
 from utils.log_config import logger
 import os
 import wave
+import io
 
 DEFAULT_RATE = 16000
 DEFAULT_CHUNK_SIZE = 512
@@ -50,7 +51,7 @@ def pad_audio_chunk(chunk, pad_seconds=0.5, rate = DEFAULT_RATE, chunk_size = DE
 
     return silence_start + chunk + silence_end
 
-def encrypt_audio_chunk(chunk, filepath: str = None):
+def encrypt_audio_chunk(chunk, filepath: str):
     """
     Encrypt an audio chunk using AES encryption and save as WAV format.
     Appends to existing file if it exists.
@@ -62,16 +63,7 @@ def encrypt_audio_chunk(chunk, filepath: str = None):
     filepath : str, optional
         Base filename to save the encrypted file (without extension)
         If None, uses the current_recording_file from client.py
-    """
-    import wave
-    import io
-    
-    if filepath is None:
-        from client import current_recording_file
-        if current_recording_file is None:
-            raise ValueError("No recording file specified")
-        filepath = current_recording_file
-    
+    """  
     filepath = utils.file_utils.get_resource_path(f"recordings/{filepath}.AE2")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     
@@ -129,9 +121,6 @@ def decrypt_whole_audio_file(filename: str):
     np.ndarray
         The decrypted audio data
     """
-    import wave
-    import io
-    
     filepath = utils.file_utils.get_resource_path(f"recordings/{filename}")
     wav_filepath = utils.file_utils.get_resource_path(f"recordings/{filename}.wav")
     
