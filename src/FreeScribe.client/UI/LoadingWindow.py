@@ -52,44 +52,47 @@ class LoadingWindow:
         :param note_text: Optional note text to display below the initial text
         :type note_text: str or None
         """
+        self.title = title
+        self.initial_text = initial_text
+        self.note_text = note_text
+        self.parent = parent
+        self.on_cancel = on_cancel
+        self.cancelled = False
+    
+        self.parent.after(0, self.build_ui)
+
+    def build_ui(self):
         try:
-            self.title = title
-            self.initial_text = initial_text
-            self.note_text = note_text
-            self.parent = parent
-            self.on_cancel = on_cancel
-            self.cancelled = False
-            
-            self.popup = tk.Toplevel(parent)
-            self.popup.title(title)
+            self.popup = tk.Toplevel(self.parent)
+            self.popup.title(self.title)
             # Adjust geometry based on whether note_text is provided
-            if note_text:
+            if self.note_text:
                 self.popup.geometry("360x180")  # Increased height for note text
             else:
                 self.popup.geometry("280x105")  # Default height
             self.popup.iconbitmap(get_file_path('assets','logo.ico'))
 
-            if parent:
+            if self.parent:
                 # Center the popup window on the parent window
-                parent.update_idletasks()
-                x = parent.winfo_x() + (parent.winfo_width() - self.popup.winfo_reqwidth()) // 2
-                y = parent.winfo_y() + (parent.winfo_height() - self.popup.winfo_reqheight()) // 2
+                self.parent.update_idletasks()
+                x = self.parent.winfo_x() + (self.parent.winfo_width() - self.popup.winfo_reqwidth()) // 2
+                y = self.parent.winfo_y() + (self.parent.winfo_height() - self.popup.winfo_reqheight()) // 2
                 self.popup.geometry(f"+{x}+{y}")
-                self.popup.transient(parent)
+                self.popup.transient(self.parent)
                 
                 # Disable the parent window
-                parent.wm_attributes('-disabled', True)
+                self.parent.wm_attributes('-disabled', True)
 
             # Use label and progress bar
-            self.label = tk.Label(self.popup, text=initial_text)
+            self.label = tk.Label(self.popup, text=self.initial_text)
             self.label.pack(pady=(10,5))
             self.progress = ttk.Progressbar(self.popup, mode='indeterminate')
             self.progress.pack(padx=20, pady=(0,10), fill='x')
             self.progress.start()
 
             # Add note text if provided
-            if note_text:
-                self.note_label = tk.Label(self.popup, text=note_text, wraplength=350, justify='center', font=("TkDefaultFont",9),fg="#262525")
+            if self.note_text:
+                self.note_label = tk.Label(self.popup, text=self.note_text, wraplength=350, justify='center', font=("TkDefaultFont",9),fg="#262525")
                 self.note_label.pack(pady=(0,10))
 
             # Add cancel button
@@ -103,8 +106,8 @@ class LoadingWindow:
             self.popup.protocol("WM_DELETE_WINDOW", lambda: None)
         except Exception:
             # Enable the window on exception
-            if parent:
-                parent.wm_attributes('-disabled', False)
+            if self.parent:
+                self.parent.wm_attributes('-disabled', False)
             raise
 
     def _handle_cancel(self):

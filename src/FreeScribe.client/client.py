@@ -149,12 +149,15 @@ def populate_ui_with_notes():
     """
     Populates the UI components with the data from response_history.
     """
-    global IS_FIRST_LOG
-    IS_FIRST_LOG = False
+    def action():
+        global IS_FIRST_LOG
+        IS_FIRST_LOG = False
+        
+        timestamp_listbox.delete(0, tk.END)
+        for time, user_msg, response in response_history:
+            timestamp_listbox.insert(tk.END, time)
 
-    timestamp_listbox.delete(0, tk.END)
-    for time, user_msg, response in response_history:
-        timestamp_listbox.insert(tk.END, time)
+    root.after(0, action)
 
 def clear_all_notes():
     """
@@ -163,15 +166,7 @@ def clear_all_notes():
     global response_history
     response_history = []  # Clear the response history list
 
-    # Clear the timestamp listbox
-    timestamp_listbox.delete(0, tk.END)
-
-    # Clear the response display
-    response_display.scrolled_text.configure(state='normal')
-    response_display.scrolled_text.delete("1.0", tk.END)
-    response_display.scrolled_text.insert(tk.END, "Medical Note")
-    response_display.scrolled_text.config(fg='grey')
-    response_display.scrolled_text.configure(state='disabled')
+    clear_notes_ui_element()  # Clear the UI elements
 
     # Clear the contents of the .txt file
     notes_file_path = get_resource_path('notes_history.txt')
@@ -181,6 +176,74 @@ def clear_all_notes():
         logger.info(f"Temporary notes file cleared: {notes_file_path}")
     except Exception as e:
         logger.error(f"Error clearing temporary notes file: {e}")
+
+def clear_notes_ui_element():
+    """Clears the UI elements displaying the notes."""
+    # Clear the timestamp listbox
+    def action():
+        timestamp_listbox.delete(0, tk.END)
+
+        # Clear the response display
+        response_display.scrolled_text.configure(state='normal')
+        response_display.scrolled_text.delete("1.0", tk.END)
+        response_display.scrolled_text.insert(tk.END, "Medical Note")
+        response_display.scrolled_text.config(fg='grey')
+        response_display.scrolled_text.configure(state='disabled') 
+
+    root.after(0, action)
+
+def safe_set_button_config(button, **kwargs):
+    """
+    Safely sets the text of a button in the UI.
+
+    Args:
+        button (tk.Button): The button to update.
+        text (str): The text to set on the button.
+    """
+    def update_text(button, **kwargs):
+        if button.winfo_exists():
+            button.config(**kwargs)
+        else:
+            logger.warning("Button does not exist, cannot set text.")
+    root.after(0, lambda: update_text(button, **kwargs))
+
+def safe_set_transcription_box(text, callback=None):
+    """
+    Safely sets the text of the transcription box in the UI.
+
+    Args:
+        text (str): The text to set on the transcription box.
+        callback (callable, optional): Function to call after text is updated.
+    """
+    def update_text():
+        if user_input.scrolled_text.winfo_exists():
+            user_input.scrolled_text.configure(state='normal')
+            user_input.scrolled_text.delete("1.0", tk.END)
+            user_input.scrolled_text.insert(tk.END, text)
+            user_input.scrolled_text.configure(state='disabled')
+            if callback:
+                callback()
+        else:
+            logger.warning("Transcription box does not exist, cannot set text.")
+    root.after(0, update_text)
+
+def safe_set_note_box(text):
+    """
+    Safely sets the text of the note box in the UI.
+
+    Args:
+        text (str): The text to set on the note box.
+    """
+    def update_text():
+        if response_display.scrolled_text.winfo_exists():
+            response_display.scrolled_text.configure(state='normal')
+            response_display.scrolled_text.delete("1.0", tk.END)
+            response_display.scrolled_text.insert(tk.END, text)
+            response_display.scrolled_text.config(fg='black')
+            response_display.scrolled_text.configure(state='disabled')
+        else:
+            logger.warning("Note box does not exist, cannot set text.")
+    root.after(0, update_text)
 
 # This runs before on_closing, if not confirmed, nothing should be changed
 def confirm_exit_and_destroy():
@@ -405,19 +468,22 @@ def threaded_send_audio_to_server():
 
 
 def toggle_pause():
-    global is_paused
-    is_paused = not is_paused
+    def action():
+        global is_paused
+        is_paused = not is_paused
 
-    if is_paused:
-        if current_view == "full":
-            pause_button.config(text="Resume", bg="red")
-        elif current_view == "minimal":
-            pause_button.config(text="▶️", bg="red")
-    else:
-        if current_view == "full":
-            pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
-        elif current_view == "minimal":
-            pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
+        if is_paused:
+            if current_view == "full":
+                pause_button.config(text="Resume", bg="red")
+            elif current_view == "minimal":
+                pause_button.config(text="▶️", bg="red")
+        else:
+            if current_view == "full":
+                pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
+            elif current_view == "minimal":
+                pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
+
+    root.after(0, action)
     
 SILENCE_WARNING_LENGTH = 10 # seconds, warn the user after 10s of no input something might be wrong
 
@@ -669,8 +735,13 @@ def realtime_text():
         is_realtimeactive = False
 
 def update_gui(text):
-    user_input.scrolled_text.insert(tk.END, text + '\n')
-    user_input.scrolled_text.see(tk.END)
+    def action(text):
+        if user_input.scrolled_text.winfo_exists():
+            user_input.scrolled_text.configure(state='normal')  # enable for editing
+            user_input.scrolled_text.insert(tk.END, text + '\n')
+            user_input.scrolled_text.see(tk.END)
+            user_input.scrolled_text.configure(state='disabled')  # disable again
+    root.after(0, lambda: action(text))
 
 def save_audio():
     global frames
@@ -703,16 +774,17 @@ def toggle_recording():
     if not is_recording:
         disable_recording_ui_elements()
         # reset generate button state
-        send_button.config(text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+        safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+        safe_set_transcription_box("")
+
         REALTIME_TRANSCRIBE_THREAD_ID = realtime_thread.ident
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.delete("1.0", tk.END)
+        
         if not app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value]:
-            user_input.scrolled_text.insert(tk.END, "Recording")
-        response_display.scrolled_text.configure(state='normal')
-        response_display.scrolled_text.delete("1.0", tk.END)
-        response_display.scrolled_text.configure(fg='black')
-        response_display.scrolled_text.configure(state='disabled')
+            safe_set_transcription_box("Recording Audio... Realtime Transcription disabled. Audio while transcribe when you press stop recording.\n")
+
+        # Set the text in the transcription box, nothing for it to be empty
+        safe_set_note_box("")
+
         is_recording = True
 
         # reset frames before new recording so old data is not used
@@ -723,13 +795,17 @@ def toggle_recording():
 
 
         if current_view == "full":
-            mic_button.config(bg="red", text="Stop\nRecording")
+            safe_set_button_config(mic_button, bg="red", text="Stop\nRecording")
         elif current_view == "minimal":
-            mic_button.config(bg="red", text="⏹️")
+            safe_set_button_config(mic_button, bg="red", text="⏹️")
 
         start_flashing()
     else:
         enable_recording_ui_elements()
+        if current_view == "full":
+            safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
+        elif current_view == "minimal":
+            safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="🎤")
         is_recording = False
         if recording_thread.is_alive():
             recording_thread.join()  # Ensure the recording thread is terminated
@@ -790,34 +866,34 @@ def toggle_recording():
         print("*** Recording Stopped")
         stop_flashing()
 
-        if current_view == "full":
-            mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
-        elif current_view == "minimal":
-            mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="🎤")
-
 def disable_recording_ui_elements():
-    window.disable_settings_menu()
-    user_input.scrolled_text.configure(state='disabled')
-    send_button.config(state='disabled')
-    #hidding the AI Scribe button actions
-    #toggle_button.config(state='disabled')
-    upload_button.config(state='disabled')
-    response_display.scrolled_text.configure(state='disabled')
-    timestamp_listbox.config(state='disabled')
-    clear_button.config(state='disabled')
-    mic_test.set_mic_test_state(False)
+    def action():
+        window.disable_settings_menu()
+        user_input.scrolled_text.configure(state='disabled')
+        send_button.config(state='disabled')
+        #hidding the AI Scribe button actions
+        #toggle_button.config(state='disabled')
+        upload_button.config(state='disabled')
+        response_display.scrolled_text.configure(state='disabled')
+        timestamp_listbox.config(state='disabled')
+        clear_button.config(state='disabled')
+        mic_test.set_mic_test_state(False)
+    root.after(0, action)
 
 def enable_recording_ui_elements():
-    window.enable_settings_menu()
-    user_input.scrolled_text.configure(state='normal')
-    send_button.config(state='normal')
-    #hidding the AI Scribe button actions
-    #toggle_button.config(state='normal')
-    upload_button.config(state='normal')
-    timestamp_listbox.config(state='normal')
-    clear_button.config(state='normal')
-    mic_test.set_mic_test_state(True)
-    
+    def action():
+        window.enable_settings_menu()
+        user_input.scrolled_text.configure(state='normal')
+        send_button.config(state='normal')
+        #hidding the AI Scribe button actions
+        #toggle_button.config(state='normal')
+        upload_button.config(state='normal')
+        timestamp_listbox.config(state='normal')
+        clear_button.config(state='normal')
+        mic_test.set_mic_test_state(True)
+
+    root.after(0, action)
+        
 
 def cancel_processing():
     """Cancels any ongoing audio processing.
@@ -836,7 +912,7 @@ def clear_application_press():
     reset_recording_status()  # Reset recording-related variables
     clear_all_text_fields()  # Clear UI text areas
     # change re generate button to generate button
-    send_button.config(text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+    safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
 
 def reset_recording_status():
     """Resets all recording-related variables and stops any active recording.
@@ -883,21 +959,20 @@ def clear_all_text_fields():
         - Resets response display with default text
     """
     # Enable and clear user input field
-    user_input.scrolled_text.configure(state='normal')
-    user_input.scrolled_text.delete("1.0", tk.END)
+    safe_set_transcription_box("Tran")
     
     # Reset focus to main window
-    user_input.scrolled_text.focus_set()
-    root.focus_set()
+    def set_focus():
+        user_input.scrolled_text.focus_set()
+        root.focus_set()
+
+    root.after(0, set_focus)  # Use after to ensure focus is set after UI updates
     
+
     stop_flashing()  # Stop any UI flashing effects
     
     # Reset response display with default text
-    response_display.scrolled_text.configure(state='normal')
-    response_display.scrolled_text.delete("1.0", tk.END)
-    response_display.scrolled_text.insert(tk.END, "Medical Note")
-    response_display.scrolled_text.config(fg='grey')
-    response_display.scrolled_text.configure(state='disabled')
+    safe_set_note_box("Medical Note")
 
 #hidding the AI Scribe button Function
 # def toggle_aiscribe():
@@ -962,11 +1037,7 @@ def send_audio_to_server():
         clear_all_text_fields()
 
         # Configure the user input widget to be editable and clear its content
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.delete("1.0", tk.END)
-
-        # Display a message indicating that audio to text processing is in progress
-        user_input.scrolled_text.insert(tk.END, "Audio to Text Processing...Please Wait")
+        safe_set_transcription_box("Audio to Text Processing...Please Wait")
         try:
             # Determine the file to send for transcription
             file_to_send = uploaded_file_path or get_resource_path('recording.wav')
@@ -987,23 +1058,10 @@ def send_audio_to_server():
 
             #check if canceled, if so do not update the UI
             if not is_audio_processing_whole_canceled.is_set():
-                # Update the user input widget with the transcribed text
-                user_input.scrolled_text.configure(state='normal')
-                user_input.scrolled_text.delete("1.0", tk.END)
-                user_input.scrolled_text.insert(tk.END, transcribed_text)
-
-                # Send the transcribed text and receive a response
-                send_and_receive()
+                safe_set_transcription_box(transcribed_text, send_and_receive)
         except Exception as e:
-            # Log the error message
-            # TODO: Add system eventlogger
             print(f"An error occurred: {e}")
-
-            #log error to input window
-            user_input.scrolled_text.configure(state='normal')
-            user_input.scrolled_text.delete("1.0", tk.END)
-            user_input.scrolled_text.insert(tk.END, f"An error occurred: {e}")
-            user_input.scrolled_text.configure(state='disabled')
+            safe_set_transcription_box(f"An error occurred: {e}")
         finally:
             loading_window.destroy()
             
@@ -1012,11 +1070,7 @@ def send_audio_to_server():
         print("Using Remote Whisper for transcription.")
 
         # Configure the user input widget to be editable and clear its content
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.delete("1.0", tk.END)
-
-        # Display a message indicating that audio to text processing is in progress
-        user_input.scrolled_text.insert(tk.END, "Audio to Text Processing...Please Wait")
+        safe_set_transcription_box("Audio to Text Processing...Please Wait")
 
         delete_file = False if uploaded_file_path else True
 
@@ -1073,21 +1127,13 @@ def send_audio_to_server():
                         except Exception as e:
                             # ignore the error as it should not break the transcription
                             logger.exception(f"remote Error during hallucination cleaning: {str(e)}")
-                    user_input.scrolled_text.configure(state='normal')
-                    user_input.scrolled_text.delete("1.0", tk.END)
-                    user_input.scrolled_text.insert(tk.END, transcribed_text)
-
-                    # Send the transcribed text and receive a response
-                    send_and_receive()
+                    safe_set_transcription_box(transcribed_text, send_and_receive)
             except Exception as e:
                 # log error message
                 #TODO: Implment proper logging to system
                 print(f"An error occurred: {e}")
                 # Display an error message to the user
-                user_input.scrolled_text.configure(state='normal')
-                user_input.scrolled_text.delete("1.0", tk.END)
-                user_input.scrolled_text.insert(tk.END, f"An error occurred: {e}")
-                user_input.scrolled_text.configure(state='disabled')
+                safe_set_transcription_box(f"An error occurred: {e}")
             finally:
                 # done with file clean up
                 f.close()
@@ -1132,7 +1178,7 @@ def kill_thread(thread_id):
 def send_and_receive():
     global use_aiscribe, user_message
     user_message = user_input.scrolled_text.get("1.0", tk.END).strip()
-    display_text(NOTE_CREATION)
+    safe_set_note_box(NOTE_CREATION)
     threaded_handle_message(user_message)
 
 def save_notes_history():
@@ -1157,35 +1203,31 @@ def save_notes_history():
     except Exception as e:
         logger.error(f"Error saving temporary notes: {e}")
 
-def display_text(text):
-    response_display.scrolled_text.configure(state='normal')
-    response_display.scrolled_text.delete("1.0", tk.END)
-    response_display.scrolled_text.insert(tk.END, f"{text}\n")
-    response_display.scrolled_text.configure(fg='black')
-    response_display.scrolled_text.configure(state='disabled')
-
 IS_FIRST_LOG = True
 def update_gui_with_response(response_text):
-    global response_history, user_message, IS_FIRST_LOG
+    def action(text):
+        global response_history, user_message, IS_FIRST_LOG
 
-    if IS_FIRST_LOG:
+        if IS_FIRST_LOG:
+            timestamp_listbox.delete(0, tk.END)
+            timestamp_listbox.config(fg='black')
+            IS_FIRST_LOG = False
+
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        response_history.insert(0, (timestamp, user_message, response_text))
+        if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+            save_notes_history()
+
+        # Update the timestamp listbox
         timestamp_listbox.delete(0, tk.END)
-        timestamp_listbox.config(fg='black')
-        IS_FIRST_LOG = False
+        for time, _, _ in response_history:
+            timestamp_listbox.insert(tk.END, time)
 
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    response_history.insert(0, (timestamp, user_message, response_text))
-    if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
-        save_notes_history()
-
-    # Update the timestamp listbox
-    timestamp_listbox.delete(0, tk.END)
-    for time, _, _ in response_history:
-        timestamp_listbox.insert(tk.END, time)
-
-    display_text(response_text)
-    pyperclip.copy(response_text)
-    stop_flashing()
+        safe_set_note_box(response_text)
+        pyperclip.copy(response_text)
+        stop_flashing()
+    
+    root.after(0, lambda: action(response_text))
 
 def show_response(event):
     global IS_FIRST_LOG
@@ -1197,18 +1239,11 @@ def show_response(event):
     if selection:
         index = selection[0]
         # set the regenerate note button
-        send_button.config(text="Regenerate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+        safe_set_button_config(send_button, text="Regenerate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
         transcript_text = response_history[index][1]
         response_text = response_history[index][2]
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.config(fg='black')
-        user_input.scrolled_text.delete("1.0", tk.END)
-        user_input.scrolled_text.insert(tk.END, transcript_text)
-        response_display.scrolled_text.configure(state='normal')
-        response_display.scrolled_text.delete('1.0', tk.END)
-        response_display.scrolled_text.insert('1.0', response_text)
-        response_display.scrolled_text.config(fg='black')
-        response_display.scrolled_text.configure(state='disabled')
+        safe_set_transcription_box(transcript_text)
+        safe_set_note_box(response_text)
         pyperclip.copy(response_text)
 
 def send_text_to_api(edited_text):
@@ -1449,7 +1484,7 @@ def generate_note(formatted_message):
                 #Logg
                 #TODO: Implement proper logging to system event logger
                 print(f"An error occurred: {e}")
-                display_text(f"An error occurred: {e}")
+                safe_set_note_box(f"An error occurred: {e}")
                 return False
 
 def show_edit_transcription_popup(formatted_message):
@@ -1542,8 +1577,7 @@ def generate_note_thread(text: str):
             loading_window.destroy()
             stop_flashing()
             # switch generate note button to "Regenerate Note"
-            send_button.config(text="Regenerate Note")
-
+            safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
     root.after(500, lambda: check_thread_status(thread, loading_window))
 
 def upload_file():
@@ -1558,13 +1592,13 @@ def upload_file():
 def start_flashing():
     global is_flashing
     is_flashing = True
-    flash_circle()
+    root.after(0, flash_circle())
 
 
 def stop_flashing():
     global is_flashing
     is_flashing = False
-    blinking_circle_canvas.itemconfig(circle, fill='white')  # Reset to default color
+    root.after(0, lambda: blinking_circle_canvas.itemconfig(circle, fill='white'))  # Reset to default color
 
 
 def flash_circle():
@@ -1614,70 +1648,73 @@ def set_full_view():
     - current_view: Tracks the current interface state ('full' or 'minimal').
     - last_minimal_position: Saves the geometry of the window when switching from minimal view.
     """
-    global current_view, last_minimal_position, silent_warning_duration
+    def action():
+        global current_view, last_minimal_position, silent_warning_duration
 
-    # Reset button sizes and placements for full view
-    mic_button.config(width=11, height=2)
-    pause_button.config(width=11, height=2)
-    switch_view_button.config(width=11, height=2, text="Minimize View")
+        # Reset button sizes and placements for full view
+        mic_button.config(width=11, height=2)
+        pause_button.config(width=11, height=2)
+        switch_view_button.config(width=11, height=2, text="Minimize View")
 
-    # Show all UI components
-    user_input.grid()
-    send_button.grid()
-    clear_button.grid()
-    # toggle_button.grid()
-    upload_button.grid()
-    response_display.grid()
-    history_frame.grid()
-    mic_button.grid(row=1, column=1, pady=5, padx=0,sticky='nsew')
-    pause_button.grid(row=1, column=2, pady=5, padx=0,sticky='nsew')
-    switch_view_button.grid(row=1, column=6, pady=5, padx=0,sticky='nsew')
-    blinking_circle_canvas.grid(row=1, column=7, padx=0,pady=5)
-    footer_frame.grid()
-    
-    
+        # Show all UI components
+        user_input.grid()
+        send_button.grid()
+        clear_button.grid()
+        # toggle_button.grid()
+        upload_button.grid()
+        response_display.grid()
+        history_frame.grid()
+        mic_button.grid(row=1, column=1, pady=5, padx=0,sticky='nsew')
+        pause_button.grid(row=1, column=2, pady=5, padx=0,sticky='nsew')
+        switch_view_button.grid(row=1, column=6, pady=5, padx=0,sticky='nsew')
+        blinking_circle_canvas.grid(row=1, column=7, padx=0,pady=5)
+        footer_frame.grid()
+        
+        
 
-    window.toggle_menu_bar(enable=True, is_recording=is_recording)
+        window.toggle_menu_bar(enable=True, is_recording=is_recording)
 
-    # Reconfigure button styles and text
-    mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR,
-                      text="Stop\nRecording" if is_recording else "Start\nRecording")
-    pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR,
-                        text="Resume" if is_paused else "Pause")
+        # Reconfigure button styles and text
+        mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR,
+                        text="Stop\nRecording" if is_recording else "Start\nRecording")
+        pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR,
+                            text="Resume" if is_paused else "Pause")
 
-    # Unbind transparency events and reset window properties
-    root.unbind('<Enter>')
-    root.unbind('<Leave>')
-    root.attributes('-alpha', 1.0)
-    root.attributes('-topmost', False)
-    root.minsize(900, 400)
-    current_view = "full"
+        # Unbind transparency events and reset window properties
+        root.unbind('<Enter>')  
+        root.unbind('<Leave>')
+        root.attributes('-alpha', 1.0)
+        root.attributes('-topmost', False)
+        root.minsize(900, 400)
+        current_view = "full"
 
-    #Recreates Silence Warning Bar
-    window.destroy_warning_bar()
-    check_silence_warning(silence_duration= silent_warning_duration)
+        #Recreates Silence Warning Bar
+        window.destroy_warning_bar()
+        check_silence_warning(silence_duration= silent_warning_duration)
 
-    # add the minimal view geometry and remove the last full view geometry
-    add_min_max(root)
+        # add the minimal view geometry and remove the last full view geometry
+        add_min_max(root)
 
-    # create docker_status bar if enabled
-    if app_settings.editable_settings["Use Docker Status Bar"]:
-        window.create_docker_status_bar()
+        # create docker_status bar if enabled
+        if app_settings.editable_settings["Use Docker Status Bar"]:
+            window.create_docker_status_bar()
 
-    if app_settings.editable_settings["Enable Scribe Template"]:
-        window.destroy_scribe_template()
-        window.create_scribe_template()
+        if app_settings.editable_settings["Enable Scribe Template"]:
+            window.destroy_scribe_template()
+            window.create_scribe_template()
 
-    # Save minimal view geometry and restore last full view geometry
-    last_minimal_position = root.geometry()
-    root.update_idletasks()
-    if last_full_position:
-        root.geometry(last_full_position)
-    else:
-        root.geometry("900x400")
+        # Save minimal view geometry and restore last full view geometry
+        last_minimal_position = root.geometry()
+        root.update_idletasks()
+        if last_full_position:
+            root.geometry(last_full_position)
+        else:
+            root.geometry("900x400")
 
-    # Disable to make the window an app(show taskbar icon)
-    # root.attributes('-toolwindow', False)
+        # Disable to make the window an app(show taskbar icon)
+        # root.attributes('-toolwindow', False)
+
+    root.after(0, action)
 
 def set_minimal_view():
 
@@ -1695,75 +1732,77 @@ def set_minimal_view():
     - current_view: Tracks the current interface state ('full' or 'minimal').
     - last_full_position: Saves the geometry of the window when switching from full view.
     """
-    global current_view, last_full_position, silent_warning_duration
+    def action():
+        global current_view, last_full_position, silent_warning_duration
 
-    # Remove all non-essential UI components
-    user_input.grid_remove()
-    send_button.grid_remove()
-    clear_button.grid_remove()
-    # toggle_button.grid_remove()
-    upload_button.grid_remove()
-    response_display.grid_remove()
-    history_frame.grid_remove()
-    blinking_circle_canvas.grid_remove()
-    footer_frame.grid_remove()
-    # Configure minimal view button sizes and placements
-    mic_button.config(width=2, height=1)
-    pause_button.config(width=2, height=1)
-    switch_view_button.config(width=2, height=1)
+        # Remove all non-essential UI components
+        user_input.grid_remove()
+        send_button.grid_remove()
+        clear_button.grid_remove()
+        # toggle_button.grid_remove()
+        upload_button.grid_remove()
+        response_display.grid_remove()
+        history_frame.grid_remove()
+        blinking_circle_canvas.grid_remove()
+        footer_frame.grid_remove()
+        # Configure minimal view button sizes and placements
+        mic_button.config(width=2, height=1)
+        pause_button.config(width=2, height=1)
+        switch_view_button.config(width=2, height=1)
 
-    mic_button.grid(row=0, column=0, pady=2, padx=2)
-    pause_button.grid(row=0, column=1, pady=2, padx=2)
-    switch_view_button.grid(row=0, column=2, pady=2, padx=2)
+        mic_button.grid(row=0, column=0, pady=2, padx=2)
+        pause_button.grid(row=0, column=1, pady=2, padx=2)
+        switch_view_button.grid(row=0, column=2, pady=2, padx=2)
 
-    # Update button text based on recording and pause states
-    mic_button.config(text="⏹️" if is_recording else "🎤")
-    pause_button.config(text="▶️" if is_paused else "⏸️")
-    switch_view_button.config(text="⬆️")  # Minimal view indicator
+        # Update button text based on recording and pause states
+        mic_button.config(text="⏹️" if is_recording else "🎤")
+        pause_button.config(text="▶️" if is_paused else "⏸️")
+        switch_view_button.config(text="⬆️")  # Minimal view indicator
 
-    blinking_circle_canvas.grid(row=0, column=3, pady=2, padx=2)
+        blinking_circle_canvas.grid(row=0, column=3, pady=2, padx=2)
 
-    window.toggle_menu_bar(enable=False)
+        window.toggle_menu_bar(enable=False)
 
-    # Update window properties for minimal view
-    root.attributes('-topmost', True)
-    root.minsize(125, 50)  # Smaller minimum size for minimal view
-    current_view = "minimal"
+        # Update window properties for minimal view
+        root.attributes('-topmost', True)
+        root.minsize(125, 50)  # Smaller minimum size for minimal view
+        current_view = "minimal"
 
-    if root.wm_state() == 'zoomed':  # Check if window is maximized
-        root.wm_state('normal')       # Restore the window
+        if root.wm_state() == 'zoomed':  # Check if window is maximized
+            root.wm_state('normal')       # Restore the window
 
-    #Recreates Silence Warning Bar
-    window.destroy_warning_bar()
-    check_silence_warning(silence_duration= silent_warning_duration)
+        #Recreates Silence Warning Bar
+        window.destroy_warning_bar()
+        check_silence_warning(silence_duration= silent_warning_duration)
 
-    # Set hover transparency events
-    def on_enter(e):
-        if e.widget == root:  # Ensure the event is from the root window
-            root.attributes('-alpha', 1.0)
+        # Set hover transparency events
+        def on_enter(e):
+            if e.widget == root:  # Ensure the event is from the root window
+                root.attributes('-alpha', 1.0)
 
-    def on_leave(e):
-        if e.widget == root:  # Ensure the event is from the root window
-            root.attributes('-alpha', 0.70)
+        def on_leave(e):
+            if e.widget == root:  # Ensure the event is from the root window
+                root.attributes('-alpha', 0.70)
 
-    root.bind('<Enter>', on_enter)
-    root.bind('<Leave>', on_leave)
+        root.bind('<Enter>', on_enter)
+        root.bind('<Leave>', on_leave)
 
-    # Destroy and re-create components as needed
-    window.destroy_docker_status_bar()
-    if app_settings.editable_settings["Enable Scribe Template"]:
-        window.destroy_scribe_template()
-        window.create_scribe_template(row=1, column=0, columnspan=3, pady=5)
+        # Destroy and re-create components as needed
+        window.destroy_docker_status_bar()
+        if app_settings.editable_settings["Enable Scribe Template"]:
+            window.destroy_scribe_template()
+            window.create_scribe_template(row=1, column=0, columnspan=3, pady=5)
 
-    # Remove the minimal view geometry and save the current full view geometry
-    remove_min_max(root)
+        # Remove the minimal view geometry and save the current full view geometry
+        remove_min_max(root)
 
-    # Save full view geometry and restore last minimal view geometry
-    last_full_position = root.geometry()
-    if last_minimal_position:
-        root.geometry(last_minimal_position)
-    else:
-        root.geometry("125x50")  # Set the window size to the minimal view size
+        # Save full view geometry and restore last minimal view geometry
+        last_full_position = root.geometry()
+        if last_minimal_position:
+            root.geometry(last_minimal_position)
+        else:
+            root.geometry("125x50")  # Set the window size to the minimal view size
+    root.after(0, action)
 
 def copy_text(widget):
     """
@@ -1784,9 +1823,12 @@ def add_placeholder(event, text_widget, placeholder_text="Text box"):
         text_widget: The tkinter Text widget to add placeholder text to.
         placeholder_text (str, optional): The placeholder text to display. Defaults to "Text box".
     """
-    if text_widget.get("1.0", "end-1c") == "":
-        text_widget.insert("1.0", placeholder_text)
-        text_widget.config(fg='grey')
+    def on_call(text_widget=text_widget, placeholder_text=placeholder_text):
+        if text_widget.get("1.0", "end-1c") == "":
+            text_widget.insert("1.0", placeholder_text)
+            text_widget.config(fg='grey')
+
+    root.after(0, on_call)
 
 def remove_placeholder(event, text_widget, placeholder_text="Text box"):
     """
@@ -1797,9 +1839,12 @@ def remove_placeholder(event, text_widget, placeholder_text="Text box"):
         text_widget: The tkinter Text widget to remove placeholder text from.
         placeholder_text (str, optional): The placeholder text to remove. Defaults to "Text box".
     """
-    if text_widget.get("1.0", "end-1c") == placeholder_text:
-        text_widget.delete("1.0", "end")
-        text_widget.config(fg='black')
+    def on_call(text_widget=text_widget, placeholder_text=placeholder_text):
+        if text_widget.get("1.0", "end-1c") == placeholder_text:
+            text_widget.delete("1.0", "end")
+            text_widget.config(fg='black')
+
+    root.after(0, on_call)
 
 def load_stt_model(event=None):
     """
@@ -2204,7 +2249,7 @@ def generate_note_bind(event, data: np.ndarray):
 
         result = faster_whisper_transcribe(wav_data)
 
-        root.after(0, update_gui(result))
+        update_gui(result)
 
     wrk_thrd = threading.Thread(target=action)
     wrk_thrd.start()

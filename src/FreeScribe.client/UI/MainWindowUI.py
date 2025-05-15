@@ -308,15 +308,20 @@ class MainWindowUI:
         """
         Disable the Settings menu.
         """
-        if self.menu_bar is not None:
-            self.menu_bar.entryconfig("Settings", state="disabled")  # Disables the entire Settings menu
+        def action():
+            if self.menu_bar is not None:
+                self.menu_bar.entryconfig("Settings", state="disabled")  # Disables the entire Settings menu
+        self.root.after(0, action)  # Schedule the action to run after the current event loop
     
     def enable_settings_menu(self):
         """
         Enable the Settings menu.
         """
-        if self.menu_bar is not None:
-            self.menu_bar.entryconfig("Settings", state="normal")
+        def action():
+            if self.menu_bar is not None:
+                self.menu_bar.entryconfig("Settings", state="normal")
+
+        self.root.after(0, action)  # Schedule the action to run after the current event loop
 
     def _show_md_content(self, file_path: str, title: str, show_checkbox: bool = False):
         """
