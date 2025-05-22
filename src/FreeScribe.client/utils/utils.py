@@ -36,8 +36,6 @@ def bring_to_front(app_name: str):
     U32DLL.ShowWindow(hwnd, SW_SHOW)
     U32DLL.SetForegroundWindow(hwnd)
 
-logger = logging.getLogger(__name__)
-
 
 def get_application_version():
         version_str = "vx.x.x.alpha"

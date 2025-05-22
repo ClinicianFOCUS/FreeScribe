@@ -11,20 +11,28 @@ Example:
     >>> print(cleaned)
     'This is a real transcription.'
 """
-
-from typing import List
+import threading
+from tkinter import messagebox
+from typing import List, Optional
 import string
 import spacy
-import spacy.cli
-import time
 import logging
-import subprocess
-import sys
+from spacy.language import Language
+from spacy.tokens import Doc
+import os
+
+from UI.LoadingWindow import LoadingWindow
+from UI.SettingsConstant import SettingsKeys, FeatureToggle
+
 # Create a punctuation string without apostrophe
 punct_without_apostrophe = string.punctuation.replace("'", "")
 
+# Default logger
+default_logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
+class HallucinationCleanerException(Exception):
+    """Exception raised for errors in the hallucination cleaner."""
+    pass
 
 
 COMMON_HALUCINATIONS = [
@@ -78,61 +86,6 @@ SIMILARITY_THRESHOLD = 0.95
 SPACY_MODEL_NAME = "en_core_web_md"
 
 
-def download_spacy_model():
-    """Download the spacy model with retries.
-    
-    Attempts to download the spaCy model if not already installed.
-    Will retry up to 3 times with a 2-second delay between attempts.
-    Uses subprocess.run to execute the download command for better error handling
-    and output capture.
-    
-    :returns: True if model was downloaded successfully, False otherwise
-    :rtype: bool
-    
-    :raises: No exceptions are raised, failures are logged and False is returned
-    """
-    max_retries = 3
-    retry_delay = 2  # seconds
-    python_executable = sys.executable
-    
-    logger.info(f"Checking/downloading spacy model {SPACY_MODEL_NAME}...")
-    for attempt in range(max_retries):
-        try:
-            # Check if model is already installed
-            if spacy.util.is_package(SPACY_MODEL_NAME):
-                logger.info("Spacy model already installed")
-                return True
-            
-            logger.info(f"Downloading spacy model (attempt {attempt + 1}/{max_retries})...")
-            
-            # Use subprocess.run to execute the download command
-            result = subprocess.run(
-                [python_executable, "-m", "spacy", "download", SPACY_MODEL_NAME],
-                capture_output=True,
-                text=True,
-                check=False  # Don't raise exception on non-zero return code
-            )
-            
-            # Check if the command was successful
-            if result.returncode == 0:
-                logger.info("Spacy model downloaded successfully")
-                return True
-            else:
-                logger.error(f"Error downloading spacy model: {result.stderr}")
-                if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                    
-        except Exception as e:
-            logger.error(f"Unexpected error downloading spacy model: {str(e)}")
-            if attempt < max_retries - 1:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-    
-    logger.error("Failed to download spacy model after all retries")
-    return False
-
-
 class WhisperHallucinationCleaner:
     """A class to clean common hallucinations from Whisper transcriptions.
     
@@ -141,26 +94,75 @@ class WhisperHallucinationCleaner:
     
     :param similarity_threshold: The minimum similarity ratio (0-1) between a sentence
                                and a hallucination to consider it a match
+    :param spacy_model_name: Name of the spaCy model to use
+    :param hallucinations: List of hallucination phrases to check against
+    :param nlp: Optional pre-configured spaCy model
+    :param logger: Logger instance for debugging
     :type similarity_threshold: float
+    :type spacy_model_name: str
+    :type hallucinations: List[str]
+    :type nlp: Optional[Language]
+    :type logger: logging.Logger
     """
     
-    def __init__(self, similarity_threshold: float = SIMILARITY_THRESHOLD):
-        """Initialize the cleaner with a similarity threshold.
+    def __init__(
+        self,
+        similarity_threshold: float = SIMILARITY_THRESHOLD,
+        spacy_model_name: str = SPACY_MODEL_NAME,
+        hallucinations: List[str] = COMMON_HALUCINATIONS,
+        nlp: Optional[Language] = None,
+        logger: logging.Logger = default_logger
+    ):
+        """Initialize the cleaner with configurable dependencies.
         
-        :param similarity_threshold: The minimum similarity ratio (0-1) between a sentence
-                                   and a hallucination to consider it a match
-        :type similarity_threshold: float
+        :param similarity_threshold: The minimum similarity ratio (0-1)
+        :param spacy_model_name: Name of the spaCy model to use
+        :param hallucinations: List of hallucination phrases to check against
+        :param nlp: Optional pre-configured spaCy model
+        :param logger: Logger instance for debugging
         """
+        self.logger = logger
         self.similarity_threshold = similarity_threshold
-        # Create a translation table (all punctuation -> spaces)
+        self.spacy_model_name = spacy_model_name
         self._trans_table = str.maketrans(punct_without_apostrophe, ' ' * len(punct_without_apostrophe))
-        # Store normalized hallucinations for exact matching
-        self.hallucinations = {self._normalize_text(h) for h in COMMON_HALUCINATIONS}
-        self._nlp = None
+        self.hallucinations = {self._normalize_text(h) for h in hallucinations}
+        self._nlp = nlp
         self._hallucination_docs = None
         
+    def initialize_model(self) -> Optional[str]:
+        """Initialize the spaCy model proactively.
+        
+        This method should be called when the hallucination cleaning feature is enabled
+        in settings. It downloads and loads the model if necessary.
+        
+        :returns: Error message if initialization fails, None if successful
+        :rtype: Optional[str]
+        """
+        if self._nlp is not None:
+            return None
+            
+        try:
+            self._nlp = spacy.load(self.spacy_model_name)
+            # Pre-process hallucination docs
+            self._hallucination_docs = [
+                self._nlp(h) for h in sorted(self.hallucinations)
+            ]
+            return None
+        except IOError as e:
+            return f"Failed to load spaCy model. {e}"
+        except Exception as e:
+            error_msg = f"Failed to initialize spaCy model: {str(e)}"
+            self.logger.error(error_msg)
+            return error_msg
+
+    def unload_model(self):
+        """Unload the spaCy model and free resources."""
+        self._nlp = None
+        self._hallucination_docs = None
+        self.logger.info("Unloaded spaCy model")
+        
     @property
-    def nlp(self):
+    def nlp(self) -> Language:
         """Lazy load the spacy model.
         
         :returns: The loaded spaCy model
@@ -168,13 +170,12 @@ class WhisperHallucinationCleaner:
         :raises RuntimeError: If the spaCy model fails to download
         """
         if self._nlp is None:
-            if not download_spacy_model():
-                raise RuntimeError("Failed to download spacy model")
-            self._nlp = spacy.load(SPACY_MODEL_NAME)
+            if error := self.initialize_model():
+                raise RuntimeError(error)
         return self._nlp
     
     @property
-    def hallucination_docs(self):
+    def hallucination_docs(self) -> List[Doc]:
         """Lazy load the hallucination docs.
         
         :returns: List of processed spaCy docs for each hallucination
@@ -190,9 +191,9 @@ class WhisperHallucinationCleaner:
     def _normalize_text(self, text: str) -> str:
         """Normalize text by removing punctuation and extra whitespace.
         
-        :param text: Text to normalize
+        :param text: The text to normalize
         :type text: str
-        :returns: Normalized text
+        :returns: Normalized text with punctuation removed and whitespace normalized
         :rtype: str
         """
         # Remove punctuation and normalize whitespace
@@ -200,15 +201,15 @@ class WhisperHallucinationCleaner:
         # remove all punctuation
         text = text.translate(self._trans_table)
         text = ' '.join(t for t in text.split() if t.isalnum())
-        logger.debug(f"Normalized text: {text}")
+        self.logger.debug(f"Normalized text: {text}")
         return text
     
     def _is_similar_to_hallucination(self, sentence: str) -> bool:
         """Check if a sentence is similar to any known hallucination using vector similarity.
         
-        :param sentence: The sentence to check
+        :param sentence: The sentence to check for hallucination similarity
         :type sentence: str
-        :returns: True if the sentence is similar to a hallucination, False otherwise
+        :returns: True if the sentence is similar to a known hallucination, False otherwise
         :rtype: bool
         """
         if not sentence:
@@ -218,7 +219,7 @@ class WhisperHallucinationCleaner:
         normalized = self._normalize_text(sentence)
         # First check for exact matches (case insensitive)
         if any(h in normalized for h in self.hallucinations):
-            logger.debug(f"Sentence contains a hallucination: {normalized}")
+            self.logger.debug(f"Sentence contains a hallucination: {normalized}")
             return True
             
         # Process the original sentence for semantic similarity
@@ -232,16 +233,16 @@ class WhisperHallucinationCleaner:
         result = any(doc.similarity(h_doc) >= self.similarity_threshold 
                   for h_doc in self.hallucination_docs)
         if result:
-            logger.debug(f"Sentence is similar to hallucination: {sentence}")
+            self.logger.debug(f"Sentence is similar to hallucination: {sentence}")
         return result
     
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences using spacy.
         
-        :param text: The text to split
+        :param text: The text to split into sentences
         :type text: str
         :returns: List of sentences
-        :rtype: list[str]
+        :rtype: List[str]
         """
         if not text:
             return []
@@ -256,9 +257,9 @@ class WhisperHallucinationCleaner:
         
         :param text: The text to clean
         :type text: str
-        :returns: The cleaned text with hallucinations removed
+        :returns: Cleaned text with hallucination sentences removed
         :rtype: str
-        
+
         Example:
             >>> cleaner = WhisperHallucinationCleaner()
             >>> text = "This is a real transcription. Thanks for watching!"
@@ -274,8 +275,74 @@ class WhisperHallucinationCleaner:
         
         # Join sentences back together with a single space, since each sentence already has its punctuation
         result = ' '.join(s.strip() for s in cleaned_sentences)
-        logger.debug(f"Cleaned text: {result}")
+        self.logger.debug(f"Cleaned text: {result}")
         return result
 
-# Initialize the hallucination cleaner
+
+def load_hallucination_cleaner_model(root, settings) -> None:
+    """
+    Loads or unloads the hallucination cleaner based on settings.
+
+    The logic handles two scenarios:
+    1. Application startup: new_value is None, use current setting
+    2. Settings change: new_value exists, compare with previous setting
+    """
+    # Get current enabled state from settings
+    current_enabled = settings.editable_settings.get(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value) and FeatureToggle.HALLUCINATION_CLEANING
+
+    # Get new value from settings panel if it exists
+    setting_entry = settings.editable_settings_entries.get(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value) and FeatureToggle.HALLUCINATION_CLEANING
+    new_enabled = setting_entry.get() if setting_entry else None
+
+    default_logger.info(f"Hallucination cleaner - Current: {current_enabled}, New: {new_enabled}")
+
+    # Determine if we should initialize the model
+    should_initialize = (
+        # Case 1: App startup - initialize if currently enabled
+        (new_enabled is None and current_enabled) or
+        # Case 2: Settings changed - initialize if newly enabled
+        (new_enabled is not None and new_enabled and not current_enabled)
+    )
+
+    # Determine if we should unload the model
+    should_unload = (
+        # Only unload if setting was explicitly changed to disabled
+        new_enabled is not None and not new_enabled
+    )
+
+    # Launch initialization/unloading in a separate thread
+    threading.Thread(target=_initialize_spacy_model,
+                     args=(root, should_initialize, should_unload),
+                     daemon=True).start()
+
+
+def _initialize_spacy_model(root, is_init_model: bool, is_unload_model: bool):
+    """
+    Initializes or unloads the spaCy model for hallucination cleaning.
+
+    Args:
+        is_init_model (bool): True to initialize the model
+        is_unload_model (bool): True to unload the model
+    """
+    if is_init_model:
+        loading_window = LoadingWindow(
+            root,
+            "Loading SpaCy Model",
+            "Setting up spaCy model for hallucination cleaning. Please wait...",
+            note_text="Note: This may take a few minutes on first run."
+        )
+        error = hallucination_cleaner.initialize_model()
+        loading_window.destroy()
+
+        if error:
+            messagebox.showerror(
+                "SpaCy Model Error",
+                f"Failed to initialize spaCy model for hallucination cleaning: {error}\n\n"
+                "Hallucination cleaning will be disabled."
+            )
+    if is_unload_model:
+        hallucination_cleaner.unload_model()
+
+
+# Initialize the hallucination cleaner with default settings
 hallucination_cleaner = WhisperHallucinationCleaner()

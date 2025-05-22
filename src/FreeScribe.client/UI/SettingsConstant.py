@@ -29,7 +29,8 @@ class SettingsKeys(Enum):
     ENABLE_HALLUCINATION_CLEAN = "Enable Hallucination Cleaning (Experimental)"
     FACTUAL_CONSISTENCY_VERIFICATION = "Factual Consistency Verification (Experimental)"
     BEST_OF = "best_of"
-
+    GOOGLE_MAPS_API_KEY = "Google Maps API Key"
+    ENABLE_FILE_LOGGER = "Enable File Log"
 
 class Architectures(Enum):
     CPU = ("CPU", "cpu")
@@ -49,6 +50,11 @@ class FeatureToggle:
     DOCKER_STATUS_BAR = False
     POST_PROCESSING = False
     PRE_PROCESSING = False
+    INTENT_ACTION = False
+    HALLUCINATION_CLEANING = False
+    FACTS_CHECK = False
+    BEST_OF = False
+    LLM_CONVO_PRESCREEN = False
 
 
 DEFAULT_CONTEXT_WINDOW_SIZE = 4096

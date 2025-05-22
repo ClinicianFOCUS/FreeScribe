@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 
 import UI.Helpers
 from utils.file_utils import get_file_path
+import utils.windows_utils
 
 class ImageWindow:
     """A window to display an image with scrollbars and zoom functionality.
@@ -21,7 +22,7 @@ class ImageWindow:
     :param image_path: Path to the image file to display
     :type image_path: str
     """
-    def __init__(self, parent, title, image_path):
+    def __init__(self, parent, title, image_path, width=None, height=None):
         """Initialize the ImageWindow.
         
         Creates a new window, loads the specified image, and sets up scrollable canvas.
@@ -42,6 +43,8 @@ class ImageWindow:
 
             # Load image
             self.image = Image.open(image_path)
+            if width and height:
+                self.image = self.image.resize((width, height), Image.LANCZOS)
             self.photo = ImageTk.PhotoImage(self.image)
             
             # Create canvas with scrollbars
@@ -83,14 +86,12 @@ class ImageWindow:
             # Set initial window size
             screen_width = self.window.winfo_screenwidth()
             screen_height = self.window.winfo_screenheight()
-            width = min(self.image.width, screen_width - 100)
-            height = min(self.image.height, screen_height - 100)
+            width = min(self.image.width, screen_width - 100) + 25
+            height = min(self.image.height, screen_height - 100) + 25
             self.window.geometry(f"{width}x{height}")
             
-            # Center window
-            x = (screen_width - width) // 2
-            y = (screen_height - height) // 2
-            self.window.geometry(f"+{x}+{y}")
+            utils.windows_utils._display_center_to_parent(self.window, parent, width=width, height=height)  # Center the ImageWindow to MarkdownWindow
+
             
             # Bind window close to escape key
             self.window.bind('<Escape>', lambda e: self.window.destroy())

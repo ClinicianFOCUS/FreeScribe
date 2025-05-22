@@ -22,6 +22,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 import requests
+import logging
 from typing import List, Any, Optional
 
 from UI.SettingsConstant import SettingsKeys, Architectures, FeatureToggle, DEFAULT_CONTEXT_WINDOW_SIZE
@@ -144,6 +145,9 @@ class SettingsWindow():
             SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value: False,
             # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
             SettingsKeys.BEST_OF.value: 1,
+            # Google Maps API settings
+            SettingsKeys.GOOGLE_MAPS_API_KEY.value: "",  # Will be set by user
+            SettingsKeys.ENABLE_FILE_LOGGER.value: False,
         }
 
     def __init__(self):
@@ -207,7 +211,6 @@ class SettingsWindow():
             # "top_a",
             "top_k",
             "top_p",
-            SettingsKeys.BEST_OF.value,
             # "typical",
             # "sampler_order",
             # "singleline",
@@ -215,9 +218,16 @@ class SettingsWindow():
             # "frmtrmblln",
             SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value,
             SettingsKeys.Enable_Word_Count_Validation.value,
-            SettingsKeys.Enable_AI_Conversation_Validation.value,
-            SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value,
         ]
+        
+        if FeatureToggle.LLM_CONVO_PRESCREEN:
+            self.adv_ai_settings.append(SettingsKeys.Enable_AI_Conversation_Validation.value)
+
+        if FeatureToggle.BEST_OF:
+            self.adv_ai_settings.append(SettingsKeys.BEST_OF.value)
+
+        if FeatureToggle.FACTS_CHECK:
+            self.adv_ai_settings.append(SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value)
 
         self.adv_whisper_settings = [
             # "Real Time Audio Length",
@@ -230,14 +240,20 @@ class SettingsWindow():
             # SettingsKeys.SILERO_SPEECH_THRESHOLD.value, 
             SettingsKeys.USE_TRANSLATE_TASK.value,
             SettingsKeys.WHISPER_LANGUAGE_CODE.value,
-            SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value,
         ]
+
+        if FeatureToggle.HALLUCINATION_CLEANING:
+            self.adv_whisper_settings.append(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value)
 
 
         self.adv_general_settings = [
             # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
             SettingsKeys.USE_LOW_MEM_MODE.value,
+        ]
+
+        self.developer_settings = [
+            SettingsKeys.ENABLE_FILE_LOGGER.value,
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
@@ -637,25 +653,84 @@ class SettingsWindow():
         # in case context_window value is invalid
         except (ValueError, TypeError) as e:
             logger.exception(f"Failed to determine reload/unload model: {str(e)}")
-        logger.debug(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
+        logger.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
         return unload_flag, reload_flag
+
 
     def _create_settings_and_aiscribe_if_not_exist(self):
         """
-        Create the settings and AI Scribe files if they do not exist.
+        Ensure settings and AI Scribe files exist.
+        - If settings.txt is missing or invalid, create it with default values.
+        - If preserved_network_config.txt exists, transfer its network-related settings to settings.txt and delete it.
         """
-        if not os.path.exists(get_resource_path('settings.txt')):
-            architectures = self.get_available_architectures()
+        
+        settings_path = get_resource_path('settings.txt')
+        preserved_network_path = get_resource_path('preserved_network_config.txt')
+        
+        # Initialize settings with a default structure
+        settings = {"editable_settings": {}}
+        
+        # Try to load existing settings if the file exists and is not empty
+        if os.path.exists(settings_path) and os.path.getsize(settings_path) > 0:
+            try:
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+            except json.JSONDecodeError:
+                print("settings.txt exists but contains invalid JSON. Creating new settings file.")
+        else:
+            print("settings.txt not found or empty. Creating with default values.")
             
-            # If CUDA is available, set it as the default architecture to save in settings
-            if Architectures.CUDA.label in architectures:
-                logger.info("Settings file not found. Creating default settings file with CUDA architecture.")
-                self.editable_settings[SettingsKeys.WHISPER_ARCHITECTURE.value] = Architectures.CUDA.label
-                self.editable_settings[SettingsKeys.LLM_ARCHITECTURE.value] = Architectures.CUDA.label
-            else:
-                logger.info("Settings file not found. Creating default settings file.")
-
-            self.save_settings_to_file()
+        # Set default architecture if CUDA is available
+        architectures = self.get_available_architectures()
+        if Architectures.CUDA.label in architectures:
+            settings["editable_settings"][SettingsKeys.WHISPER_ARCHITECTURE.value] = Architectures.CUDA.label
+            settings["editable_settings"][SettingsKeys.LLM_ARCHITECTURE.value] = Architectures.CUDA.label
+        
+        # If preserved_network_config.txt exists, move network settings to settings.txt
+        if os.path.exists(preserved_network_path):
+            try:
+                print("Found preserved_network_config.txt. Moving network settings to settings.txt.")
+                
+                # Load preserved network settings
+                with open(preserved_network_path, 'r') as f:
+                    preserved_config = json.load(f)
+                
+                preserved_network_config = preserved_config.get("editable_settings", {})
+                
+                # Extract only the relevant network settings
+                settings_to_keep = {
+                    SettingsKeys.LLM_ENDPOINT.value: preserved_network_config.get(SettingsKeys.LLM_ENDPOINT.value),
+                    "AI Server Self-Signed Certificates": preserved_network_config.get("AI Server Self-Signed Certificates"),
+                    SettingsKeys.LOCAL_LLM.value: preserved_network_config.get(SettingsKeys.LOCAL_LLM.value),
+                    SettingsKeys.LOCAL_WHISPER.value: preserved_network_config.get(SettingsKeys.LOCAL_WHISPER.value),
+                    SettingsKeys.WHISPER_ENDPOINT.value: preserved_network_config.get(SettingsKeys.WHISPER_ENDPOINT.value),
+                    SettingsKeys.WHISPER_SERVER_API_KEY.value: preserved_network_config.get(SettingsKeys.WHISPER_SERVER_API_KEY.value),
+                    SettingsKeys.S2T_SELF_SIGNED_CERT.value: preserved_network_config.get(SettingsKeys.S2T_SELF_SIGNED_CERT.value),
+                }
+                
+                # Filter out None values
+                settings_to_keep = {k: v for k, v in settings_to_keep.items() if v is not None}
+                
+                # Update settings with the extracted network values
+                if "editable_settings" not in settings:
+                    settings["editable_settings"] = {}
+                settings["editable_settings"].update(settings_to_keep)
+                
+                # Remove preserved_network_config.txt after merging network settings
+                os.remove(preserved_network_path)
+                print("Deleted preserved_network_config.txt.")
+            except json.JSONDecodeError:
+                print("preserved_network_config.txt contains invalid JSON. Skipping import.")
+            except Exception as e:
+                print(f"Error processing preserved_network_config.txt: {str(e)}")
+        
+        # Update self.editable_settings from the settings dictionary
+        self.editable_settings.update(settings.get("editable_settings", {}))
+        
+        # Save updated settings to file
+        self.save_settings_to_file()
+        
+        # Ensure AIScribe files exist, create them if missing
         if not os.path.exists(get_resource_path('aiscribe.txt')):
             logger.info("AIScribe file not found. Creating default AIScribe file.")
             with open(get_resource_path('aiscribe.txt'), 'w') as f:
@@ -707,7 +782,7 @@ class SettingsWindow():
         if self.editable_settings_entries[SettingsKeys.LOCAL_WHISPER.value].get() and (
                 old_model != self.editable_settings_entries[SettingsKeys.WHISPER_MODEL.value].get() or
                 old_whisper_architecture != self.editable_settings_entries[SettingsKeys.WHISPER_ARCHITECTURE.value].get() or
-                old_cpu_count != self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get() or
+                int(old_cpu_count) != int(self.editable_settings_entries[SettingsKeys.WHISPER_CPU_COUNT.value].get()) or
                 old_compute_type != self.editable_settings_entries[SettingsKeys.WHISPER_COMPUTE_TYPE.value].get()
         ):
             return True

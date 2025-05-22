@@ -3,13 +3,19 @@ macOS-specific utilities for process and window management.
 """
 import logging
 import os
-import fcntl
+import utils.system
+if utils.system.is_linux() or utils.system.is_macos():
+    import fcntl
+
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 # Lock file path for macOS
-MACOS_LOCK_PATH = f'/tmp/FreeScribe_{os.getuid()}.lock'
+if utils.system.is_macos():
+    MACOS_LOCK_PATH = f'/tmp/FreeScribe_{os.getuid()}.lock'
+else:
+    MACOS_LOCK_PATH = '/tmp/FreeScribe.lock'
 
 def check_instance() -> Tuple[Optional[object], bool]:
     """

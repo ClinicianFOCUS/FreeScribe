@@ -14,7 +14,7 @@ Alex Simko, Pemba Sherpa, Naitik Patel, Yogesh Kumar and Xun Zhong.
 import utils.system
 import utils.file_utils
 import tkinter as tk
-
+from utils.log_config import logger
 
 def enable_parent_window(parent, child_window = None):
     """
@@ -31,7 +31,7 @@ def enable_parent_window(parent, child_window = None):
         if child_window:
             child_window.grab_release()
         else:
-            print("Child window not provided")
+            logger.warning("Child window not provided")
 
 
 def disable_parent_window(parent, child_window = None):
@@ -51,7 +51,7 @@ def disable_parent_window(parent, child_window = None):
             child_window.grab_set()
             child_window.attributes('-topmost', True)
         else:
-            print("Child window not provided")
+            logger.warning("Child window not provided")
 
 
 def set_window_icon(window):

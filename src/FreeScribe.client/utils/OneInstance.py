@@ -21,11 +21,14 @@ from utils.windows_utils import (
     bring_to_front as windows_bring_to_front,
     kill_with_admin_privilege,
 )
-from utils.linux_utils import (
-    check_instance as linux_check_instance,
-    cleanup_lock as linux_cleanup_lock,
-    bring_to_front as linux_bring_to_front,
-)
+import utils.system
+if utils.system.is_linux():
+    from utils.linux_utils import (
+        check_instance as linux_check_instance,
+        cleanup_lock as linux_cleanup_lock,
+        bring_to_front as linux_bring_to_front,
+    )
+
 from utils.macos_utils import (
     check_instance as macos_check_instance,
     cleanup_lock as macos_cleanup_lock,

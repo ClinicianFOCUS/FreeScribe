@@ -2,6 +2,8 @@
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 !include "WordFunc.nsh"
+!include StrFunc.nsh
+
 
 ; Define the name of the installer
 OutFile "..\dist\FreeScribeInstaller.exe"
@@ -410,21 +412,95 @@ Function CleanUninstall
 FunctionEnd
 
 Function CheckForOldConfig
-    ; Check if the old version exists in AppData
-    IfFileExists "$APPDATA\FreeScribe\settings.txt" 0 End
-        ; Open Dialog to ask user if they want to uninstall the old version
-        MessageBox MB_YESNO|MB_ICONQUESTION "An old configuration file has been detected. We recommend removing it to prevent conflict with new versions. Would you like to remove it?" IDYES RemoveOldConfig IDNO End
-        RemoveOldConfig:
-            ClearErrors
-            ; Remove the old version executable
-            RMDir /r "$APPDATA\FreeScribe"
-            ${If} ${Errors}
-                MessageBox MB_RETRYCANCEL "Unable to remove old configuration. Please close any applications using these files and try again." IDRETRY RemoveOldConfig IDCANCEL ConfigFilesFailed
-            ${EndIf}
-            Goto End
-    ConfigFilesFailed:
-        MessageBox MB_OK|MB_ICONEXCLAMATION "Old configuration files could not be removed. Proceeding with installation."
-    End:
+    ; Check if old config exists
+    IfFileExists "$APPDATA\FreeScribe\settings.txt" old_config_exists
+    Goto end
+    
+    old_config_exists:
+    MessageBox MB_YESNO|MB_ICONQUESTION \
+        "An old configuration file has been detected. Would you like to remove it to prevent conflict with new versions?" \
+        IDYES process_old_config \
+        IDNO end
+    
+    Goto end
+    
+    process_old_config:
+    MessageBox MB_YESNO|MB_ICONQUESTION \
+        "Would you like to keep the network-related settings and remove other configuration?" \
+        IDYES keep_network_config_only \
+        IDNO remove_old_config
+    
+    Goto end
+    
+    remove_old_config:
+        ClearErrors
+        RMDir /r "$APPDATA\FreeScribe"
+        IfErrors 0 +3
+            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION \
+                "Unable to remove old configuration. Please close any applications using these files and try again." \
+                IDRETRY remove_old_config
+            Goto config_files_failed
+        Goto end
+    
+    keep_network_config_only:
+        ; First create a preserved_network_config.txt file with the original settings
+        ClearErrors
+        CopyFiles "$APPDATA\FreeScribe\settings.txt" "$APPDATA\FreeScribe\preserved_network_config.txt"
+        IfErrors 0 +3
+            MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION \
+                "Unable to preserve network configuration. Please close any applications using these files and try again." \
+                IDRETRY keep_network_config_only
+            Goto config_files_failed
+        
+        ; Create a list of files to keep
+        StrCpy $R2 "$APPDATA\FreeScribe\preserved_network_config.txt" ; File to keep
+        
+        ; Delete all files except preserved_network_config.txt
+        FindFirst $R0 $R1 "$APPDATA\FreeScribe\*"
+        delete_loop:
+            StrCmp $R1 "" done_deleting
+            StrCmp $R1 "." next_file
+            StrCmp $R1 ".." next_file
+            
+            ; Don't delete our preserved config file
+            StrCmp $R1 "preserved_network_config.txt" next_file
+            
+            ; Delete other files
+            Delete "$APPDATA\FreeScribe\$R1"
+            
+            next_file:
+            FindNext $R0 $R1
+            Goto delete_loop
+        
+        done_deleting:
+        FindClose $R0
+        
+        ; Remove subdirectories if any
+        FindFirst $R0 $R1 "$APPDATA\FreeScribe\*.*"
+        delete_dir_loop:
+            StrCmp $R1 "" done_deleting_dirs
+            StrCmp $R1 "." next_dir
+            StrCmp $R1 ".." next_dir
+            
+            ; Check if it's a directory
+            IfFileExists "$APPDATA\FreeScribe\$R1\*.*" 0 next_dir
+            
+            ; Delete directory
+            RMDir /r "$APPDATA\FreeScribe\$R1"
+            
+            next_dir:
+            FindNext $R0 $R1
+            Goto delete_dir_loop
+        
+        done_deleting_dirs:
+        FindClose $R0
+        
+        Goto end
+    
+    config_files_failed:
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Configuration update failed. Original settings preserved."
+    
+    end:
 FunctionEnd
 
 ; Define the section of the installer

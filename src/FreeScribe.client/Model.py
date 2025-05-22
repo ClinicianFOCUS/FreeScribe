@@ -2,7 +2,6 @@ from llama_cpp import Llama
 import os
 from typing import Optional, Dict, Any
 import threading
-import logging
 from UI.LoadingWindow import LoadingWindow
 import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys, DEFAULT_CONTEXT_WINDOW_SIZE
@@ -248,9 +247,14 @@ class ModelManager:
             except Exception as e:
                 # model doesnt exist
                 # TODO: Logo to system log
-                messagebox.showerror(
-                    "Model Error",
-                    f"Model failed to load. Please ensure you have a valid model selected in the settings. Currently trying to load: {os.path.abspath(model_path)}. Error received ({e.__class__.__name__}): {str(e)}")
+                local_exception = e
+                def show_error(exception):
+                    messagebox.showerror(
+                        "Model Error",
+                        f"Model failed to load. Please ensure you have a valid model selected in the settings. Currently trying to load: {os.path.abspath(model_path)}. Error received ({exception.__class__.__name__}): {str(exception)}")
+                
+                root.after(100, lambda: show_error(local_exception))
+
                 ModelManager.local_model = ModelStatus.ERROR
 
         thread = threading.Thread(target=load_model)
@@ -307,4 +311,4 @@ class ModelManager:
                 ModelManager.local_model.model.close()
             del ModelManager.local_model
             ModelManager.local_model = None
-        logging.debug(f"{ModelManager.local_model=}")
+        logger.debug(f"{ModelManager.local_model=}")

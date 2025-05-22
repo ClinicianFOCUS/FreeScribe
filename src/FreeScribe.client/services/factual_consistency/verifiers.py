@@ -88,7 +88,7 @@ class NERVerifier(ConsistencyVerifier):
     def __init__(self):
         try:
             self.nlp = spacy.load(self.NLP_MODEL)
-        except (OSError, ImportError, ValueError):
+        except (OSError, ImportError, ValueError) as e:
             logger.error(f"Error loading spaCy model {self.NLP_MODEL}: {e}")
             logger.info(f"Downloading spaCy model {self.NLP_MODEL}...")
             spacy.cli.download(self.NLP_MODEL)
