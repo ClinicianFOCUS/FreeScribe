@@ -4,6 +4,8 @@ import re
 import spacy
 from spacy.matcher import Matcher
 from pydantic import BaseModel, Field, field_validator
+from services.plugins.manager import load_plugin_intent_patterns
+import os
 
 from .base import BaseIntentRecognizer, Intent
 
@@ -176,6 +178,15 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
                 confidence_weights={"pattern_match": 1.0, "entity_match": 0.0}  # Focus on pattern matching
             )
         ]
+
+        # Load plugin patterns
+        plugins_dir = os.path.join(os.path.dirname(__file__), "..", "..", "plugins", "intent-action")
+        loaded_intents = load_plugin_intent_patterns(plugins_dir)
+        self.patterns.extend(loaded_intents)
+
+        for pattern in self.patterns:
+            logger.info(f"Loaded pattern: {pattern.intent_name}")
+            logger.debug(f"Pattern details: {pattern.patterns}")
     
     def add_pattern(self, pattern: SpacyIntentPattern) -> None:
         """

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .intents import SpacyIntentRecognizer, Intent
 from .actions import BaseAction, PrintMapAction, ShowDirectionsAction
+from ..plugins.manager import discover_action_plugin_files, load_actions_from_files, get_plugins_dir
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,19 @@ class IntentActionManager:
             PrintMapAction(maps_directory, google_maps_api_key),
             ShowDirectionsAction()
         ]
+
+        plugin_file_list = discover_action_plugin_files(get_plugins_dir())
+
+        plugin_classes = load_actions_from_files(plugin_file_list)
+
+        # Register plugin actions
+        for action_cls in plugin_classes:
+            try:
+                action_instance = action_cls()
+                self.actions.append(action_instance)
+                logger.info(f"Registered plugin action: {action_cls.__name__}")
+            except Exception as e:
+                logger.error(f"Failed to instantiate action {action_cls}: {e}")
         
         # Register action handlers
         for action in self.actions:
