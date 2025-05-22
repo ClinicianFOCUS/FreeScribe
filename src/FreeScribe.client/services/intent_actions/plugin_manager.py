@@ -4,14 +4,22 @@ import importlib.util
 import glob
 from utils.file_utils import get_resource_path
 
-def get_plugins_dir():
+INTENT_ACTION_DIR = "intent-action"
+
+def get_plugins_dir(sub_folder: str = ""):
     """
     Get the path to the plugins directory.
     """
     # Assuming the plugins directory is at the same level as this script
-    return get_resource_path("plugins/intent-action")
+    
+    plugin_path = "plugins"
 
-def discover_action_plugin_files(plugins_dir: str = get_plugins_dir()):
+    if sub_folder:
+        plugin_path = plugin_path + os.sep + sub_folder
+    
+    return get_resource_path(plugin_path)
+
+def discover_action_plugin_files(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR)):
     """
     Recursively discover all *Action.py files in the plugins/intent-action directory.
     Returns a list of file paths.

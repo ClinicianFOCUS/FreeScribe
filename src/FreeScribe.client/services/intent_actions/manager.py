@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .intents import SpacyIntentRecognizer, Intent
 from .actions import BaseAction, PrintMapAction, ShowDirectionsAction
-from ..plugins.manager import discover_action_plugin_files, load_actions_from_files, get_plugins_dir
+from .plugin_manager import discover_action_plugin_files, load_actions_from_files, get_plugins_dir, INTENT_ACTION_DIR
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class IntentActionManager:
             ShowDirectionsAction()
         ]
 
-        plugin_file_list = discover_action_plugin_files(get_plugins_dir())
+        plugin_file_list = discover_action_plugin_files(get_plugins_dir(INTENT_ACTION_DIR))
 
         plugin_classes = load_actions_from_files(plugin_file_list)
 

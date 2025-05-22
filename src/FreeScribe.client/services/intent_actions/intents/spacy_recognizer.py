@@ -4,7 +4,7 @@ import re
 import spacy
 from spacy.matcher import Matcher
 from pydantic import BaseModel, Field, field_validator
-from services.plugins.manager import load_plugin_intent_patterns
+from services.intent_actions.plugin_manager import load_plugin_intent_patterns
 import os
 
 from .base import BaseIntentRecognizer, Intent
