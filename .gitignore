@@ -35,6 +35,5 @@ launch.json
 _build
 /mac/scripts/preinstall
 
-freescribe.log
-
+env
 freescribe.log
