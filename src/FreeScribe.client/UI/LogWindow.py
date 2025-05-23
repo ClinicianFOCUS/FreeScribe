@@ -33,9 +33,6 @@ class LogWindow:
                                 title="Loading Log",
                                 initial_text="Decrypting log file…",
                                 note_text="May take a moment.")
-        loading.popup.attributes('-topmost', True)
-        loading.popup.focus_force()
-        loading.popup.grab_set()
 
         def on_done(result=None, error=None):
             loading.destroy()
