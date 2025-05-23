@@ -125,9 +125,6 @@ class SettingsWindowUI:
 
         self.settings_window.protocol("WM_DELETE_WINDOW", self.close_window)
 
-
-        self.llm_settings_frame = self.add_scrollbar_to_frame(self.llm_settings_frame)
-        self.whisper_settings_frame = self.add_scrollbar_to_frame(self.whisper_settings_frame)
         self.advanced_settings_frame = self.add_scrollbar_to_frame(self.advanced_frame)
 
         # self.create_basic_settings()
