@@ -3,10 +3,11 @@ from utils.log_config import logger
 import importlib.util
 import glob
 from utils.file_utils import get_resource_path
+from typing import List, Tuple, Optional
 
 INTENT_ACTION_DIR = "intent-action"
 
-def get_plugins_dir(sub_folder: str = ""):
+def get_plugins_dir(subdir: Optional[str] = None) -> str:
     """
     Get the path to the plugins directory.
     """
@@ -14,8 +15,8 @@ def get_plugins_dir(sub_folder: str = ""):
     
     plugin_path = "plugins"
 
-    if sub_folder:
-        plugin_path = plugin_path + os.sep + sub_folder
+    if subdir:
+        plugin_path = plugin_path + os.sep + subdir
     
     return get_resource_path(plugin_path)
 
@@ -53,19 +54,43 @@ def load_actions_from_files(action_files):
             logger.error(f"Failed to import plugin module {module_name} from {file_path}: {e}")
     return actions
 
-def load_plugin_intent_patterns(plugins_base_dir):
+def load_plugin_intent_patterns(plugins_dir: str) -> Tuple[List, List]:
     """
-    Dynamically load SpacyIntentPattern lists from all *Intent.py files in plugins/intent-action/**/
+    Load all intent patterns and entity patterns from plugins.
+    
+    Returns a tuple of (intent_patterns, entity_patterns)
     """
-    patterns = []
-    # Recursively find all *Intent.py files
-    pattern_files = glob.glob(os.path.join(plugins_base_dir, "**", "*Intent.py"), recursive=True)
-    for file_path in pattern_files:
-        module_name = os.path.splitext(os.path.basename(file_path))[0]
-        spec = importlib.util.spec_from_file_location(module_name, file_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        if hasattr(module, "exported_patterns"):
-            logger.info(f"Loaded pattern: {module_name} from {file_path}")
-            patterns.extend(module.exported_patterns)
-    return patterns
+    intent_patterns = []
+    entity_patterns = []
+    
+    if not os.path.exists(plugins_dir):
+        logger.warning(f"Plugins directory does not exist: {plugins_dir}")
+        return intent_patterns, entity_patterns
+    
+    for plugin_dir in os.listdir(plugins_dir):
+        plugin_path = os.path.join(plugins_dir, plugin_dir)
+        
+        if os.path.isdir(plugin_path):
+            intent_file = os.path.join(plugin_path, "Intent.py")
+            
+            if os.path.exists(intent_file):
+                try:
+                    # Import the Intent.py file
+                    spec = importlib.util.spec_from_file_location("plugin_intent", intent_file)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    
+                    # Load intent patterns
+                    if hasattr(module, "exported_patterns"):
+                        intent_patterns.extend(module.exported_patterns)
+                        logger.info(f"Loaded {len(module.exported_patterns)} patterns from {plugin_dir}")
+                    
+                    # Load entity patterns
+                    if hasattr(module, "exported_entities"):
+                        entity_patterns.extend(module.exported_entities)
+                        logger.info(f"Loaded {len(module.exported_entities)} entity patterns from {plugin_dir}")
+                    
+                except Exception as e:
+                    logger.error(f"Error loading plugin {plugin_dir}: {e}")
+    
+    return intent_patterns, entity_patterns
