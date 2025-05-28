@@ -77,7 +77,7 @@ class SettingsWindow():
     STATE_FILES_DIR = "install_state"
     DEFAULT_WHISPER_ARCHITECTURE = Architectures.CPU.architecture_value
     DEFAULT_LLM_ARCHITECTURE = Architectures.CPU.architecture_value
-    AUTO_DETECT_LANGUAGE_CODES = ["", "auto", "Auto Detect", "None", "None (Auto Detect)"]
+    AUTO_DETECT_LANGUAGE_CODES = ["", " ","auto", "Auto Detect", "None", "None (Auto Detect)"]
 
     DEFAULT_SETTINGS_TABLE = {
             SettingsKeys.LOCAL_LLM_MODEL.value: "gemma2:2b-instruct-q8_0",
@@ -116,7 +116,7 @@ class SettingsWindow():
             "Current Mic": "None",
             SettingsKeys.WHISPER_REAL_TIME.value: True,
             "Real Time Audio Length": 3,
-            "Real Time Silence Length": 1,
+            "Real Time Silence Length": 1.1,
             "Silence cut-off": 0.035,
             "LLM Container Name": "ollama",
             "LLM Caddy Container Name": "caddy-ollama",
@@ -127,7 +127,7 @@ class SettingsWindow():
             "Use Docker Status Bar": False,
             "Show Welcome Message": True,
             "Enable Scribe Template": False,
-            "Use Pre-Processing": FeatureToggle.PRE_PROCESSING,
+            SettingsKeys.USE_PRE_PROCESSING.value: False,
             "Use Post-Processing": FeatureToggle.POST_PROCESSING,
             "AI Server Self-Signed Certificates": False,
             SettingsKeys.S2T_SELF_SIGNED_CERT.value: False,
@@ -148,6 +148,11 @@ class SettingsWindow():
             # Google Maps API settings
             SettingsKeys.GOOGLE_MAPS_API_KEY.value: "",  # Will be set by user
             SettingsKeys.ENABLE_FILE_LOGGER.value: False,
+            SettingsKeys.STORE_NOTES_LOCALLY.value: False,
+            SettingsKeys.STORE_RECORDINGS_LOCALLY.value: False,
+            SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
+            # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
+            SettingsKeys.BEST_OF.value: 1,
         }
 
     def __init__(self):
@@ -172,7 +177,8 @@ class SettingsWindow():
 
         self.general_settings = [
             "Show Welcome Message",
-            "Show Scrub PHI"
+            "BlankSpace",
+            "Show Scrub PHI",      
         ]
 
         self.whisper_settings = [
@@ -236,6 +242,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_CPU_COUNT.value,
             # SettingsKeys.WHISPER_VAD_FILTER.value,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value,
+            "Real Time Audio Length",
             # left out for now, dont need users tinkering and default is good and tested.
             # SettingsKeys.SILERO_SPEECH_THRESHOLD.value, 
             SettingsKeys.USE_TRANSLATE_TASK.value,
@@ -249,11 +256,15 @@ class SettingsWindow():
         self.adv_general_settings = [
             # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
+            SettingsKeys.STORE_RECORDINGS_LOCALLY.value,
+            SettingsKeys.STORE_NOTES_LOCALLY.value,
+            SettingsKeys.ENABLE_FILE_LOGGER.value,
             SettingsKeys.USE_LOW_MEM_MODE.value,
         ]
 
         self.developer_settings = [
-            SettingsKeys.ENABLE_FILE_LOGGER.value,
+            "Real Time Silence Length",
+            "BlankSpace", # Represents the Whisper Initial Prompt
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
@@ -337,7 +348,8 @@ class SettingsWindow():
             else:
                 return str(value)
         except (ValueError, TypeError):
-            logger.warning(f"Warning: Could not convert {setting} value to {target_type}")
+            logging.warning(f"Warning: Could not convert {setting} value to {target_type}")
+
             return value
 
     def load_settings_from_file(self, filename='settings.txt'):
@@ -355,7 +367,7 @@ class SettingsWindow():
                 try:
                     settings = json.load(file)
                 except json.JSONDecodeError:
-                    logger.error("Error loading settings file. Using default settings.")
+                    logger.exception("Failed to decode JSON from settings file")
                     return self.OPENAI_API_KEY
 
                 self.OPENAI_API_KEY = settings.get("openai_api_key", self.OPENAI_API_KEY)
@@ -445,6 +457,7 @@ class SettingsWindow():
             with open(get_resource_path('aiscribe.txt'), 'r') as f:
                 return f.read()
         except FileNotFoundError:
+            logger.info("aiscribe.txt not found, using default value.")
             return None
 
     def load_aiscribe2_from_file(self):
@@ -458,6 +471,7 @@ class SettingsWindow():
             with open(get_resource_path('aiscribe2.txt'), 'r') as f:
                 return f.read()
         except FileNotFoundError:
+            logger.info("aiscribe2.txt not found, using default value.")
             return None
 
     def __clear_settings_file(self):
@@ -531,7 +545,7 @@ class SettingsWindow():
             settings_window.destroy()
         except Exception as e:
             # Print any exception that occurs during file handling or window destruction.
-            logger.error(f"Error clearing settings files: {e}")
+            logger.exception("Failed to clear settings file")
             messagebox.showerror("Error", "An error occurred while clearing settings. Please try again.")
 
     def get_available_models(self,endpoint=None):
@@ -571,8 +585,7 @@ class SettingsWindow():
             available_models.append("Custom")
             return available_models
         except requests.RequestException as e:
-            # messagebox.showerror("Error", f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.") 
-            logger.error(str(e))
+            logger.exception("Failed to fetch models from endpoint")
             return ["Failed to load models", "Custom"]
 
     def update_models_dropdown(self, dropdown, endpoint=None):
@@ -652,8 +665,8 @@ class SettingsWindow():
                 unload_flag = True
         # in case context_window value is invalid
         except (ValueError, TypeError) as e:
-            logger.exception(f"Failed to determine reload/unload model: {str(e)}")
-        logger.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
+            logging.exception("Failed to determine reload/unload model")
+        logging.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
         return unload_flag, reload_flag
 
 

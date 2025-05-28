@@ -21,7 +21,7 @@ and Research Students - Software Developer Alex Simko, Pemba Sherpa (F24), and N
 
 from ContainerManager import ContainerManager, ContainerState
 import tkinter as tk
-
+from utils.log_config import logger
 class MainWindow:
     """
     Main window class for the FreeScribe client application.
@@ -50,6 +50,7 @@ class MainWindow:
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.start_container(app_settings.editable_settings["LLM Caddy Container Name"]))
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.start_container(app_settings.editable_settings["LLM Authentication Container Name"]))
         except Exception as e:
+            logger.exception("Failed to start LLM container: %s", e)
             tk.messagebox.showerror("Error", f"An error occurred while starting the LLM container: {e}")
 
     def stop_LLM_container(self, widget_name, app_settings):
@@ -66,6 +67,7 @@ class MainWindow:
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.stop_container(app_settings.editable_settings["LLM Caddy Container Name"]))
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.stop_container(app_settings.editable_settings["LLM Authentication Container Name"]))
         except Exception as e:
+            logger.exception("Failed to stop LLM container")
             tk.messagebox.showerror("Error", f"An error occurred while stopping the LLM container: {e}")
 
     def start_whisper_container(self, widget_name, app_settings):
@@ -81,6 +83,7 @@ class MainWindow:
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.start_container(app_settings.editable_settings["Whisper Container Name"]))
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.start_container(app_settings.editable_settings["Whisper Caddy Container Name"]))
         except Exception as e:
+            logger.exception("Failed to start Whisper container")
             tk.messagebox.showerror("Error", f"An error occurred while starting the Whisper container: {e}")
 
     def stop_whisper_container(self, widget_name, app_settings):
@@ -96,6 +99,7 @@ class MainWindow:
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.stop_container(app_settings.editable_settings["Whisper Container Name"]))
             self.container_manager.set_status_icon_color(widget_name, self.container_manager.stop_container(app_settings.editable_settings["Whisper Caddy Container Name"]))
         except Exception as e:
+            logger.exception("Failed to stop Whisper container")
             tk.messagebox.showerror("Error", f"An error occurred while stopping the Whisper container: {e}")
 
     def check_llm_containers(self):

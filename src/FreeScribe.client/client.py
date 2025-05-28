@@ -51,13 +51,16 @@ from utils.ip_utils import is_private_ip
 from utils.file_utils import get_file_path, get_resource_path
 from utils.OneInstance import OneInstance
 from utils.utils import get_application_version
+import utils.AESCryptoUtils as AESCryptoUtils
 import utils.audio
+import utils.AESCryptoUtils as AESCryptoUtils
 import utils.system
 from UI.Widgets.MicrophoneTestFrame import MicrophoneTestFrame
 from utils.windows_utils import remove_min_max, add_min_max
 from WhisperModel import TranscribeError
 from UI.Widgets.PopupBox import PopupBox
 from UI.Widgets.TimestampListbox import TimestampListbox
+from UI.RecordingsManager import RecordingsManager
 from UI.ScrubWindow import ScrubWindow
 from utils.log_config import logger
 from Model import ModelStatus
@@ -109,18 +112,154 @@ def delete_temp_file(filename):
             logger.info(f"Deleting temporary file: {filename}")
             os.remove(file_path)
         except OSError as e:
-            logger.error(f"Error deleting temporary file {filename}: {e}")
-
+            logger.exception(f"Error deleting temporary file {filename}: {e}")
 
 def on_closing():
     delete_temp_file('recording.wav')
     delete_temp_file('realtime.wav')
     app_manager.cleanup()
 
-
 # Register the cleanup function to be called on exit
 atexit.register(on_closing)
 
+def update_store_notes_locally_ui(event=None):
+        global warning_label        
+        """
+        Updates the UI components based on the 'Store Notes Locally' setting.
+        """
+        if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+            # Loads all existing notes
+            load_notes_history()
+            warning_label.grid_remove()
+        else:
+            # Clear all existing notes
+            warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+            clear_all_notes()
+
+def load_notes_history():
+    """
+    Loads the temporary notes from a local .txt file containing encrypted JSON data and populates the response_history list.
+    """
+    notes_file_path = get_resource_path('notes_history.txt')
+    try:
+        with open(notes_file_path, 'r') as file:
+            encrypted_data = file.read()
+        
+        # Decrypt the JSON data
+        json_data = AESCryptoUtils.AESCryptoUtilsClass.decrypt(encrypted_data)
+
+        notes_data = json.loads(json_data)
+        for entry in notes_data:
+            timestamp = entry["timestamp"]
+            user_message = entry["user_message"]
+            response_text = entry["response_text"]
+            response_history.append((timestamp, user_message, response_text))
+        populate_ui_with_notes()
+        logger.info(f"Temporary notes loaded from {notes_file_path}")
+    except FileNotFoundError:
+        logger.info(f"No temporary notes file found at {notes_file_path}")
+    except Exception as e:
+        logger.exception(f"Error loading temporary notes: {e}")
+
+def populate_ui_with_notes():
+    """
+    Populates the UI components with the data from response_history.
+    """
+    def action():
+        global IS_FIRST_LOG
+        IS_FIRST_LOG = False
+        
+        timestamp_listbox.delete(0, tk.END)
+        for time, user_msg, response in response_history:
+            timestamp_listbox.insert(tk.END, time)
+
+    root.after(0, action)
+
+def clear_all_notes():
+    """
+    Clears all temporary notes from the UI and the .txt file.
+    """
+    global response_history
+    response_history = []  # Clear the response history list
+
+    clear_notes_ui_element()  # Clear the UI elements
+
+    # Clear the contents of the .txt file
+    notes_file_path = get_resource_path('notes_history.txt')
+    try:
+        with open(notes_file_path, 'w') as file:
+            file.write("")  # Write an empty string to clear the file
+        logger.info(f"Temporary notes file cleared: {notes_file_path}")
+    except Exception as e:
+        logger.exception(f"Error clearing temporary notes file: {e}")
+
+def clear_notes_ui_element():
+    """Clears the UI elements displaying the notes."""
+    # Clear the timestamp listbox
+    def action():
+        timestamp_listbox.delete(0, tk.END)
+
+        # Clear the response display
+        response_display.scrolled_text.configure(state='normal')
+        response_display.scrolled_text.delete("1.0", tk.END)
+        response_display.scrolled_text.insert(tk.END, "Medical Note")
+        response_display.scrolled_text.config(fg='grey')
+        response_display.scrolled_text.configure(state='disabled') 
+
+    root.after(0, action)
+
+def safe_set_button_config(button, **kwargs):
+    """
+    Safely sets configuration options for a button in the UI.
+
+    Args:
+        button (tk.Button): The button to update.
+        **kwargs: Arbitrary keyword arguments for button configuration options (e.g., text, state, etc.).
+    """
+    def update_text(button, **kwargs):
+        if button.winfo_exists():
+            button.config(**kwargs)
+        else:
+            logger.warning("Button does not exist, cannot set text.")
+    root.after(0, lambda: update_text(button, **kwargs))
+
+def safe_set_transcription_box(text, callback=None):
+    """
+    Safely sets the text of the transcription box in the UI.
+
+    Args:
+        text (str): The text to set on the transcription box.
+        callback (callable, optional): Function to call after text is updated.
+    """
+    def update_text():
+        if user_input.scrolled_text.winfo_exists():
+            user_input.scrolled_text.configure(state='normal')
+            user_input.scrolled_text.delete("1.0", tk.END)
+            user_input.scrolled_text.insert(tk.END, text)
+            user_input.scrolled_text.configure(state='disabled')
+            if callback:
+                callback()
+        else:
+            logger.warning("Transcription box does not exist, cannot set text.")
+    root.after(0, update_text)
+
+def safe_set_note_box(text):
+    """
+    Safely sets the text of the note box in the UI.
+
+    Args:
+        text (str): The text to set on the note box.
+    """
+    def update_text():
+        if response_display.scrolled_text.winfo_exists():
+            response_display.scrolled_text.configure(state='normal')
+            response_display.scrolled_text.delete("1.0", tk.END)
+            response_display.scrolled_text.insert(tk.END, text)
+            response_display.scrolled_text.config(fg='black')
+            response_display.scrolled_text.configure(state='disabled')
+        else:
+            logger.warning("Note box does not exist, cannot set text.")
+    root.after(0, update_text)
 
 # This runs before on_closing, if not confirmed, nothing should be changed
 def confirm_exit_and_destroy():
@@ -154,6 +293,9 @@ root.protocol("WM_DELETE_WINDOW", confirm_exit_and_destroy)
 
 # settings logic
 app_settings = SettingsWindow()
+
+if app_settings.editable_settings[SettingsKeys.ENABLE_FILE_LOGGER.value]:
+    utils.log_config.add_file_handler(utils.log_config.logger, format=utils.log_config.AESEncryptedFormatter())
 
 #  create our ui elements and settings config
 window = MainWindowUI(root, app_settings)
@@ -193,6 +335,7 @@ silent_warning_duration = 0
 is_audio_processing_realtime_canceled = threading.Event()
 is_audio_processing_whole_canceled = threading.Event()
 cancel_await_thread = threading.Event()
+
 
 # Constants
 if utils.system.is_linux():
@@ -347,23 +490,24 @@ def threaded_send_audio_to_server():
 
 
 def toggle_pause():
-    global is_paused
-    is_paused = not is_paused
+    def action():
+        global is_paused
+        is_paused = not is_paused
 
-    if is_paused:
-        if current_view == "full":
-            pause_button.config(text="Resume", bg="red")
-        elif current_view == "minimal":
-            pause_button.config(text="▶️", bg="red")
-    else:
-        if current_view == "full":
-            pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
-        elif current_view == "minimal":
-            pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
+        if is_paused:
+            if current_view == "full":
+                pause_button.config(text="Resume", bg="red")
+            elif current_view == "minimal":
+                pause_button.config(text="▶️", bg="red")
+        else:
+            if current_view == "full":
+                pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
+            elif current_view == "minimal":
+                pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
 
-
-SILENCE_WARNING_LENGTH = 10  # seconds, warn the user after 10s of no input something might be wrong
-
+    root.after(0, action)
+    
+SILENCE_WARNING_LENGTH = 10 # seconds, warn the user after 10s of no input something might be wrong
 
 def open_microphone_stream():
     """
@@ -394,7 +538,7 @@ def open_microphone_stream():
     except (OSError, IOError) as e:
         # Log the error message
         # TODO System logger
-        logger.error(f"An error occurred opening the stream({type(e).__name__}): {e}")
+        logger.exception(f"An error occurred opening the stream({type(e).__name__}): {e}")
         return None, e
 
 
@@ -414,17 +558,19 @@ def record_audio():
     global is_paused, frames, audio_queue, silent_warning_duration
 
     try:
+        recording_id = f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         current_chunk = []
         silent_duration = 0
         record_duration = 0
-        minimum_silent_duration = int(app_settings.editable_settings["Real Time Silence Length"])
-        minimum_audio_duration = int(app_settings.editable_settings["Real Time Audio Length"])
+        minimum_silent_duration = float(app_settings.editable_settings["Real Time Silence Length"])
+        minimum_audio_duration = float(app_settings.editable_settings["Real Time Audio Length"])
 
         stream, stream_exception = open_microphone_stream()
 
         if stream is None:
             clear_application_press()
             messagebox.showerror("Error", f"An error occurred while trying to record audio: {stream_exception}")
+            logger.error(f"An error occurred while trying to record audio: {stream_exception}")
         
         audio_data_leng = 0
         while is_recording and stream is not None:
@@ -441,6 +587,7 @@ def record_audio():
                 except ValueError:
                     # default it to value in DEFAULT_SETTINGS_TABLE on invalid error
                     speech_prob_threshold = app_settings.DEFAULT_SETTINGS_TABLE[SettingsKeys.SILERO_SPEECH_THRESHOLD.value]
+                    logger.info(f"Invalid value for SILERO_SPEECH_THRESHOLD: {app_settings.editable_settings[SettingsKeys.SILERO_SPEECH_THRESHOLD.value]}. Defaulting to {speech_prob_threshold}")
 
                 if is_silent(audio_buffer, speech_prob_threshold ):
                     silent_duration += CHUNK / RATE
@@ -462,6 +609,10 @@ def record_audio():
                     if app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value] and current_chunk:
                         padded_audio = utils.audio.pad_audio_chunk(current_chunk, pad_seconds=0.5)
                         audio_queue.put(b''.join(padded_audio))
+                    
+                    if app_settings.editable_settings[SettingsKeys.STORE_RECORDINGS_LOCALLY.value]:
+                        # Encrypt the audio chunk and save it to a file
+                        utils.audio.encrypt_audio_chunk(b''.join(current_chunk), filepath=recording_id)
 
                     # Carry over the last .1 seconds of audio to the next one so next speech does not start abruptly or in middle of a word
                     carry_over_chunk = current_chunk[-int(0.1 * RATE / CHUNK):]
@@ -479,12 +630,15 @@ def record_audio():
 
         # Send any remaining audio chunk when recording stops
         if current_chunk:
-            audio_queue.put(b''.join(current_chunk))
+            last_chunk = b''.join(current_chunk)
+            audio_queue.put(last_chunk)
+            if app_settings.editable_settings[SettingsKeys.STORE_RECORDINGS_LOCALLY.value]:
+                utils.audio.encrypt_audio_chunk(last_chunk, filepath=recording_id)
     except Exception as e:
         # Log the error message
         # TODO System logger
         # For now general catch on any problems
-        logger.error(f"An error occurred: {e}")
+        logger.exception(f"An error occurred: {e}")
     finally:
         if stream:
             stream.stop_stream()
@@ -561,6 +715,7 @@ def realtime_text():
                     except Exception as e:
                         logger.exception(str(e))
                         update_gui(f"\nError: {e}\n")
+                        logger.exception(f"Error: {e}")
 
                     if not local_cancel_flag and not is_audio_processing_realtime_canceled.is_set():
                         update_gui(result)
@@ -589,6 +744,9 @@ def realtime_text():
                     if app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value] not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
                         body["language_code"] = app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value]
 
+                    if app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value].strip() not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
+                        body['initial_prompt'] = app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value].strip()
+
                     try:
                         verify = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
 
@@ -611,6 +769,7 @@ def realtime_text():
                             update_gui(f"Error (HTTP Status {response.status_code}): {response.text}")
                     except Exception as e:
                         update_gui(f"Error: {e}")
+                        logger.exception(f"Error: {e}")
                     finally:
                         # close buffer. we dont need it anymore
                         buffer.close()
@@ -631,10 +790,13 @@ def realtime_text():
 
 
 def update_gui(text):
-    # Tkinter is not thread safe, so we need to use root.after to make sure to update the GUI from main thread
-    root.after(0, lambda: user_input.scrolled_text.insert(tk.END, text + '\n'))
-    root.after(0, lambda: user_input.scrolled_text.see(tk.END))
-
+    def action(text):
+        if user_input.scrolled_text.winfo_exists():
+            user_input.scrolled_text.configure(state='normal')  # enable for editing
+            user_input.scrolled_text.insert(tk.END, text + '\n')
+            user_input.scrolled_text.see(tk.END)
+            user_input.scrolled_text.configure(state='disabled')  # disable again
+    root.after(0, lambda: action(text))
 
 def save_audio():
     global frames
@@ -674,17 +836,18 @@ def toggle_recording():
             loading_screen.destroy()
             
         disable_recording_ui_elements()
+        # reset generate button state
+        safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+        safe_set_transcription_box("")
+
         REALTIME_TRANSCRIBE_THREAD_ID = realtime_thread.ident
         
-        def _start_recording_ui():
-            user_input.scrolled_text.configure(state='normal')
-            user_input.scrolled_text.delete("1.0", tk.END)
-            if not app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value]:
-                user_input.scrolled_text.insert(tk.END, "Recording")
-            response_display.scrolled_text.configure(state='normal')
-            response_display.scrolled_text.delete("1.0", tk.END)
-            response_display.scrolled_text.configure(state='disabled')
-        root.after(0, _start_recording_ui)
+        if not app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value]:
+            safe_set_transcription_box("Recording Audio... Realtime Transcription disabled. Audio while transcribe when you press stop recording.\n")
+      
+        # Set the text in the transcription box, nothing for it to be empty
+        safe_set_note_box("")
+
         is_recording = True
 
         # reset frames before new recording so old data is not used
@@ -694,13 +857,17 @@ def toggle_recording():
         recording_thread.start()
 
         if current_view == "full":
-            root.after(0, lambda: mic_button.config(bg="red", text="Stop\nRecording"))
+            safe_set_button_config(mic_button, bg="red", text="Stop\nRecording")
         elif current_view == "minimal":
-            root.after(0, lambda: mic_button.config(bg="red", text="⏹️"))
+            safe_set_button_config(mic_button, bg="red", text="⏹️")
 
         start_flashing()
     else:
         enable_recording_ui_elements()
+        if current_view == "full":
+            safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
+        elif current_view == "minimal":
+            safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="🎤")
         is_recording = False
         if recording_thread and recording_thread.is_alive():
             recording_thread.join()  # Ensure the recording thread is terminated
@@ -717,9 +884,7 @@ def toggle_recording():
                 try:
                     kill_thread(thread_id)
                 except Exception as e:
-                    # Log the error message
-                    # TODO System logger
-                    logger.error(f"An error occurred: {e}")
+                    logger.exception(f"An error occurred: {e}")
                 finally:
                     REALTIME_TRANSCRIBE_THREAD_ID = None
 
@@ -741,6 +906,7 @@ def toggle_recording():
             except ValueError:
                 # default to 3minutes
                 timeout_length = 180
+                logger.info(f"Invalid value for AUDIO_PROCESSING_TIMEOUT_LENGTH: {app_settings.editable_settings[SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value]}. Defaulting to {timeout_length} seconds")
 
             timeout_timer = 0.0
             while audio_queue.empty() is False and timeout_timer < timeout_length:
@@ -768,15 +934,8 @@ def toggle_recording():
         logger.info("*** Recording Stopped")
         stop_flashing()
 
-        if current_view == "full":
-            root.after(0, lambda: mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording"))
-        elif current_view == "minimal":
-            root.after(0, lambda: mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="🎤"))
-        logger.debug("the end of toggle_recording")
-
-
 def disable_recording_ui_elements():
-    def _disable_recording_ui_elements():
+    def action():
         window.disable_settings_menu()
         user_input.scrolled_text.configure(state='disabled')
         send_button.config(state='disabled')
@@ -787,10 +946,10 @@ def disable_recording_ui_elements():
         timestamp_listbox.config(state='disabled')
         clear_button.config(state='disabled')
         mic_test.set_mic_test_state(False)
-    root.after(0, _disable_recording_ui_elements)
+    root.after(0, action)
 
 def enable_recording_ui_elements():
-    def _enable_recording_ui_elements():
+    def action():
         window.enable_settings_menu()
         user_input.scrolled_text.configure(state='normal')
         send_button.config(state='normal')
@@ -800,8 +959,9 @@ def enable_recording_ui_elements():
         timestamp_listbox.config(state='normal')
         clear_button.config(state='normal')
         mic_test.set_mic_test_state(True)
-    root.after(0, _enable_recording_ui_elements)
 
+    root.after(0, action)
+        
 
 def cancel_processing():
     """Cancels any ongoing audio processing.
@@ -820,6 +980,8 @@ def clear_application_press():
     """Resets the application state by clearing text fields and recording status."""
     reset_recording_status()  # Reset recording-related variables
     clear_all_text_fields()  # Clear UI text areas
+    # change re generate button to generate button
+    safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
 
 
 def reset_recording_status():
@@ -841,9 +1003,7 @@ def reset_recording_status():
         try:
             kill_thread(REALTIME_TRANSCRIBE_THREAD_ID)
         except Exception as e:
-            # Log the error message
-            # TODO System logger
-            logger.error(f"An error occurred: {e}")
+            logger.exception(f"An error occurred: {e}")
         finally:
             REALTIME_TRANSCRIBE_THREAD_ID = None
 
@@ -851,9 +1011,7 @@ def reset_recording_status():
         try:
             kill_thread(GENERATION_THREAD_ID)
         except Exception as e:
-            # Log the error message
-            # TODO System logger
-            logger.error(f"An error occurred: {e}")
+            logger.exception(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
 
@@ -868,20 +1026,20 @@ def clear_all_text_fields():
         - Resets response display with default text
     """
     # Enable and clear user input field
-    user_input.scrolled_text.configure(state='normal')
-    user_input.scrolled_text.delete("1.0", tk.END)
-
+    safe_set_transcription_box("")
+    
     # Reset focus to main window
-    user_input.scrolled_text.focus_set()
-    root.focus_set()
+    def set_focus():
+        user_input.scrolled_text.focus_set()
+        root.focus_set()
+
+    root.after(0, set_focus)  # Use after to ensure focus is set after UI updates
+    
 
     stop_flashing()  # Stop any UI flashing effects
 
     # Reset response display with default text
-    response_display.scrolled_text.configure(state='normal')
-    response_display.scrolled_text.delete("1.0", tk.END)
-    response_display.scrolled_text.insert(tk.END, "Medical Note")
-    response_display.scrolled_text.configure(state='disabled')
+    safe_set_note_box("Medical Note")
 
 # hidding the AI Scribe button Function
 # def toggle_aiscribe():
@@ -929,8 +1087,7 @@ def send_audio_to_server():
         try:
             kill_thread(thread_id)
         except Exception as e:
-            # Log the error message
-            logger.error(f"An error occurred: {e}")
+            logger.exception(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
             clear_application_press()
@@ -952,11 +1109,7 @@ def send_audio_to_server():
         clear_all_text_fields()
 
         # Configure the user input widget to be editable and clear its content
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.delete("1.0", tk.END)
-
-        # Display a message indicating that audio to text processing is in progress
-        user_input.scrolled_text.insert(tk.END, "Audio to Text Processing...Please Wait")
+        safe_set_transcription_box("Audio to Text Processing...Please Wait")
         try:
             if utils.system.is_macos():
                 # Load the audio file to send for transcription
@@ -986,8 +1139,8 @@ def send_audio_to_server():
                 if app_settings.editable_settings[SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value] and FeatureToggle.HALLUCINATION_CLEANING:
                     result = hallucination_cleaner.clean_text(result)
             except Exception as e:
-                logger.error(traceback.format_exc())
                 result = f"An error occurred ({type(e).__name__}): {e}\n \n {traceback.format_exc()}"
+                logger.exception(f"An error occurred: {e}")
             finally:
                 if app_settings.is_low_mem_mode():
                     unload_stt_model()
@@ -1000,22 +1153,10 @@ def send_audio_to_server():
 
             # check if canceled, if so do not update the UI
             if not is_audio_processing_whole_canceled.is_set():
-                # Update the user input widget with the transcribed text
-                user_input.scrolled_text.configure(state='normal')
-                user_input.scrolled_text.delete("1.0", tk.END)
-                user_input.scrolled_text.insert(tk.END, transcribed_text)
-
-                # Send the transcribed text and receive a response
-                send_and_receive()
+                safe_set_transcription_box(transcribed_text, send_and_receive)
         except Exception as e:
-            # Log the error message
-            logger.error(f"An error occurred: {e}")
-
-            # log error to input window
-            user_input.scrolled_text.configure(state='normal')
-            user_input.scrolled_text.delete("1.0", tk.END)
-            user_input.scrolled_text.insert(tk.END, f"An error occurred: {e}")
-            user_input.scrolled_text.configure(state='disabled')
+            logger.exception(f"An error occurred: {e}")
+            safe_set_transcription_box(f"An error occurred: {e}")
         finally:
             loading_window.destroy()
 
@@ -1024,11 +1165,7 @@ def send_audio_to_server():
         logger.info("Using Remote Whisper for transcription.")
 
         # Configure the user input widget to be editable and clear its content
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.delete("1.0", tk.END)
-
-        # Display a message indicating that audio to text processing is in progress
-        user_input.scrolled_text.insert(tk.END, "Audio to Text Processing...Please Wait")
+        safe_set_transcription_box("Audio to Text Processing...Please Wait")
 
         delete_file = False if uploaded_file_path else True
 
@@ -1054,6 +1191,9 @@ def send_audio_to_server():
 
             if app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value] not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
                 body["language_code"] = app_settings.editable_settings[SettingsKeys.WHISPER_LANGUAGE_CODE.value]
+
+            if app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value] not in SettingsWindow.AUTO_DETECT_LANGUAGE_CODES:
+                body['initial_prompt'] = app_settings.editable_settings[SettingsKeys.WHISPER_INITIAL_PROMPT.value]
 
             try:
                 verify = not app_settings.editable_settings[SettingsKeys.S2T_SELF_SIGNED_CERT.value]
@@ -1083,21 +1223,11 @@ def send_audio_to_server():
                         except Exception as e:
                             # ignore the error as it should not break the transcription
                             logger.exception(f"remote Error during hallucination cleaning: {str(e)}")
-                    user_input.scrolled_text.configure(state='normal')
-                    user_input.scrolled_text.delete("1.0", tk.END)
-                    user_input.scrolled_text.insert(tk.END, transcribed_text)
-
-                    # Send the transcribed text and receive a response
-                    send_and_receive()
+                    safe_set_transcription_box(transcribed_text, send_and_receive)
             except Exception as e:
-                # log error message
-                logger.error(f"An error occurred: {e}")
-
+                logger.exception(f"An error occurred: {e}")
                 # Display an error message to the user
-                user_input.scrolled_text.configure(state='normal')
-                user_input.scrolled_text.delete("1.0", tk.END)
-                user_input.scrolled_text.insert(tk.END, f"An error occurred: {e}")
-                user_input.scrolled_text.configure(state='disabled')
+                safe_set_transcription_box(f"An error occurred: {e}")
             finally:
                 # done with file clean up
                 f.close()
@@ -1143,9 +1273,30 @@ def kill_thread(thread_id):
 def send_and_receive():
     global use_aiscribe, user_message
     user_message = user_input.scrolled_text.get("1.0", tk.END).strip()
-    display_text(NOTE_CREATION)
+    safe_set_note_box(NOTE_CREATION)
     threaded_handle_message(user_message)
 
+def save_notes_history():
+    """
+    Saves the temporary notes to a local .txt file in encrypted JSON format.
+    """
+    notes_file_path = get_resource_path('notes_history.txt')
+    try:
+        # Convert response_history to a list of dictionaries
+        notes_data = [
+            {"timestamp": timestamp, "user_message": user_message, "response_text": response_text}
+            for timestamp, user_message, response_text in response_history
+        ]
+        json_data = json.dumps(notes_data, indent=4)
+        
+        # Encrypt the JSON data
+        encrypted_data = AESCryptoUtils.AESCryptoUtilsClass.encrypt(json_data)
+        
+        with open(notes_file_path, 'w') as file:
+            file.write(encrypted_data)
+        logger.info(f"Temporary notes saved to {notes_file_path}")
+    except Exception as e:
+        logger.exception(f"Error saving temporary notes: {e}")
 
 def display_text(text):
     def _display_text():
@@ -1160,27 +1311,32 @@ IS_FIRST_LOG = True
 
 
 def update_gui_with_response(response_text):
-    global response_history, user_message, IS_FIRST_LOG
+    def action(text):
+        global response_history, user_message, IS_FIRST_LOG
 
-    if IS_FIRST_LOG:
+        if IS_FIRST_LOG:
+            timestamp_listbox.delete(0, tk.END)
+            IS_FIRST_LOG = False
+
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        response_history.insert(0, (timestamp, user_message, response_text))
+        if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+            save_notes_history()
+
+        # Update the timestamp listbox
         timestamp_listbox.delete(0, tk.END)
-        IS_FIRST_LOG = False
+        for time, _, _ in response_history:
+            timestamp_listbox.insert(tk.END, time)
 
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    response_history.insert(0, (timestamp, user_message, response_text))
-
-    # Update the timestamp listbox
-    timestamp_listbox.delete(0, tk.END)
-    for time, _, _ in response_history:
-        timestamp_listbox.insert(tk.END, time)
-
-    display_text(response_text)
-    try:
-        # copy/paste may be disabled in sandbox environment
-        pyperclip.copy(response_text)
-    except Exception as e:
-        logger.warning(str(e))
+        safe_set_note_box(response_text)
+        try:
+            # copy/paste may be disabled in sandbox environment
+            pyperclip.copy(response_text)
+        except Exception as e:
+            logger.warning(str(e))
     stop_flashing()
+    
+    root.after(0, lambda: action(response_text))
 
 
 def show_response(event):
@@ -1192,20 +1348,17 @@ def show_response(event):
     selection = event.widget.curselection()
     if selection:
         index = selection[0]
+        # set the regenerate note button
+        safe_set_button_config(send_button, text="Regenerate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
         transcript_text = response_history[index][1]
         response_text = response_history[index][2]
-        user_input.scrolled_text.configure(state='normal')
-        user_input.scrolled_text.delete("1.0", tk.END)
-        user_input.scrolled_text.insert(tk.END, transcript_text)
-        response_display.scrolled_text.configure(state='normal')
-        response_display.scrolled_text.delete('1.0', tk.END)
-        response_display.scrolled_text.insert('1.0', response_text)
-        response_display.scrolled_text.configure(state='disabled')
+        safe_set_transcription_box(transcript_text)
+        safe_set_note_box(response_text)
+
         try:
             pyperclip.copy(response_text)
         except Exception as e:
             logger.warning(str(e))
-
 
 def send_text_to_api(edited_text):
     headers = {
@@ -1247,7 +1400,7 @@ def send_text_to_api(edited_text):
         if app_settings.editable_settings["best_of"]:
             payload["best_of"] = int(app_settings.editable_settings["best_of"])
 
-        logger.info(f"Error parsing settings: {e}. Using default settings.")
+        logger.exception(f"Error parsing settings: {e}. Using default settings.")
 
     try:
 
@@ -1460,7 +1613,6 @@ def generate_note(formatted_message):
                 else:
                     update_gui_with_response(medical_note)
                     summary = medical_note
-
             else: # If pre-processing is not enabled then just generate the note
                 medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}")
 
@@ -1479,8 +1631,8 @@ def generate_note(formatted_message):
 
         return True
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        display_text(f"An error occurred: {e}")
+        logger.exception(f"An error occurred: {e}")
+        safe_set_note_box(f"An error occurred: {e}")
         return False
 
 def check_and_warn_about_factual_consistency(formatted_message: str, medical_note: str) -> None:
@@ -1572,9 +1724,7 @@ def generate_note_thread(text: str):
             if screen_thread and screen_thread.is_alive():
                 kill_thread(screen_thread.ident)
         except Exception as e:
-            # Log the error message
-            # TODO implment system logger
-            logger.error(f"An error occurred: {e}")
+            logger.exception(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
             stop_flashing()
@@ -1614,7 +1764,8 @@ def generate_note_thread(text: str):
         else:
             loading_window.destroy()
             stop_flashing()
-
+            # switch generate note button to "Regenerate Note"
+            safe_set_button_config(send_button, text="Regenerate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
     root.after(500, lambda: check_thread_status(thread, loading_window))
 
 def upload_file():
@@ -1629,14 +1780,13 @@ def upload_file():
 def start_flashing():
     global is_flashing
     is_flashing = True
-    flash_circle()
+    root.after(0, flash_circle())
 
 
 def stop_flashing():
     global is_flashing
     is_flashing = False
-    # Reset to default color
-    root.after(0, lambda: blinking_circle_canvas.itemconfig(circle, fill='white'))
+    root.after(0, lambda: blinking_circle_canvas.itemconfig(circle, fill='white'))  # Reset to default color
 
 
 def flash_circle():
@@ -1691,71 +1841,73 @@ def set_full_view():
     - current_view: Tracks the current interface state ('full' or 'minimal').
     - last_minimal_position: Saves the geometry of the window when switching from minimal view.
     """
-    global current_view, last_minimal_position, silent_warning_duration
+    def action():
+        global current_view, last_minimal_position, silent_warning_duration
 
-    # Reset button sizes and placements for full view
-    mic_button.config(width=11, height=2)
-    pause_button.config(width=11, height=2)
-    switch_view_button.config(width=11, height=2, text="Minimize View")
+        # Reset button sizes and placements for full view
+        mic_button.config(width=11, height=2)
+        pause_button.config(width=11, height=2)
+        switch_view_button.config(width=11, height=2, text="Minimize View")
 
-    # Show all UI components
-    user_input.grid()
-    send_button.grid()
-    clear_button.grid()
-    # toggle_button.grid()
-    upload_button.grid()
-    response_display.grid()
-    history_frame.grid()
-    mic_button.grid(row=1, column=1, pady=5, padx=0, sticky='nsew')
-    pause_button.grid(row=1, column=2, pady=5, padx=0, sticky='nsew')
-    switch_view_button.grid(row=1, column=6, pady=5, padx=0, sticky='nsew')
-    blinking_circle_canvas.grid(row=1, column=7, padx=0, pady=5)
-    footer_frame.grid()
-    
-    
+        # Show all UI components
+        user_input.grid()
+        send_button.grid()
+        clear_button.grid()
+        # toggle_button.grid()
+        upload_button.grid()
+        response_display.grid()
+        history_frame.grid()
+        mic_button.grid(row=1, column=1, pady=5, padx=0,sticky='nsew')
+        pause_button.grid(row=1, column=2, pady=5, padx=0,sticky='nsew')
+        switch_view_button.grid(row=1, column=6, pady=5, padx=0,sticky='nsew')
+        blinking_circle_canvas.grid(row=1, column=7, padx=0,pady=5)
+        footer_frame.grid()
+        
+        
 
-    window.toggle_menu_bar(enable=True, is_recording=is_recording)
+        window.toggle_menu_bar(enable=True, is_recording=is_recording)
 
-    # Reconfigure button styles and text
-    mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR,
-                      text="Stop\nRecording" if is_recording else "Start\nRecording")
-    pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR,
-                        text="Resume" if is_paused else "Pause")
+        # Reconfigure button styles and text
+        mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR,
+                        text="Stop\nRecording" if is_recording else "Start\nRecording")
+        pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR,
+                            text="Resume" if is_paused else "Pause")
 
-    # Unbind transparency events and reset window properties
-    root.unbind('<Enter>')
-    root.unbind('<Leave>')
-    root.attributes('-alpha', 1.0)
-    root.attributes('-topmost', False)
-    root.minsize(900, 400)
-    current_view = "full"
+        # Unbind transparency events and reset window properties
+        root.unbind('<Enter>')  
+        root.unbind('<Leave>')
+        root.attributes('-alpha', 1.0)
+        root.attributes('-topmost', False)
+        root.minsize(900, 400)
+        current_view = "full"
 
-    # Recreates Silence Warning Bar
-    window.destroy_warning_bar()
-    check_silence_warning(silence_duration=silent_warning_duration)
+        #Recreates Silence Warning Bar
+        window.destroy_warning_bar()
+        check_silence_warning(silence_duration= silent_warning_duration)
 
-    # add the minimal view geometry and remove the last full view geometry
-    add_min_max(root)
+        # add the minimal view geometry and remove the last full view geometry
+        add_min_max(root)
 
-    # create docker_status bar if enabled
-    if app_settings.editable_settings["Use Docker Status Bar"]:
-        window.create_docker_status_bar()
+        # create docker_status bar if enabled
+        if app_settings.editable_settings["Use Docker Status Bar"]:
+            window.create_docker_status_bar()
 
-    if app_settings.editable_settings["Enable Scribe Template"]:
-        window.destroy_scribe_template()
-        window.create_scribe_template()
+        if app_settings.editable_settings["Enable Scribe Template"]:
+            window.destroy_scribe_template()
+            window.create_scribe_template()
 
-    # Save minimal view geometry and restore last full view geometry
-    last_minimal_position = root.geometry()
-    root.update_idletasks()
-    if last_full_position:
-        root.geometry(last_full_position)
-    else:
-        root.geometry("900x400")
+        # Save minimal view geometry and restore last full view geometry
+        last_minimal_position = root.geometry()
+        root.update_idletasks()
+        if last_full_position:
+            root.geometry(last_full_position)
+        else:
+            root.geometry("900x400")
 
-    # Disable to make the window an app(show taskbar icon)
-    # root.attributes('-toolwindow', False)
+        # Disable to make the window an app(show taskbar icon)
+        # root.attributes('-toolwindow', False)
 
+    root.after(0, action)
 
 def set_minimal_view():
     """
@@ -1772,75 +1924,77 @@ def set_minimal_view():
     - current_view: Tracks the current interface state ('full' or 'minimal').
     - last_full_position: Saves the geometry of the window when switching from full view.
     """
-    global current_view, last_full_position, silent_warning_duration
+    def action():
+        global current_view, last_full_position, silent_warning_duration
 
-    # Remove all non-essential UI components
-    user_input.grid_remove()
-    send_button.grid_remove()
-    clear_button.grid_remove()
-    # toggle_button.grid_remove()
-    upload_button.grid_remove()
-    response_display.grid_remove()
-    history_frame.grid_remove()
-    blinking_circle_canvas.grid_remove()
-    footer_frame.grid_remove()
-    # Configure minimal view button sizes and placements
-    mic_button.config(width=2, height=1)
-    pause_button.config(width=2, height=1)
-    switch_view_button.config(width=2, height=1)
+        # Remove all non-essential UI components
+        user_input.grid_remove()
+        send_button.grid_remove()
+        clear_button.grid_remove()
+        # toggle_button.grid_remove()
+        upload_button.grid_remove()
+        response_display.grid_remove()
+        history_frame.grid_remove()
+        blinking_circle_canvas.grid_remove()
+        footer_frame.grid_remove()
+        # Configure minimal view button sizes and placements
+        mic_button.config(width=2, height=1)
+        pause_button.config(width=2, height=1)
+        switch_view_button.config(width=2, height=1)
 
-    mic_button.grid(row=0, column=0, pady=2, padx=2)
-    pause_button.grid(row=0, column=1, pady=2, padx=2)
-    switch_view_button.grid(row=0, column=2, pady=2, padx=2)
+        mic_button.grid(row=0, column=0, pady=2, padx=2)
+        pause_button.grid(row=0, column=1, pady=2, padx=2)
+        switch_view_button.grid(row=0, column=2, pady=2, padx=2)
 
-    # Update button text based on recording and pause states
-    mic_button.config(text="⏹️" if is_recording else "🎤")
-    pause_button.config(text="▶️" if is_paused else "⏸️")
-    switch_view_button.config(text="⬆️")  # Minimal view indicator
+        # Update button text based on recording and pause states
+        mic_button.config(text="⏹️" if is_recording else "🎤")
+        pause_button.config(text="▶️" if is_paused else "⏸️")
+        switch_view_button.config(text="⬆️")  # Minimal view indicator
 
-    blinking_circle_canvas.grid(row=0, column=3, pady=2, padx=2)
+        blinking_circle_canvas.grid(row=0, column=3, pady=2, padx=2)
 
-    window.toggle_menu_bar(enable=False)
+        window.toggle_menu_bar(enable=False)
 
-    # Update window properties for minimal view
-    root.attributes('-topmost', True)
-    root.minsize(125, 50)  # Smaller minimum size for minimal view
-    current_view = "minimal"
+        # Update window properties for minimal view
+        root.attributes('-topmost', True)
+        root.minsize(125, 50)  # Smaller minimum size for minimal view
+        current_view = "minimal"
 
-    if root.wm_state() == 'zoomed':  # Check if window is maximized
-        root.wm_state('normal')       # Restore the window
+        if root.wm_state() == 'zoomed':  # Check if window is maximized
+            root.wm_state('normal')       # Restore the window
 
-    # Recreates Silence Warning Bar
-    window.destroy_warning_bar()
-    check_silence_warning(silence_duration=silent_warning_duration)
+        #Recreates Silence Warning Bar
+        window.destroy_warning_bar()
+        check_silence_warning(silence_duration= silent_warning_duration)
 
-    # Set hover transparency events
-    def on_enter(e):
-        if e.widget == root:  # Ensure the event is from the root window
-            root.attributes('-alpha', 1.0)
+        # Set hover transparency events
+        def on_enter(e):
+            if e.widget == root:  # Ensure the event is from the root window
+                root.attributes('-alpha', 1.0)
 
-    def on_leave(e):
-        if e.widget == root:  # Ensure the event is from the root window
-            root.attributes('-alpha', 0.70)
+        def on_leave(e):
+            if e.widget == root:  # Ensure the event is from the root window
+                root.attributes('-alpha', 0.70)
 
-    root.bind('<Enter>', on_enter)
-    root.bind('<Leave>', on_leave)
+        root.bind('<Enter>', on_enter)
+        root.bind('<Leave>', on_leave)
 
-    # Destroy and re-create components as needed
-    window.destroy_docker_status_bar()
-    if app_settings.editable_settings["Enable Scribe Template"]:
-        window.destroy_scribe_template()
-        window.create_scribe_template(row=1, column=0, columnspan=3, pady=5)
+        # Destroy and re-create components as needed
+        window.destroy_docker_status_bar()
+        if app_settings.editable_settings["Enable Scribe Template"]:
+            window.destroy_scribe_template()
+            window.create_scribe_template(row=1, column=0, columnspan=3, pady=5)
 
-    # Remove the minimal view geometry and save the current full view geometry
-    remove_min_max(root)
+        # Remove the minimal view geometry and save the current full view geometry
+        remove_min_max(root)
 
-    # Save full view geometry and restore last minimal view geometry
-    last_full_position = root.geometry()
-    if last_minimal_position:
-        root.geometry(last_minimal_position)
-    else:
-        root.geometry("125x50")  # Set the window size to the minimal view size
+        # Save full view geometry and restore last minimal view geometry
+        last_full_position = root.geometry()
+        if last_minimal_position:
+            root.geometry(last_minimal_position)
+        else:
+            root.geometry("125x50")  # Set the window size to the minimal view size
+    root.after(0, action)
 
 
 def copy_text(widget):
@@ -1866,9 +2020,12 @@ def add_placeholder(event, text_widget, placeholder_text="Text box"):
         text_widget: The tkinter Text widget to add placeholder text to.
         placeholder_text (str, optional): The placeholder text to display. Defaults to "Text box".
     """
-    if text_widget.get("1.0", "end-1c") == "":
-        text_widget.insert("1.0", placeholder_text)
+    def on_call(text_widget=text_widget, placeholder_text=placeholder_text):
+        if text_widget.get("1.0", "end-1c") == "":
+            text_widget.insert("1.0", placeholder_text)
+            text_widget.config(fg='grey')
 
+    root.after(0, on_call)
 
 def remove_placeholder(event, text_widget, placeholder_text="Text box"):
     """
@@ -1879,8 +2036,12 @@ def remove_placeholder(event, text_widget, placeholder_text="Text box"):
         text_widget: The tkinter Text widget to remove placeholder text from.
         placeholder_text (str, optional): The placeholder text to remove. Defaults to "Text box".
     """
-    if text_widget.get("1.0", "end-1c") == placeholder_text:
-        text_widget.delete("1.0", "end")
+    def on_call(text_widget=text_widget, placeholder_text=placeholder_text):
+        if text_widget.get("1.0", "end-1c") == placeholder_text:
+            text_widget.delete("1.0", "end")
+            text_widget.config(fg='black')
+
+    root.after(0, on_call)
 
 # Configure grid weights for scalability
 root.grid_columnconfigure(0, weight=1, minsize=10)
@@ -1977,6 +2138,7 @@ history_frame.grid_rowconfigure(3, weight=1)
 system_font = tk.font.nametofont("TkDefaultFont")
 base_size = system_font.cget("size")
 scaled_size = int(base_size * 0.9)  # 90% of system font size
+
 # Add warning label
 warning_label = tk.Label(history_frame,
                          text="Temporary Note History will be cleared when app closes",
@@ -1987,13 +2149,24 @@ warning_label = tk.Label(history_frame,
                          )
 warning_label.grid(row=3, column=0, sticky='ew', pady=(0, 5))
 
-
 # Add the timestamp listbox
 timestamp_listbox = TimestampListbox(history_frame, height=30, exportselection=False, response_history=response_history)
 timestamp_listbox.grid(row=0, column=0, rowspan=3, sticky='nsew')
 timestamp_listbox.bind('<<ListboxSelect>>', show_response)
 timestamp_listbox.insert(tk.END, "Temporary Note History")
 
+warning_label = tk.Label(history_frame,
+                            text="Temporary Note History will be cleared when app closes",
+                            # fg="red",
+                            # wraplength=200,
+                            justify="left",
+                            font=tk.font.Font(size=scaled_size),
+                            )
+
+if not app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+    warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+    
+    
 
 # Add microphone test frame
 mic_test = MicrophoneTestFrame(parent=history_frame, p=p, app_settings=app_settings, root=root)
@@ -2131,8 +2304,49 @@ def await_models(timeout_length=60):
 
 root.after(100, await_models)
 
-root.bind("<<LoadSttModel>>", lambda event: load_model_with_loading_screen(root=root, app_settings=app_settings))
-root.bind("<<UnloadSttModel>>", lambda e: unload_stt_model())
+root.bind("<<LoadSttModel>>", load_stt_model)
+root.bind("<<UnloadSttModel>>", unload_stt_model)
+root.bind("<<UpdateNoteHistoryUi>>", update_store_notes_locally_ui)
+
+def generate_note_bind(event, data: np.ndarray):
+    """
+    Generate a note based on the current user input and update the response display.
+
+    Args:
+        event: Optional event parameter for binding to tkinter events.
+    """
+    loading_window = LoadingWindow(root, "Transcribing Audio", "Transcribing Audio. Please wait.", on_cancel=clear_application_press)
+    
+    def action():
+        clear_application_press()
+
+        wav_data = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768
+
+        result = faster_whisper_transcribe(wav_data)
+
+        update_gui(result)
+
+    wrk_thrd = threading.Thread(target=action)
+    wrk_thrd.start()
+
+    def check_thread():
+        if wrk_thrd.is_alive():
+            root.after(100, check_thread)
+        else:
+            loading_window.destroy()
+            send_and_receive()
+
+    check_thread()
+
+                           
+root.bind("<<GenerateNote>>", lambda e: threading.Thread(target=lambda: generate_note_bind(e, RecordingsManager.last_selected_data)).start())
+
+if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+    # Load temporary notes from the file
+    load_notes_history()
+    # Populate the UI with the loaded notes
+    populate_ui_with_notes()
+
 
 root.mainloop()
 

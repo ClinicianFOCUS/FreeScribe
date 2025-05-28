@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 
 import UI.Helpers
 from utils.file_utils import get_file_path
+from utils.log_config import logger
 import utils.windows_utils
 
 class ImageWindow:
@@ -98,6 +99,7 @@ class ImageWindow:
             
         except FileNotFoundError:
             messagebox.showerror("Error", f"Image file not found: {image_path}")
+            logger.exception("Image file not found")
             if hasattr(self, 'window'):
                 self.window.destroy()
 

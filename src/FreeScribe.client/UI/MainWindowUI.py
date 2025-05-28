@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-
+from UI.SettingsConstant import SettingsKeys
 import UI.Helpers
 import UI.MainWindow as mw
 from UI.ImageWindow import ImageWindow
@@ -11,9 +11,11 @@ from UI.Widgets.ActionResultsWindow import ActionResultsWindow
 from services.intent_actions.manager import IntentActionManager
 from utils.file_utils import get_file_path
 from UI.DebugWindow import DebugPrintWindow
-from pathlib import Path
+from UI.RecordingsManager import RecordingsManager
+from UI.LogWindow import LogWindow
+from UI.SettingsWindow import SettingsWindow
 from utils.log_config import logger
-
+from pathlib import Path
 
 DOCKER_CONTAINER_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker container status
 DOCKER_DESKTOP_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker Desktop status
@@ -27,7 +29,7 @@ class MainWindowUI:
     :param settings: The application settings passed to control the containers' behavior.
     """
     
-    def __init__(self, root, settings):
+    def __init__(self, root: tk.Tk, settings: SettingsWindow):
         """
         Initialize the MainWindowUI class.
 
@@ -59,6 +61,9 @@ class MainWindowUI:
 
         self.current_docker_status_check_id = None  # ID for the current Docker status check
         self.current_container_status_check_id = None  # ID for the current container status check
+        self.root.bind("<<ProcessDataTab>>", self.__create_data_menu)  # Bind the destroy event to clean up resources
+
+        self.manage_app_data_menu = None  # Manage App Data menu
 
     def load_main_window(self):
         """
@@ -267,6 +272,7 @@ class MainWindowUI:
         self.root.config(menu=self.menu_bar)
         self._create_settings_menu()
         self._create_help_menu()
+        self.__create_data_menu()
 
     def _destroy_menu_bar(self):
         """
@@ -317,15 +323,20 @@ class MainWindowUI:
         """
         Disable the Settings menu.
         """
-        if self.menu_bar is not None:
-            self.menu_bar.entryconfig("Settings", state="disabled")  # Disables the entire Settings menu
+        def action():
+            if self.menu_bar is not None:
+                self.menu_bar.entryconfig("Settings", state="disabled")  # Disables the entire Settings menu
+        self.root.after(0, action)  # Schedule the action to run after the current event loop
     
     def enable_settings_menu(self):
         """
         Enable the Settings menu.
         """
-        if self.menu_bar is not None:
-            self.menu_bar.entryconfig("Settings", state="normal")
+        def action():
+            if self.menu_bar is not None:
+                self.menu_bar.entryconfig("Settings", state="normal")
+
+        self.root.after(0, action)  # Schedule the action to run after the current event loop
 
     def _show_md_content(self, file_path: str, title: str, show_checkbox: bool = False):
         """
@@ -411,6 +422,37 @@ class MainWindowUI:
             self.logic.container_manager.set_status_icon_color(llm_dot, self.logic.check_llm_containers())
             self.logic.container_manager.set_status_icon_color(whisper_dot, self.logic.check_whisper_containers())
             self.current_container_status_check_id = self.root.after(DOCKER_CONTAINER_CHECK_INTERVAL, self._background_check_container_status, llm_dot, whisper_dot)
+    
+    def __create_data_menu(self, event=None):
+        logger.info("Creating Manage App Data menu")
+
+        # Add the submenu to the main menu bar
+        if self.manage_app_data_menu is not None:
+            self.manage_app_data_menu.destroy()
+            try:
+                self.menu_bar.delete("Manage App Data")
+            except tk.TclError:
+                logger.debug("Manage App Data menu not found in menu bar")
+
+            self.manage_app_data_menu = None
+
+            logger.debug("Manage App Data menu destroyed")
+
+        self.manage_app_data_menu = tk.Menu(self.menu_bar, tearoff=0)
+        settings_enabled = 0
+        if self.app_settings.editable_settings[SettingsKeys.STORE_RECORDINGS_LOCALLY.value]:
+            self.manage_app_data_menu.add_command(label="Manage Recordings", command=lambda: RecordingsManager(self.root))
+            settings_enabled += 1
+            logger.debug("Manage Recordings option added to menu")
+        
+        if self.app_settings.editable_settings[SettingsKeys.ENABLE_FILE_LOGGER.value]:
+            self.manage_app_data_menu.add_command(label="Manage Logs", command=lambda: LogWindow(self.root))
+            settings_enabled += 1
+            logger.debug("Manage Logs option added to menu")
+
+        if settings_enabled > 0:
+            self.menu_bar.add_cascade(label="Manage App Data", menu=self.manage_app_data_menu)
+            logger.debug("Manage App Data menu added to menu bar")
 
     def get_text_intents(self, text: str) -> None:
         """
@@ -435,6 +477,5 @@ class MainWindowUI:
     def close_action_window(self) -> None:
         """Close the action results window."""
         self.action_window.hide()
-
 
 
