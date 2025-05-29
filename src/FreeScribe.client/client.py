@@ -106,24 +106,34 @@ def on_closing():
 # Register the close_mutex function to be called on exit
 atexit.register(on_closing)
 
-def update_store_notes_locally_ui(event=None):
-        global warning_label        
-        """
-        Updates the UI components based on the 'Store Notes Locally' setting.
-        """
-        if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
-            # Loads all existing notes
-            load_notes_history()
-            warning_label.grid_remove()
-        else:
-            # Clear all existing notes
-            warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
-            clear_all_notes()
+def enable_notes_history(event=None):
+    """
+    Enables the 'Store Notes Locally' setting in the application settings.
+    """
+    load_notes_history()
+    warning_label.grid_remove()
+
+root.bind("<<EnableNoteHistory>>", enable_notes_history)
+
+def disable_notes_history(event=None):
+    """
+    Disables the 'Store Notes Locally' setting in the application settings.
+    Clears all existing notes and updates the UI accordingly.
+    """
+    clear_all_notes()
+    warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+
+    # delete all notes button
+
+root.bind("<<DisableNoteHistory>>", disable_notes_history)
 
 def load_notes_history():
     """
     Loads the temporary notes from a local .txt file containing encrypted JSON data and populates the response_history list.
     """
+    #ensure the box is empty
+    root.after(0, lambda: timestamp_listbox.delete(0, tk.END))  # Clear the timestamp listbox
+
     notes_file_path = get_resource_path('notes_history.txt')
     try:
         with open(notes_file_path, 'r') as file:
@@ -2128,8 +2138,6 @@ warning_label = tk.Label(history_frame,
 
 if not app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
     warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
-    
-    
 
 # Add microphone test frame
 mic_test = MicrophoneTestFrame(parent=history_frame, p=p, app_settings=app_settings, root=root)
@@ -2225,7 +2233,6 @@ root.after(100, await_models)
 
 root.bind("<<LoadSttModel>>", load_stt_model)
 root.bind("<<UnloadSttModel>>", unload_stt_model)
-root.bind("<<UpdateNoteHistoryUi>>", update_store_notes_locally_ui)
 
 def generate_note_bind(event, data: np.ndarray):
     """

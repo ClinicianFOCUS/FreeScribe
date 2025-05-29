@@ -725,13 +725,9 @@ pady=5, sticky="w")
                 parent=self.root  # Use the main window as the parent
             )
             
-            if confirm:
-                # User clicked Continue, keep the setting disabled
-                self.settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value] = False
-            else:
+            if not confirm:
                 # User clicked Cancel, revert the checkbox to checked
                 self.settings.editable_settings_entries[SettingsKeys.STORE_NOTES_LOCALLY.value].set(1)
-                self.settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value] = True
         else:
             self.display_notes_warning = False  # Reset the flag to show the warning next time
             self.__display_encrypted_phi_warning(SettingsKeys.STORE_NOTES_LOCALLY.value)
@@ -860,6 +856,7 @@ pady=5, sticky="w")
         )
         
         self.__initialize_file_logger()
+        self.__initialize_notes_history()
 
         if self.get_selected_model() not in ["Loading models...", "Failed to load models"]:
             self.settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value] = self.get_selected_model()
@@ -905,7 +902,6 @@ pady=5, sticky="w")
             ModelManager.start_model_threaded(self.settings, self.main_window.root)
 
         #update the notes and Ui
-        self.main_window.root.event_generate("<<UpdateNoteHistoryUi>>")
         self.main_window.root.event_generate("<<ProcessDataTab>>")
 
         if self.settings.editable_settings["Use Docker Status Bar"] and self.main_window.docker_status_bar is None:
@@ -920,6 +916,25 @@ pady=5, sticky="w")
 
         if close_window:
             self.close_window()
+
+    def __initialize_notes_history(self):
+        """
+        Initializes the notes history setting based on the current editable settings.
+        """
+        old_value = self.settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]
+        new_value = self.settings.editable_settings_entries[SettingsKeys.STORE_NOTES_LOCALLY.value].get()
+
+        # check the checkbox again the current setting
+        if old_value == new_value:
+            logger.info("Notes history setting unchanged.")
+            return
+        
+        if new_value == 1:
+            logger.info("Notes history enabled.")
+            self.root.event_generate("<<EnableNoteHistory>>")
+        else:
+            logger.info("Notes history disabled.")
+            self.root.event_generate("<<DisableNoteHistory>>")
 
     def __initialize_file_logger(self):
         # if un changed, do nothing
