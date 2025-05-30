@@ -114,11 +114,21 @@ def update_store_notes_locally_ui(event=None):
         if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
             # Loads all existing notes
             load_notes_history()
-            warning_label.grid_remove()
+            def action():
+                global warning_label
+                warning_label.grid_remove()
+                grid_clear_all_btn()
+
+            root.after(0, action)
         else:
-            # Clear all existing notes
-            warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
             clear_all_notes()
+
+            def action():
+                # Clear all existing notes
+                clear_all_notes_btn.grid_remove()
+                warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+
+            root.after(0, action) 
 
 def load_notes_history():
     """
@@ -422,7 +432,7 @@ def double_check_stt_model_loading(task_done_var, task_cancel_var):
             while True:
                 time.sleep(0.1)
                 if task_cancel_var.get():
-                    # user cancel
+                    # user canc
                     logging.debug(f"user canceled after {time.monotonic() - time_start} seconds")
                     return
                 if time.monotonic() - time_start > timeout:
@@ -2126,10 +2136,30 @@ warning_label = tk.Label(history_frame,
                             font=tk.font.Font(size=scaled_size),
                             )
 
+def on_click_clear_all_notes():
+    """
+    Callback function to clear all notes from the timestamp listbox and response display.
+    """
+    # Disclaimer that all notes will be deleted
+    if messagebox.askyesno("Clear All Notes", "Are you sure you want to delete all notes? You will not be able to undo or recover the notes."):
+        clear_all_notes()
+
+
+clear_all_notes_btn = tk.Button(history_frame, text="Clear All Notes", command=on_click_clear_all_notes, width=20, height=2)
+
+def grid_clear_all_btn():
+    """
+    Function to grid the clear all notes button after the UI is initialized.
+    """
+    def action():
+        clear_all_notes_btn.grid(row=3, column=0, sticky='ew', pady=5)
+
+    root.after(0, action)
+
 if not app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
     warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
-    
-    
+else:
+    grid_clear_all_btn()
 
 # Add microphone test frame
 mic_test = MicrophoneTestFrame(parent=history_frame, p=p, app_settings=app_settings, root=root)
