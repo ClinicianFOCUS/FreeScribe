@@ -395,6 +395,7 @@ def threaded_toggle_recording():
         return
     thread = threading.Thread(target=toggle_recording)
     thread.start()
+    return thread
 
 
 def double_check_stt_model_loading(task_done_var, task_cancel_var):
@@ -627,7 +628,29 @@ def record_audio():
 
 def check_silence_warning(silence_duration):
     """Check if silence warning should be displayed."""
+    try:
+        recording_timeout = float(app_settings.editable_settings[SettingsKeys.RECORDING_TIMEOUT.value])
+    except ValueError:
+        # If the value is invalid, default to 300 seconds
+        recording_timeout = 300
+        logger.info(f"Invalid value for RECORDING_TIMEOUT: {app_settings.editable_settings[SettingsKeys.RECORDING_TIMEOUT.value]}. Defaulting to {recording_timeout}")
+    
+    if silence_duration >= recording_timeout:
+        # If the silence duration exceeds the recording timeout, stop the recording
+        if is_recording:
+            logger.info(f"Silence duration exceeded {app_settings.editable_settings[SettingsKeys.RECORDING_TIMEOUT.value]} seconds. Stopping recording.")
+            toggle_recording_thread = threaded_toggle_recording()
 
+            def check_thread():
+                if toggle_recording_thread.is_alive():
+                    # If the thread is still alive, wait for it to finish
+                    root.after(100, check_thread)
+                else:
+                    # popup saying recording auto stopped due to silence
+                    messagebox.showinfo("Recording Stopped", f"Recording automatically stopped due to silence for {app_settings.editable_settings[SettingsKeys.RECORDING_TIMEOUT.value]} seconds. This value can be changed in settings under advanced settings->whisper settings->{SettingsKeys.RECORDING_TIMEOUT.value}.", parent=root)
+
+            root.after(100, check_thread)
+            
     # Check if we need to warn if silence is long than warn time
     if silence_duration >= SILENCE_WARNING_LENGTH and window.warning_bar is None and not is_paused:
         if current_view == "full":            

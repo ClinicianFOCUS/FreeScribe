@@ -31,6 +31,7 @@ class SettingsKeys(Enum):
     STORE_RECORDINGS_LOCALLY = "Store Recordings Locally (Encrypted)"
     USE_PRE_PROCESSING = "Use Pre-Processing"
     WHISPER_INITIAL_PROMPT = "Whisper Initial Prompt"
+    RECORDING_TIMEOUT = "Auto Stop Recording (seconds)"
 
 class Architectures(Enum):
     CPU = ("CPU", "cpu")
