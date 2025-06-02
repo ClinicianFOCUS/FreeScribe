@@ -633,7 +633,7 @@ def check_silence_warning(silence_duration):
     except ValueError:
         # If the value is invalid, default to 300 seconds
         recording_timeout = 300
-        logger.info(f"Invalid value for RECORDING_TIMEOUT: {app_settings.editable_settings[SettingsKeys.RECORDING_TIMEOUT.value]}. Defaulting to {recording_timeout}")
+        logger.warning(f"Invalid value for RECORDING_TIMEOUT: {app_settings.editable_settings[SettingsKeys.RECORDING_TIMEOUT.value]}. Defaulting to {recording_timeout}")
     
     if silence_duration >= recording_timeout:
         # If the silence duration exceeds the recording timeout, stop the recording
