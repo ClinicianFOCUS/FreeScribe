@@ -143,6 +143,7 @@ class SettingsWindow():
             SettingsKeys.STORE_NOTES_LOCALLY.value: False,
             SettingsKeys.STORE_RECORDINGS_LOCALLY.value: False,
             SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
+            SettingsKeys.RECORDING_TIMEOUT.value: 300,
         }
 
     def __init__(self):
@@ -224,6 +225,7 @@ class SettingsWindow():
             SettingsKeys.USE_TRANSLATE_TASK.value,
             SettingsKeys.WHISPER_LANGUAGE_CODE.value,
             SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value,
+            SettingsKeys.RECORDING_TIMEOUT.value,
         ]
 
 
