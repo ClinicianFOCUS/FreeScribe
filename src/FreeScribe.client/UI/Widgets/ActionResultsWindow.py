@@ -256,7 +256,7 @@ class ActionResultsWindow:
         # Add message
         message = ttk.Label(
             card, 
-            # text=result["message"], 
+            text=result["message"], 
             wraplength=350
         )
         message.pack(fill="x", padx=10, pady=5)
