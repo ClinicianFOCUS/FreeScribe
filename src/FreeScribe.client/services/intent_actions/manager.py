@@ -46,9 +46,8 @@ class IntentActionManager:
         # Register plugin actions
         for action_cls in plugin_classes:
             try:
-                action_instance = action_cls()
-                self.actions.append(action_instance)
-                logger.info(f"Registered plugin action: {action_cls.__name__}")
+                self.actions.append(action_cls)
+                logger.info(f"Registered plugin action: {action_cls.action_id}")
             except Exception as e:
                 logger.error(f"Failed to instantiate action {action_cls}: {e}")
         
@@ -85,6 +84,7 @@ class IntentActionManager:
                 if result.success:
                     # Add UI data
                     ui_data = action.get_ui_data()
+                    logger.info(f"FULL FATA: {result}")
                     results.append({
                         "action_id": action.action_id,
                         "display_name": action.display_name,
