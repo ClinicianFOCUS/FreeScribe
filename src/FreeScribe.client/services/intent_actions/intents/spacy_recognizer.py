@@ -3,13 +3,50 @@ from typing import List, Dict, Optional, Pattern
 import re
 import spacy
 from spacy.matcher import Matcher
+from spacy.matcher import PhraseMatcher
+from spacy.tokens import Span
+from spacy.language import Language
 from pydantic import BaseModel, Field, field_validator
-from services.intent_actions.plugin_manager import load_plugin_intent_patterns
-import os
+from services.intent_actions.plugin_manager import load_plugin_intent_patterns, get_plugins_dir, INTENT_ACTION_DIR
 
 from .base import BaseIntentRecognizer, Intent
 
 logger = logging.getLogger(__name__)
+
+class SpacyEntityPattern(BaseModel):
+    """
+    Pattern definition for SpaCy entity recognition.
+    
+    :param entity_name: Name of the entity type
+    :type entity_name: str
+    :param patterns: List of token patterns for the spaCy Matcher
+    :type patterns: List[List[Dict[str, str]]]
+    """
+    entity_name: str = Field(..., min_length=1, description="Name of the entity type to be recognized")
+    patterns: List[List[Dict[str, str]]] = Field(..., min_length=1, description="List of token patterns for the spaCy Matcher")
+    
+    @field_validator("patterns")
+    @classmethod
+    def validate_patterns(cls, v):
+        """
+        Validate that patterns are properly formatted.
+        
+        :param v: List of patterns
+        :type v: List[List[Dict[str, str]]]
+        :return: Validated patterns
+        :rtype: List[List[Dict[str, str]]]
+        :raises ValueError: If patterns are invalid
+        """
+        if not v:
+            raise ValueError("Patterns cannot be empty")
+        
+        for pattern in v:
+            if not isinstance(pattern, list):
+                raise ValueError("Each pattern must be a list of dictionaries")
+            if not all(isinstance(token, dict) for token in pattern):
+                raise ValueError("Each token in a pattern must be a dictionary")
+        
+        return v
 
 class SpacyIntentPattern(BaseModel):
     """
@@ -100,6 +137,9 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         self.model_name = model_name
         self.nlp = None
         self.matcher = None
+        self.entity_matcher = None
+        self.custom_entities = []
+        self.document_types = []
         self.patterns = [
             SpacyIntentPattern(
                 intent_name="show_directions",
@@ -179,14 +219,22 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             )
         ]
 
-        # Load plugin patterns
-        plugins_dir = os.path.join(os.path.dirname(__file__), "..", "..", "plugins", "intent-action")
-        loaded_intents = load_plugin_intent_patterns(plugins_dir)
-        self.patterns.extend(loaded_intents)
+        # Load plugin patterns and entities
+        intent_patterns, entity_patterns = load_plugin_intent_patterns(get_plugins_dir(INTENT_ACTION_DIR))
+        
+        for pattern in intent_patterns:
+            self.add_pattern(pattern)
+            
+        for entity in entity_patterns:
+            self.add_entity_pattern(entity)
 
         for pattern in self.patterns:
             logger.info(f"Loaded pattern: {pattern.intent_name}")
             logger.debug(f"Pattern details: {pattern.patterns}")
+            
+        for entity in self.custom_entities:
+            logger.info(f"Loaded custom entity: {entity.entity_name}")
+            logger.debug(f"Entity pattern details: {entity.patterns}")
     
     def add_pattern(self, pattern: SpacyIntentPattern) -> None:
         """
@@ -198,7 +246,48 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         self.patterns.append(pattern)
         if self.matcher is not None:
             self.matcher.add(pattern.intent_name, pattern.patterns)
-    
+
+    def add_entity_pattern(self, entity_pattern: SpacyEntityPattern) -> None:
+        """
+        Add a new entity pattern to the recognizer.
+        
+        :param entity_pattern: Entity pattern to add
+        :type entity_pattern: SpacyEntityPattern
+        """
+        self.custom_entities.append(entity_pattern)
+        if self.entity_matcher is not None and self.nlp is not None:
+            self.entity_matcher.add(entity_pattern.entity_name, entity_pattern.patterns)
+            logger.info(f"Added entity pattern {entity_pattern.entity_name} to matcher")
+
+    def _setup_custom_entity_component(self) -> None:
+        """Set up the custom entity component with pattern matching."""
+        # Add entity patterns to the entity matcher
+        self.entity_matcher = Matcher(self.nlp.vocab)
+        
+        for entity_pattern in self.custom_entities:
+            self.entity_matcher.add(entity_pattern.entity_name, entity_pattern.patterns)
+            logger.info(f"Added entity pattern {entity_pattern.entity_name} to entity matcher")
+        
+        # Register a custom component to add custom entities
+        if not Language.has_factory("custom_entity_component"):
+            @Language.component("custom_entity_component")
+            def custom_entity_component(doc):
+                matches = self.entity_matcher(doc)
+                entities = []
+                for match_id, start, end in matches:
+                    label = self.nlp.vocab.strings[match_id]
+                    entities.append(Span(doc, start, end, label=label))
+                
+                # Only add non-overlapping entities
+                filtered_entities = spacy.util.filter_spans(list(doc.ents) + entities)
+                doc.ents = filtered_entities
+                return doc
+            
+            # Add the component to the pipeline
+            if "custom_entity_component" not in self.nlp.pipe_names:
+                self.nlp.add_pipe("custom_entity_component", after="ner")
+                logger.info("Added custom entity component to pipeline")
+
     def initialize(self) -> None:
         """
         Initialize SpaCy model and configure the matcher.
@@ -213,11 +302,44 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             for pattern in self.patterns:
                 self.matcher.add(pattern.intent_name, pattern.patterns)
             
+            # Setup custom document entity
+            self._setup_document_entity()
+            
+            # Setup custom entity component
+            self._setup_custom_entity_component()
+        
+            
             logger.info("SpaCy Intent Recognizer initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize SpaCy Intent Recognizer: {e}")
             raise
     
+    def _extract_parameters(self, doc) -> Dict[str, str]:
+        """Extract parameters from recognized entities."""
+        params = {
+            "destination": "",
+            "transport_mode": "driving",  # Default to driving
+            "appointment_time": "",
+            "patient_mobility": "",
+            "additional_context": "",
+            "document_type": "",  # Added parameter for document type
+            "print_type": ""      # New parameter for print type
+        }
+        
+        for ent in doc.ents:
+            if ent.label_ in ["LOCATION", "ORG", "GPE", "FAC"]:  # Support multiple location-like entities
+                params["destination"] = ent.text
+            elif ent.label_ == "TIME":
+                params["appointment_time"] = ent.text
+            elif ent.label_ == "TRANSPORT":  # Use TRANSPORT label for transport mode
+                params["transport_mode"] = ent.text.lower()  # Normalize to lowercase
+            elif ent.label_ == "DOCUMENT":   # Add support for document type
+                params["document_type"] = ent.text
+            elif ent.label_ == "PRINT_TYPE":  # Add support for print type
+                params["print_type"] = ent.text
+        
+        return params
+        
     def _calculate_confidence(self, pattern: SpacyIntentPattern, doc, matches: List) -> float:
         """
         Calculate confidence score based on pattern matches and entity presence.
@@ -238,27 +360,7 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             
         logger.debug(f"No matches found for pattern {pattern.intent_name}")
         return 0.0
-    
-    def _extract_parameters(self, doc) -> Dict[str, str]:
-        """Extract parameters from recognized entities."""
-        params = {
-            "destination": "",
-            "transport_mode": "driving",  # Default to driving
-            "appointment_time": "",
-            "patient_mobility": "",
-            "additional_context": ""
-        }
-        
-        for ent in doc.ents:
-            if ent.label_ in ["LOCATION", "ORG", "GPE", "FAC"]:  # Support multiple location-like entities
-                params["destination"] = ent.text
-            elif ent.label_ == "TIME":
-                params["appointment_time"] = ent.text
-            elif ent.label_ == "TRANSPORT":  # Use TRANSPORT label for transport mode
-                params["transport_mode"] = ent.text.lower()  # Normalize to lowercase
-        
-        return params
-    
+     
     def recognize_intent(self, text: str) -> List[Intent]:
         """
         Recognize medical intents from the conversation text using SpaCy.
