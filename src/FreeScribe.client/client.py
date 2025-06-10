@@ -1631,7 +1631,9 @@ def generate_note(formatted_message):
             ai_response = send_text_to_chatgpt(formatted_message)
             update_gui_with_response(ai_response)
             summary = ai_response
-        check_and_warn_about_factual_consistency(formatted_message, summary)
+
+        if FeatureToggle.FACTUAL_CONSISTENCY_VERIFICATION:
+            check_and_warn_about_factual_consistency(formatted_message, summary)
 
         return True
     except Exception as e:
