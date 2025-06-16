@@ -1364,88 +1364,40 @@ def show_response(event):
         except Exception as e:
             logger.warning(str(e))
 
-def send_text_to_api(edited_text):
-    headers = {
-        "Authorization": f"Bearer {app_settings.OPENAI_API_KEY}",
-        "Content-Type": "application/json",
-        "accept": "application/json",
-    }
+def send_text_to_api(edited_text, cancel_event):
+    """
+    Sends text to API using httpx AsyncClient in a cancellable async format.
+    
+    Args:
+        edited_text (str): The text to send to the API
+        cancel_event (threading.Event): Event to signal cancellation
+        
+    Returns:
+        str: The response text or 'Error' if cancelled/failed
+    """
+    network_config = NetworkConfig(
+        host=app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value],
+        api_key=app_settings.OPENAI_API_KEY,
+        verify_ssl=not app_settings.editable_settings["AI Server Self-Signed Certificates"],
+        timeout=50,
+        connect_timeout=30
+    )
 
-    payload = {}
+    llm_client = OpenAIClient(config=network_config, root=root)
 
-    try:
-        payload = {
-            "model": app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value].strip(),
-            "messages": [
-                {"role": "user", "content": edited_text}
-            ],
-            "temperature": float(app_settings.editable_settings["temperature"]),
-            "top_p": float(app_settings.editable_settings["top_p"]),
-            "top_k": int(app_settings.editable_settings["top_k"]),
-            "tfs": float(app_settings.editable_settings["tfs"]),
-        }
+    generated_response = llm_client.send_chat_completion_sync(
+        text=edited_text,
+        model=app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value],
+        threading_cancel_event=cancel_event,
+        temperature=float(app_settings.editable_settings["temperature"]),
+        top_p=float(app_settings.editable_settings["top_p"]),
+        top_k=int(app_settings.editable_settings["top_k"]),
+        stream=False,
+    )
 
-        if app_settings.editable_settings["best_of"]:
-            payload["best_of"] = int(app_settings.editable_settings["best_of"])
-
-    except ValueError as e:
-        payload = {
-            "model": app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value].strip(),
-            "messages": [
-                {"role": "user", "content": edited_text}
-            ],
-            "temperature": 0.1,
-            "top_p": 0.4,
-            "top_k": 30,
-            "best_of": 6,
-            "tfs": 0.97,
-        }
-
-        if app_settings.editable_settings["best_of"]:
-            payload["best_of"] = int(app_settings.editable_settings["best_of"])
-
-        logger.exception(f"Error parsing settings: {e}. Using default settings.")
-
-    try:
-
-        if app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value].endswith('/'):
-            app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value] = app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value][:-1]
-
-        # Open API Style
-        verify = not app_settings.editable_settings["AI Server Self-Signed Certificates"]
-        response = requests.post(
-            app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value] + "/chat/completions", headers=headers, json=payload, verify=verify)
-
-        response.raise_for_status()
-        response_data = response.json()
-        response_text = (response_data['choices'][0]['message']['content'])
-        return response_text
-
-        #############################################################
-        #                                                           #
-        #                   OpenAI API Style                        #
-        #           Uncomment to use API Style Selector             #
-        #                                                           #
-        #############################################################
-
-        # if app_settings.API_STYLE == "OpenAI":
-        # elif app_settings.API_STYLE == "KoboldCpp":
-        #     prompt = get_prompt(edited_text)
-
-        #     verify = not app_settings.editable_settings["AI Server Self-Signed Certificates"]
-        #     response = requests.post(app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value] + "/api/v1/generate", json=prompt, verify=verify)
-
-        #     if response.status_code == 200:
-        #         results = response.json()['results']
-        #         response_text = results[0]['text']
-        #         response_text = response_text.replace("  ", " ").strip()
-        #         return response_text
-
-    except Exception as e:
-        raise e
-
-
-def send_text_to_localmodel(edited_text):
+    return generated_response
+         
+def send_text_to_localmodel(edited_text):  
     # Send prompt to local model and get response
     if ModelManager.local_model is None:
         ModelManager.setup_model(app_settings=app_settings, root=root)
