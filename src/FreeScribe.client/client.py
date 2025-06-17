@@ -70,6 +70,10 @@ from services.factual_consistency import find_factual_inconsistency
 import utils.arg_parser
 from services.whisper_hallucination_cleaner import hallucination_cleaner, load_hallucination_cleaner_model
 from utils.log_config import logger
+import asyncio
+import httpx
+from utils.network.base import NetworkConfig
+from utils.network.openai_client import OpenAIClient
 
 # parse command line arguments
 utils.arg_parser.parse_args()
@@ -117,7 +121,24 @@ def delete_temp_file(filename):
 def on_closing():
     delete_temp_file('recording.wav')
     delete_temp_file('realtime.wav')
+
+    #save all notes
+    save_notes_history()
+     
+    # Cancel any pending async operations
+    try:
+        loop = asyncio.get_running_loop()
+        if loop and not loop.is_closed():
+            # Cancel all pending tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+    except RuntimeError as e:
+        logger.exception(f"Error during async cleanup: {e}")
+        pass  # No running loop
+
     app_manager.cleanup()
+
 
 # Register the cleanup function to be called on exit
 atexit.register(on_closing)
@@ -1364,88 +1385,40 @@ def show_response(event):
         except Exception as e:
             logger.warning(str(e))
 
-def send_text_to_api(edited_text):
-    headers = {
-        "Authorization": f"Bearer {app_settings.OPENAI_API_KEY}",
-        "Content-Type": "application/json",
-        "accept": "application/json",
-    }
+def send_text_to_api(edited_text, cancel_event):
+    """
+    Sends text to API using httpx AsyncClient in a cancellable async format.
+    
+    Args:
+        edited_text (str): The text to send to the API
+        cancel_event (threading.Event): Event to signal cancellation
+        
+    Returns:
+        str: The response text or 'Error' if cancelled/failed
+    """
+    network_config = NetworkConfig(
+        host=app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value],
+        api_key=app_settings.OPENAI_API_KEY,
+        verify_ssl=not app_settings.editable_settings["AI Server Self-Signed Certificates"],
+        timeout=180.0,  # Set a reasonable timeout for the request
+        connect_timeout=10.0,
+    )
 
-    payload = {}
+    llm_client = OpenAIClient(config=network_config)
 
-    try:
-        payload = {
-            "model": app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value].strip(),
-            "messages": [
-                {"role": "user", "content": edited_text}
-            ],
-            "temperature": float(app_settings.editable_settings["temperature"]),
-            "top_p": float(app_settings.editable_settings["top_p"]),
-            "top_k": int(app_settings.editable_settings["top_k"]),
-            "tfs": float(app_settings.editable_settings["tfs"]),
-        }
+    generated_response = llm_client.send_chat_completion_sync(
+        text=edited_text,
+        model=app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value],
+        threading_cancel_event=cancel_event,
+        temperature=float(app_settings.editable_settings["temperature"]),
+        top_p=float(app_settings.editable_settings["top_p"]),
+        top_k=int(app_settings.editable_settings["top_k"]),
+        stream=False,
+    )
 
-        if app_settings.editable_settings["best_of"]:
-            payload["best_of"] = int(app_settings.editable_settings["best_of"])
-
-    except ValueError as e:
-        payload = {
-            "model": app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value].strip(),
-            "messages": [
-                {"role": "user", "content": edited_text}
-            ],
-            "temperature": 0.1,
-            "top_p": 0.4,
-            "top_k": 30,
-            "best_of": 6,
-            "tfs": 0.97,
-        }
-
-        if app_settings.editable_settings["best_of"]:
-            payload["best_of"] = int(app_settings.editable_settings["best_of"])
-
-        logger.exception(f"Error parsing settings: {e}. Using default settings.")
-
-    try:
-
-        if app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value].endswith('/'):
-            app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value] = app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value][:-1]
-
-        # Open API Style
-        verify = not app_settings.editable_settings["AI Server Self-Signed Certificates"]
-        response = requests.post(
-            app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value] + "/chat/completions", headers=headers, json=payload, verify=verify)
-
-        response.raise_for_status()
-        response_data = response.json()
-        response_text = (response_data['choices'][0]['message']['content'])
-        return response_text
-
-        #############################################################
-        #                                                           #
-        #                   OpenAI API Style                        #
-        #           Uncomment to use API Style Selector             #
-        #                                                           #
-        #############################################################
-
-        # if app_settings.API_STYLE == "OpenAI":
-        # elif app_settings.API_STYLE == "KoboldCpp":
-        #     prompt = get_prompt(edited_text)
-
-        #     verify = not app_settings.editable_settings["AI Server Self-Signed Certificates"]
-        #     response = requests.post(app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value] + "/api/v1/generate", json=prompt, verify=verify)
-
-        #     if response.status_code == 200:
-        #         results = response.json()['results']
-        #         response_text = results[0]['text']
-        #         response_text = response_text.replace("  ", " ").strip()
-        #         return response_text
-
-    except Exception as e:
-        raise e
-
-
-def send_text_to_localmodel(edited_text):
+    return generated_response
+         
+def send_text_to_localmodel(edited_text):  
     # Send prompt to local model and get response
     if ModelManager.local_model is None:
         ModelManager.setup_model(app_settings=app_settings, root=root)
@@ -1570,15 +1543,14 @@ def threaded_screen_input(user_message, screen_return):
     input_return = screen_input(user_message)
     screen_return.set(input_return)
 
-
-def send_text_to_chatgpt(edited_text):
+def send_text_to_chatgpt(edited_text, cancel_event=None): 
     if app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value]:
         return send_text_to_localmodel(edited_text)
     else:
-        return send_text_to_api(edited_text)
-
-
-def generate_note(formatted_message):
+        # send_text_to_api is already synchronous and handles async internally
+        return send_text_to_api(edited_text, cancel_event)
+    
+def generate_note(formatted_message, cancel_event):
     """Generate a note from the formatted message.
     
     This function processes the input text and generates a medical note or AI response
@@ -1602,37 +1574,39 @@ def generate_note(formatted_message):
         summary = None
         if use_aiscribe:
             # If pre-processing is enabled
-            if app_settings.editable_settings["Use Pre-Processing"]:
+            if app_settings.editable_settings[SettingsKeys.USE_PRE_PROCESSING.value]:
                 #Generate Facts List
-                list_of_facts = send_text_to_chatgpt(f"{app_settings.editable_settings['Pre-Processing']} {formatted_message}")
-
+                list_of_facts = send_text_to_chatgpt(f"{app_settings.editable_settings['Pre-Processing']} {formatted_message}", cancel_event)
+                
                 #Make a note from the facts
-                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {list_of_facts} {app_settings.AISCRIBE2}")
+                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {list_of_facts} {app_settings.AISCRIBE2}", cancel_event)
 
                 # If post-processing is enabled check the note over
                 if app_settings.editable_settings["Use Post-Processing"]:
-                    post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nFacts:{list_of_facts}\nNotes:{medical_note}")
-                    update_gui_with_response(post_processed_note)
+                    post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nFacts:{list_of_facts}\nNotes:{medical_note}", cancel_event)
                     summary = post_processed_note
+                    update_gui_with_response(post_processed_note)
                 else:
-                    update_gui_with_response(medical_note)
                     summary = medical_note
+                    update_gui_with_response(medical_note)
+
             else: # If pre-processing is not enabled then just generate the note
-                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}")
+                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}", cancel_event)
 
                 if app_settings.editable_settings["Use Post-Processing"]:
-                    post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nNotes:{medical_note}")
+                    post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nNotes:{medical_note}", cancel_event)
                     update_gui_with_response(post_processed_note)
                     summary = post_processed_note
                 else:
                     update_gui_with_response(medical_note)
                     summary = medical_note
-        else: # do not generate note just send text directly to AI
-            ai_response = send_text_to_chatgpt(formatted_message)
+        else: # do not generate note just send text directly to AI 
+            ai_response = send_text_to_chatgpt(formatted_message, cancel_event)
             update_gui_with_response(ai_response)
             summary = ai_response
-        check_and_warn_about_factual_consistency(formatted_message, summary)
 
+        check_and_warn_about_factual_consistency(formatted_message, summary)
+            
         return True
     except Exception as e:
         logger.exception(f"An error occurred: {e}")
@@ -1712,6 +1686,8 @@ def generate_note_thread(text: str):
 
     GENERATION_THREAD_ID = None
 
+    cancel_event = threading.Event()
+
     def cancel_note_generation(thread_id, screen_thread):
         """Cancels any ongoing note generation.
 
@@ -1720,13 +1696,18 @@ def generate_note_thread(text: str):
         global GENERATION_THREAD_ID
 
         try:
-            logger.debug(f"*** Cancelling note generation thread with ID: {thread_id}")
+            # Set the cancellation event first
+            cancel_event.set()
+            
             if thread_id:
                 kill_thread(thread_id)
 
             # check if screen thread is active before killing it
             if screen_thread and screen_thread.is_alive():
                 kill_thread(screen_thread.ident)
+                
+            # Set the note box to client canceled
+            safe_set_note_box("Note generation canceled.")
         except Exception as e:
             logger.exception(f"An error occurred: {e}")
         finally:
@@ -1757,8 +1738,18 @@ def generate_note_thread(text: str):
     loading_window.destroy()
     loading_window = LoadingWindow(root, "Generating Note.", "Generating Note. Please wait.", on_cancel=lambda: (cancel_note_generation(GENERATION_THREAD_ID, screen_thread)))
 
+    def generate_note_with_cleanup(text, cancel_event):
+        """Wrapper function that ensures proper cleanup."""
+        try:
+            return generate_note(text, cancel_event)
+        except Exception as e:
+            logger.exception(f"Error in generate_note: {e}")
+            return False
+        finally:
+            # Ensure the cancel event is set to stop any ongoing operations
+            cancel_event.set()
 
-    thread = threading.Thread(target=generate_note, args=(text,))
+    thread = threading.Thread(target=generate_note_with_cleanup, args=(text, cancel_event))
     thread.start()
     GENERATION_THREAD_ID = thread.ident
 
