@@ -1661,7 +1661,7 @@ def check_and_warn_about_factual_consistency(formatted_message: str, medical_not
         Always review generated notes carefully.
     """
     # Verify factual consistency
-    if not app_settings.editable_settings[SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value] and FeatureToggle.FACTS_CHECK:
+    if not app_settings.editable_settings[SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value] or not FeatureToggle.FACTS_CHECK:
         return
         
     inconsistent_entities = find_factual_inconsistency(formatted_message, medical_note)

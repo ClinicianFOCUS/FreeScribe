@@ -56,7 +56,7 @@ class FeatureToggle:
     PRE_PROCESSING = False
     INTENT_ACTION = False
     HALLUCINATION_CLEANING = False
-    FACTS_CHECK = False
+    FACTS_CHECK = True
     BEST_OF = False
     LLM_CONVO_PRESCREEN = False
 
