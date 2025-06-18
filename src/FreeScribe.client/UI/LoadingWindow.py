@@ -4,7 +4,7 @@ from utils.file_utils import get_file_path
 from utils.log_config import logger
 import utils.system
 import UI.Helpers
-
+import time
 
 class LoadingWindow:
     """
@@ -73,12 +73,14 @@ class LoadingWindow:
         self.parent = parent
         self.on_cancel = on_cancel
         self.cancelled = False
+        self.ui_built = False
     
         if self.parent:
             self.parent.after(0, self.build_ui)
 
     def build_ui(self):
         try:
+            logger.debug("Building LoadingWindow UI")
             self.popup = tk.Toplevel(self.parent)
             self.popup.title(self.title)
             # Adjust geometry based on whether note_text is provided
@@ -136,6 +138,9 @@ class LoadingWindow:
 
             # Disable closing of the popup manually
             self.popup.protocol("WM_DELETE_WINDOW", lambda: None)
+            
+            logger.debug("LoadingWindow UI built successfully")
+            self.ui_built = True
         except Exception:
             logger.exception("Error creating LoadingWindow")
             # Enable the window on exception
@@ -178,15 +183,38 @@ class LoadingWindow:
         >>> # Do some processing
         >>> popup.destroy()  # Properly clean up and close the window
         """
-        if self.popup:
-            # Enable the parent window
-            if self.parent:
-                UI.Helpers.enable_parent_window(self.parent, self.popup)
+        # wait for the UI to be built
+        def _destroy_ui():
+            start_time = time.time()
+            logger.debug("Waiting for LoadingWindow UI to be built")
+            while not self.ui_built:
+                elapsed_time = time.time() - start_time
+                if int(elapsed_time) % 2 == 0 or elapsed_time < 1:
+                    logger.info(f"Waiting for LoadingWindowUI to build (elapsed={elapsed_time}s, built={self.ui_built})")
+                time.sleep(0.1)
+            
+            logger.debug("LoadingWindow UI is built, proceeding to destroy it")
+            if self.popup:
+                # Enable the parent window
+                if self.parent:
+                    logger.debug("Enabling parent window")
+                    UI.Helpers.enable_parent_window(self.parent, self.popup)
 
-            if hasattr(self, 'progress') and self.progress:
-                if self.progress.winfo_exists():
-                    # Stop the progress bar animation
-                    self.progress.stop()
+                if hasattr(self, 'progress') and self.progress:
+                    logger.debug("Stopping progress bar animation")
+                    if self.progress.winfo_exists():
+                        # Stop the progress bar animation
+                        self.progress.stop()
 
-            if self.popup.winfo_exists():
-                self.popup.destroy()
+                if self.popup.winfo_exists():
+                    logger.debug("Destroying popup window")
+                    self.popup.destroy()
+
+        if self.parent and hasattr(self.parent, 'after'):
+            logger.debug("Using parent.after to destroy LoadingWindow UI")
+            self.parent.after(0, _destroy_ui)
+        else:
+            # Call the destroy function directly if parent is not available
+            logger.debug("Parent not available, calling _destroy_ui directly")
+            _destroy_ui()
+
