@@ -224,6 +224,8 @@ class SettingsWindow():
             # "frmtrmblln",
             SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value,
             SettingsKeys.Enable_Word_Count_Validation.value,
+            SettingsKeys.USE_PRE_PROCESSING.value,
+
         ]
         
         if FeatureToggle.LLM_CONVO_PRESCREEN:
@@ -265,6 +267,8 @@ class SettingsWindow():
         self.developer_settings = [
             "Real Time Silence Length",
             "BlankSpace", # Represents the Whisper Initial Prompt
+            SettingsKeys.Enable_AI_Conversation_Validation.value,
+            SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value,
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE

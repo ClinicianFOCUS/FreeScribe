@@ -128,6 +128,7 @@ def enable_notes_history(event=None):
     """
     load_notes_history()
     warning_label.grid_remove()
+    grid_clear_all_btn()
 
 root.bind("<<EnableNoteHistory>>", enable_notes_history)
 
@@ -137,9 +138,8 @@ def disable_notes_history(event=None):
     Clears all existing notes and updates the UI accordingly.
     """
     clear_all_notes()
-    warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
-
-    # delete all notes button
+    clear_all_notes_btn.grid_remove()
+    grid_warning_label()
 
 root.bind("<<DisableNoteHistory>>", disable_notes_history)
 
@@ -2165,8 +2165,39 @@ warning_label = tk.Label(history_frame,
                             font=tk.font.Font(size=scaled_size),
                             )
 
+def on_click_clear_all_notes():
+    """
+    Callback function to clear all notes from the timestamp listbox and response display.
+    """
+    # Disclaimer that all notes will be deleted
+    if messagebox.askyesno("Clear All Notes", "Are you sure you want to delete all notes? You will not be able to undo or recover the notes."):
+        clear_all_notes()
+
+
+clear_all_notes_btn = tk.Button(history_frame, text="Clear All Notes", command=on_click_clear_all_notes, width=20, height=2)
+
+def grid_clear_all_btn():
+    """
+    Function to grid the clear all notes button after the UI is initialized.
+    """
+    def action():
+        clear_all_notes_btn.grid(row=3, column=0, sticky='ew', pady=5)
+
+    root.after(0, action)
+
+def grid_warning_label():
+    """
+    Function to grid the warning label after the UI is initialized.
+    """
+    def action():
+        warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+
+    root.after(0, action)
+
 if not app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
-    warning_label.grid(row=3, column=0, sticky='ew', pady=(0,5))
+    grid_warning_label()
+else:
+    grid_clear_all_btn()
 
 # Add microphone test frame
 mic_test = MicrophoneTestFrame(parent=history_frame, p=p, app_settings=app_settings, root=root)
