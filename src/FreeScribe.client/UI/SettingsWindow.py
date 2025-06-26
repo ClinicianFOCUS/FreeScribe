@@ -588,9 +588,12 @@ class SettingsWindow():
             logger.info("Invalid LLM Endpoint")
             return ["Invalid LLM Endpoint", "Custom"]
 
+        if endpoint.endswith("/"):
+            endpoint = endpoint[:-1]
+
         try:
             verify = not self.editable_settings["AI Server Self-Signed Certificates"]
-            response = requests.get(endpoint + "/models", headers=headers, timeout=1.0, verify=verify)
+            response = requests.get(endpoint + "/models", headers=headers, verify=verify, timeout=10.0)
             response.raise_for_status()  # Raise an error for bad responses
             models = response.json().get("data", [])  # Extract the 'data' field
             
