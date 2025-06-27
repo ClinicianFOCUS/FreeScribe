@@ -39,5 +39,6 @@ This project is licensed under the MIT License. See the `LICENSE file <https://g
    :caption: Contents:
 
    welcome
+   sandboxie_plus
    how_to_use
    setting_remote_connection
