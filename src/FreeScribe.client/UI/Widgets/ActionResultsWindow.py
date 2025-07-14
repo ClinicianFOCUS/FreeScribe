@@ -431,7 +431,7 @@ class ActionResultsWindow:
                 logger.info(f"Completing action for: {result.get('display_name', 'Unknown')}")
             
         except Exception as e:
-            logger.error(f"Error completing action: {str(e)}")
+            logger.exception(f"Error completing action: {str(e)}")
             
     def _delete_card(self, card: ttk.Frame) -> None:
         """
