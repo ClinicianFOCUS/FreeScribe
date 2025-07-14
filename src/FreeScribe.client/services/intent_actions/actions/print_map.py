@@ -169,6 +169,9 @@ class PrintMapAction(BaseAction):
                         "type": "map",
                         "clickable": True,
                         "click_url": str(map_path),
+                        "has_action": True,
+                        "auto_complete": False,
+                        "action": self,
                         "additional_info": {
                             "map_image_path": str(map_path)
                         }
@@ -208,6 +211,9 @@ class PrintMapAction(BaseAction):
                         "type": "map",
                         "clickable": True,
                         "click_url": str(map_path),
+                        "has_action": True,
+                        "auto_complete": True,
+                        "action": self,
                         "additional_info": {
                             "map_image_path": str(map_path)
                         }
@@ -228,6 +234,18 @@ class PrintMapAction(BaseAction):
             "icon": "🗺️",
             "color": "#4CAF50"
         }
+
+    def complete_action(self, result_data: Dict[str, Any]) -> bool:
+        """
+        Complete the action - this is called when the user clicks "Complete Action" 
+        or when auto_complete is triggered.
+        
+        :param result_data: The result data from the ActionResult
+        :return: True if action was completed successfully, False otherwise
+        """
+        # example of running a completion logic
+        logger.info("Completing PrintMapAction")
+        return True
 
     def _find_relevant_map(self, destination: str, transport_mode: str) -> Optional[Path]:
         """
@@ -272,4 +290,4 @@ class PrintMapAction(BaseAction):
             "Turn right at Central Hospital",
             "Pass the Main Street intersection",
             "Look for the blue hospital sign"
-        ] 
+        ]

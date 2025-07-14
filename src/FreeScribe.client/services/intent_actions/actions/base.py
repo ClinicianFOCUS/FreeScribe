@@ -78,3 +78,13 @@ class BaseAction(ABC):
         :return: Dictionary containing UI-related data (icon, color, etc.)
         """
         pass 
+
+    @abstractmethod
+    def complete_action(self, result_data: Dict[str, Any]) -> bool:
+        """
+        Mark the action as completed.
+        
+        :param result_data: Data returned from the action execution
+        :return: True if the action was successfully marked as completed
+        """
+        pass
