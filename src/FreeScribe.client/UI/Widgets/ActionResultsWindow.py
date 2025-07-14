@@ -94,14 +94,21 @@ class ActionResultsWindow:
         self.scrollable_frame = ttk.Frame(self.canvas)
         
         # Configure scrolling
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
+        def configure_scroll_region(event=None):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            # Make the scrollable frame fill the canvas width
+            canvas_width = self.canvas.winfo_width()
+            if canvas_width > 1:  # Ensure canvas has been drawn
+                self.canvas.itemconfig(self.canvas_window, width=canvas_width)
+        
+        self.scrollable_frame.bind("<Configure>", configure_scroll_region)
         
         # Create the window in the canvas
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Bind canvas resize to update frame width
+        self.canvas.bind("<Configure>", configure_scroll_region)
         
         # Pack canvas and scrollbar
         self.canvas.pack(side="left", fill="both", expand=True)
@@ -286,7 +293,7 @@ class ActionResultsWindow:
                     map_label = ttk.Label(card, image=photo)
                     map_label.pack(pady=5)
                 except Exception as e:
-                    print(f"Error loading map image: {e}")
+                    logger.exception(f"Error loading map image: {e}")
                     
         elif "additional_info" in result["data"]:
             info = result["data"]["additional_info"]
@@ -321,7 +328,7 @@ class ActionResultsWindow:
                     instruction.pack(pady=2)
                 
                 except Exception as e:
-                    print(f"Error loading map image: {e}")
+                    logger.exception(f"Error loading map image: {e}")
             
             # Add other info
             if "floor" in info:
@@ -347,6 +354,45 @@ class ActionResultsWindow:
                     s = ttk.Label(card, text=f"• {step}", wraplength=330)
                     s.pack(pady=1)
                     
+        # Add footer with action button and completion checkbox
+        footer = ttk.Frame(card)
+        footer.pack(fill="x", padx=5, pady=(10, 5))
+        
+        # Get data members with defaults
+        has_action = result["data"].get("has_action", False)
+        auto_complete = result["data"].get("auto_complete", True)
+        
+        # If auto_complete is True and has_action is True, trigger the action automatically
+        if has_action and auto_complete:
+            # Schedule auto-completion to run after UI is updated
+            self.window.after(100, lambda: self._complete_action(result))
+        
+        # Left side: action button (always show)
+        if has_action:
+            if auto_complete:
+                action_button = ttk.Button(
+                    footer,
+                    text="Auto Completing Action",
+                    state="disabled",
+                    cursor="arrow"
+                )
+            else:
+                action_button = ttk.Button(
+                    footer,
+                    text="Complete Action",
+                    cursor="hand2",
+                    command=lambda: self._complete_action(result)
+                )
+        else:
+            # No action available - show disabled button
+            action_button = ttk.Button(
+                footer,
+                text="No Action",
+                state="disabled",
+                cursor="arrow"
+            )
+        action_button.pack(side="left")
+                    
         # Add separator
         ttk.Separator(self.scrollable_frame).pack(fill="x", padx=10, pady=10)
         
@@ -363,6 +409,29 @@ class ActionResultsWindow:
         """
         for result in results:
             self.add_result(result)
+            
+    def _complete_action(self, result: Dict[str, Any]) -> None:
+        """
+        Handle the complete action button click.
+        
+        :param result: The action result data
+        """
+        try:
+            # Get the action instance from the result data
+            action = result["data"].get("action")
+            if action and hasattr(action, 'complete_action'):
+                # Call the action's complete_action method
+                success = action.complete_action(result["data"])
+                if success:
+                    logger.info(f"Action completed successfully for: {result.get('display_name', 'Unknown')}")
+                else:
+                    logger.warning(f"Action completion failed for: {result.get('display_name', 'Unknown')}")
+            else:
+                # Fallback to generic logging if no action instance available
+                logger.info(f"Completing action for: {result.get('display_name', 'Unknown')}")
+            
+        except Exception as e:
+            logger.error(f"Error completing action: {str(e)}")
             
     def _delete_card(self, card: ttk.Frame) -> None:
         """
@@ -438,4 +507,4 @@ class ActionResultsWindow:
         if event.num == 4 or event.delta > 0:  # Scroll up
             self.canvas.yview_scroll(-1, "units")
         elif event.num == 5 or event.delta < 0:  # Scroll down
-            self.canvas.yview_scroll(1, "units") 
+            self.canvas.yview_scroll(1, "units")
