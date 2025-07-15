@@ -87,7 +87,10 @@ class ShowDirectionsAction(BaseAction):
                     "transport_mode": transport_mode,
                     "transport_mode_icon": transport_icon,
                     "clickable": True,
-                    "click_url": url  # This is what the UI will use
+                    "click_url": url,  # This is what the UI will use
+                    "has_action": True,
+                    "auto_complete": False,
+                    "action": self
                 }
             )
             
@@ -98,6 +101,17 @@ class ShowDirectionsAction(BaseAction):
                 message="Failed to generate directions.",
                 data={"error": str(e)}
             )
+
+    def complete_action(self, result_data: Dict[str, Any]) -> bool:
+        """
+        Complete the action with the provided result data.
+        
+        :param result_data: Data returned from the action execution
+        :return: True if the action was completed successfully
+        """
+        # This action does not require any additional completion logic
+        logger.info("ShowDirectionsAction completed successfully.")
+        return True
 
     def get_ui_data(self) -> Dict[str, Any]:
         """Get UI configuration for displaying results."""
