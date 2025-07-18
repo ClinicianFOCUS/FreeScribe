@@ -655,64 +655,11 @@ pady=5, sticky="w")
         self.whisper_language_dropdown.grid(row=len(whisper_settings), column=1, padx=0, pady=5, sticky="ew")
         self.settings.editable_settings_entries[SettingsKeys.WHISPER_LANGUAGE_CODE.value] = self.whisper_language_dropdown
         
-        # # Audio meter
-        # tk.Label(left_frame, text="Whisper Audio Cutoff").grid(row=1, column=0, padx=0, pady=0, sticky="w")
-        # self.cutoff_slider = AudioMeter(left_frame, width=150, height=50, 
-        #                             threshold=self.settings.editable_settings["Silence cut-off"] * 32768)
-        # self.cutoff_slider.grid(row=1, column=1, padx=0, pady=0, sticky="w")
         row += 1
 
         # AI Settings
         row = self._create_section_header("AI Settings", row, text_colour="black", frame=self.advanced_settings_frame)
         row = create_settings_columns(self.settings.adv_ai_settings, row)
-        
-        # Prompting Settings
-        row = self._create_section_header("Prompting Settings", row, text_colour="black", frame=self.advanced_settings_frame)
-
-        # Pre convo instruction
-        self.aiscribe_text, label_row1, text_row1, row = self._create_text_area(
-            self.advanced_settings_frame, "Pre Conversation Instruction", self.settings.AISCRIBE, row
-        )
-
-        # Explanation for Pre convo instruction
-        pre_explanation = (
-            "This is the FIRST part of the AI prompt structure:\n\n"
-            "• Acts as the opening instruction to the AI\n"
-            "• Sets up how to interpret the conversation\n"
-            "• Defines SOAP note format requirements\n"
-            "• Conversation will be inserted after this\n\n"
-            "⚠️ Modify with caution as it affects AI output quality"
-        )
-
-        font_size = 9 if utils.system.is_windows() else 14
-        tk.Label(
-            self.advanced_settings_frame,
-            text=pre_explanation,
-            justify="left",
-            font=("Arial", font_size),
-        ).grid(row=text_row1, column=1, padx=(10, 0), pady=5, sticky="nw")
-
-        # Post convo instruction
-        self.aiscribe2_text, label_row2, text_row2, row = self._create_text_area(
-            self.advanced_settings_frame, "Post Conversation Instruction", self.settings.AISCRIBE2, row
-        )
-
-        # Explanation for Post convo instruction
-        post_explanation = (
-            "This is the LAST part of the AI prompt structure:\n\n"
-            "• Added after the conversation text\n"
-            "• Provides final formatting instructions\n"
-            "• Ensures SOAP note completeness\n"
-            "• Helps maintain consistency\n\n"
-            "⚠️ Modify with caution as it affects AI output quality"
-        )
-        tk.Label(
-            self.advanced_settings_frame,
-            text=post_explanation,
-            justify="left",           
-            font=("Arial", font_size),
-
-        ).grid(row=text_row2, column=1, padx=(10, 0), pady=5, sticky="nw")
         
         if FeatureToggle.POST_PROCESSING is True:
             self.postprocess_text, _ = self.__create_processing_section(

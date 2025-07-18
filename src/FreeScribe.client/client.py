@@ -70,6 +70,7 @@ from services.factual_consistency import find_factual_inconsistency
 import utils.arg_parser
 from services.whisper_hallucination_cleaner import hallucination_cleaner, load_hallucination_cleaner_model
 from utils.log_config import logger
+from UI.NoteStyleSelector import NoteStyleSelector
 
 # parse command line arguments
 utils.arg_parser.parse_args()
@@ -1600,14 +1601,15 @@ def generate_note(formatted_message):
     """
     try:
         summary = None
+        current_prompt_info = NoteStyleSelector.get_current_prompt_info()
         if use_aiscribe:
             # If pre-processing is enabled
             if app_settings.editable_settings["Use Pre-Processing"]:
                 #Generate Facts List
                 list_of_facts = send_text_to_chatgpt(f"{app_settings.editable_settings['Pre-Processing']} {formatted_message}")
 
-                #Make a note from the facts
-                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {list_of_facts} {app_settings.AISCRIBE2}")
+                #Make a note from the facts using current style prompts
+                medical_note = send_text_to_chatgpt(f"{current_prompt_info.pre_prompt} {list_of_facts} {current_prompt_info.post_prompt}")
 
                 # If post-processing is enabled check the note over
                 if app_settings.editable_settings["Use Post-Processing"]:
@@ -1618,7 +1620,7 @@ def generate_note(formatted_message):
                     update_gui_with_response(medical_note)
                     summary = medical_note
             else: # If pre-processing is not enabled then just generate the note
-                medical_note = send_text_to_chatgpt(f"{app_settings.AISCRIBE} {formatted_message} {app_settings.AISCRIBE2}")
+                medical_note = send_text_to_chatgpt(f"{current_prompt_info.pre_prompt} {formatted_message} {current_prompt_info.post_prompt}")
 
                 if app_settings.editable_settings["Use Post-Processing"]:
                     post_processed_note = send_text_to_chatgpt(f"{app_settings.editable_settings['Post-Processing']}\nNotes:{medical_note}")
@@ -2204,20 +2206,35 @@ mic_test = MicrophoneTestFrame(parent=history_frame, p=p, app_settings=app_setti
 mic_test.frame.grid(row=4, column=0, pady=10, sticky='nsew')  # Use grid to place the frame
 
 # Add a footer frame at the bottom of the window
-footer_frame = tk.Frame(root, bg="darkgray", height=30)
-footer_frame.grid(row=100, column=0, columnspan=100, sticky="ew")  # Use grid instead of pack
+footer_frame = tk.Frame(root, bg="lightgrey", height=30)
+footer_frame.grid(row=100, column=0, columnspan=100, sticky="ew")
 
-# Add "Version 2" label in the center of the footer
+# Configure footer frame grid columns
+# Left spacer
+footer_frame.grid_columnconfigure(0, weight=1)  
+# NoteStyleSelector (center)
+footer_frame.grid_columnconfigure(1, weight=0) 
+# Right spacer 
+footer_frame.grid_columnconfigure(2, weight=1) 
+
+# Add NoteStyleSelector in the center of the footer
+note_style_selector = NoteStyleSelector(root, footer_frame)
+note_style_selector.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+
+# Add version label in a small box in the bottom right
 version = get_application_version()
-version_label = tk.Label(
-    footer_frame,
-    text=f"FreeScribe Client {version}",
-    bg="darkgray").pack(
-        side="left",
-        expand=True,
-        padx=2,
-    pady=5)
+version_frame = tk.Frame(footer_frame, bg="lightgrey", relief="sunken", bd=1)
+version_frame.grid(row=0, column=2, sticky="e", padx=5, pady=2)
 
+version_label = tk.Label(
+    version_frame,
+    text=f"FreeScribe Client {version}",
+    bg="lightgrey",
+    font=("Arial", 8),
+    padx=5,
+    pady=2
+)
+version_label.pack()
 
 window.update_aiscribe_texts(None)
 # Bind Alt+P to send_and_receive function
