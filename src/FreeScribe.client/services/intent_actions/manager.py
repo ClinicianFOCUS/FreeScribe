@@ -84,7 +84,7 @@ class IntentActionManager:
                 if result.success:
                     # Add UI data
                     ui_data = action.get_ui_data()
-                    logger.info(f"FULL FATA: {result}")
+                    logger.info(f"FULL DATA: {result}")
                     results.append({
                         "action_id": action.action_id,
                         "display_name": action.display_name,
