@@ -302,9 +302,6 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             for pattern in self.patterns:
                 self.matcher.add(pattern.intent_name, pattern.patterns)
             
-            # Setup custom document entity
-            self._setup_document_entity()
-            
             # Setup custom entity component
             self._setup_custom_entity_component()
         
