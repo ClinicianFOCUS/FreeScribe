@@ -419,8 +419,11 @@ class ActionResultsWindow:
                 # Restore normal text colors
                 self._set_card_text_color(card, None)
                 
-        except Exception as e:
+        except (AttributeError, tk.TclError) as e:
             logger.error(f"Error toggling card completion: {str(e)}")
+        except Exception as e:
+            logger.critical(f"Unexpected error toggling card completion: {str(e)}")
+            raise
     
     def _set_card_text_color(self, widget, color) -> None:
         """
