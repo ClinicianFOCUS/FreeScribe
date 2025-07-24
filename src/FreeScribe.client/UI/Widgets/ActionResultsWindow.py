@@ -365,7 +365,7 @@ class ActionResultsWindow:
         # If auto_complete is True and has_action is True, trigger the action automatically
         if has_action and auto_complete:
             # Schedule auto-completion to run after UI is updated
-            self.window.after(100, lambda: self._complete_action(result))
+            self.window.after(0, lambda: self._complete_action(result))
         
         # Left side: action button (always show)
         if has_action:
