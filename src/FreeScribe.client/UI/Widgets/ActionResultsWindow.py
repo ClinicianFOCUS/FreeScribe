@@ -103,12 +103,13 @@ class ActionResultsWindow:
         
         # Configure scrolling
         def configure_scroll_region(event=None):
-            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-            # Make the scrollable frame fill the canvas width
-            canvas_width = self.canvas.winfo_width()
-            if canvas_width > 1:  # Ensure canvas has been drawn
-                self.canvas.itemconfig(self.canvas_window, width=canvas_width)
-        
+            if hasattr(self, 'canvas_window') and self.canvas_window:  # Guard against undefined canvas_window
+                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                # Make the scrollable frame fill the canvas width
+                canvas_width = self.canvas.winfo_width()
+                if canvas_width > 1:  # Ensure canvas has been drawn
+                    self.canvas.itemconfig(self.canvas_window, width=canvas_width)
+
         self.scrollable_frame.bind("<Configure>", configure_scroll_region)
         
         # Create the window in the canvas
