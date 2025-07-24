@@ -13,6 +13,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+CANVAS_LAYOUT_THRESHOLD = 1  # Minimum width for canvas layout to apply
+
 class ActionResultsWindow:
     """
     Window for displaying intent action results.
@@ -121,7 +123,7 @@ class ActionResultsWindow:
                 self.canvas.configure(scrollregion=self.canvas.bbox("all"))
                 # Make the scrollable frame fill the canvas width
                 canvas_width = self.canvas.winfo_width()
-                if canvas_width > 1:  # Ensure canvas has been drawn
+                if canvas_width > CANVAS_LAYOUT_THRESHOLD:  # Ensure canvas has been drawn
                     self.canvas.itemconfig(self.canvas_window, width=canvas_width)
 
         self.scrollable_frame.bind("<Configure>", configure_scroll_region)
@@ -435,9 +437,12 @@ class ActionResultsWindow:
                 card.configure(style="Card.TFrame")
                 # Restore normal text colors
                 self._set_card_text_color(card, None)
-
-        except Exception as e:
+                
+        except (AttributeError, tk.TclError) as e:
             logger.error(f"Error toggling card completion: {str(e)}")
+        except Exception as e:
+            logger.critical(f"Unexpected error toggling card completion: {str(e)}")
+            raise
     
     def _set_card_text_color(self, widget, color) -> None:
         """
