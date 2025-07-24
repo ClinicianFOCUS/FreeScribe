@@ -374,7 +374,7 @@ class ActionResultsWindow:
             footer,
             variable=completed_var,
             cursor="hand2",
-            command=lambda: self._toggle_card_completed(card, completed_var.get())
+            command=lambda: self._toggle_card_completed(card, completed_var.get(), result)
         )
         completed_checkbox.pack(side="right")
         
@@ -398,14 +398,18 @@ class ActionResultsWindow:
         for result in results:
             self.add_result(result)
             
-    def _toggle_card_completed(self, card: ttk.Frame, is_completed: bool) -> None:
+    def _toggle_card_completed(self, card: ttk.Frame, is_completed: bool, result: Dict[str, Any]) -> None:
         """
         Toggle the completed state of a card, greying it out when completed.
-        
+
         :param card: The card frame to toggle
         :param is_completed: Whether the card is marked as completed
+        :param result: The result data associated with the card
         """
         try:
+            # Update the result data with the completed state
+            result['completed'] = is_completed
+
             # Configure card appearance based on completion state
             if is_completed:
                 # Grey out the card
@@ -417,7 +421,7 @@ class ActionResultsWindow:
                 card.configure(style="Card.TFrame")
                 # Restore normal text colors
                 self._set_card_text_color(card, None)
-                
+
         except Exception as e:
             logger.error(f"Error toggling card completion: {str(e)}")
     
