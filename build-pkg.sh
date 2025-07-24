@@ -55,6 +55,18 @@ cp mac/scripts/preinstall_"$ARCH" mac/scripts/preinstall
 echo "Moving app to $DIR_NAME"
 mv dist/FreeScribe.app $DIR_NAME
 
+# Create the __version__ file
+VERSION_FILE="$DIR_NAME/FreeScribe.app/Contents/Frameworks/__version__"
+echo "Creating __version__ file at $VERSION_FILE"
+tag="${GITHUB_REF#refs/tags/}"
+echo "$tag" > "$VERSION_FILE"
+
+# Verify the __version__ file exists
+if [[ ! -f "$VERSION_FILE" ]]; then
+    echo "Error: __version__ file was not created successfully."
+    exit 1
+fi
+
 # Build pkg installer for macOS using the pkgbuild command
 pkgbuild --root $DIR_NAME \
     --identifier $IDENTIFIER \

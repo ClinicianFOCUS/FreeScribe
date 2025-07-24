@@ -89,6 +89,7 @@ class Model:
             }
         except Exception as e:
             self.model = None
+            logger.exception(f"Model initialization error: {e}")
             raise e
 
     def generate_response(
@@ -134,7 +135,7 @@ class Model:
             return response["choices"][0]["message"]["content"]
 
         except Exception as e:
-            logger.error(f"GPU inference error ({e.__class__.__name__}): {str(e)}")
+            logger.exception(f"GPU inference error: {e}")
             return f"({e.__class__.__name__}): {str(e)}"
 
     def get_gpu_info(self) -> Dict[str, Any]:
@@ -246,12 +247,12 @@ class ModelManager:
                 )
             except Exception as e:
                 # model doesnt exist
-                # TODO: Logo to system log
                 local_exception = e
                 def show_error(exception):
                     messagebox.showerror(
                         "Model Error",
                         f"Model failed to load. Please ensure you have a valid model selected in the settings. Currently trying to load: {os.path.abspath(model_path)}. Error received ({exception.__class__.__name__}): {str(exception)}")
+                logger.exception(f"Model loading error: {e}")
                 
                 root.after(100, lambda: show_error(local_exception))
 
@@ -277,6 +278,18 @@ class ModelManager:
 
         root.after(500, lambda: check_thread_status(thread, loading_window, root))
 
+    @staticmethod
+    def is_llm_valid() -> bool:
+        """
+        Check if the local model is valid and loaded.
+
+        :return: True if a valid model is loaded, False otherwise
+        :rtype: bool
+
+        This method checks if the local_model attribute is not None and is an instance of Model.
+        If the model is in an error state, it returns False.
+        """
+        return ModelManager.local_model is not None and ModelManager.local_model != ModelStatus.ERROR
     @staticmethod
     def start_model_threaded(settings, root_window):
         """
