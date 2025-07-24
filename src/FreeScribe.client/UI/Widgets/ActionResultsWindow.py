@@ -44,6 +44,20 @@ class ActionResultsWindow:
         # Bind to parent window events
         self.parent.bind("<Configure>", self._on_parent_moved)
         
+        # Initialize label styles
+        self._init_label_styles()
+        
+    def _init_label_styles(self):
+        """
+        Initialize custom label styles for card labels.
+        Should be called once, e.g., in __init__.
+        """
+        style = ttk.Style()
+        # Default label style for cards
+        style.configure("CardLabel.TLabel", foreground="black")
+        # Completed card label style
+        style.configure("CardLabel.Complete.TLabel", foreground="gray50")
+        
     def _create_window(self) -> None:
         """Create the window and its widgets."""
         if self.window is not None:
@@ -256,7 +270,7 @@ class ActionResultsWindow:
         icon = ttk.Label(left_frame, text=result["ui"]["icon"])
         icon.pack(side="left", padx=5)
         
-        title = ttk.Label(left_frame, text=result["display_name"], style="CardTitle.TLabel")
+        title = ttk.Label(left_frame, text=result["display_name"], style="CardLabel.TLabel")
         title.pack(side="left", padx=5)
         
         # Right side: delete button
@@ -427,24 +441,24 @@ class ActionResultsWindow:
     
     def _set_card_text_color(self, widget, color) -> None:
         """
-        Recursively set text color for all label widgets in a card.
-        
+        Recursively set label style for all label widgets in a card.
+
         :param widget: The widget to process
         :param color: The color to set (None for default)
         """
         try:
             # Process current widget if it's a label
             if isinstance(widget, ttk.Label):
-                if color:
-                    widget.configure(foreground=color)
+                if color == "gray50":
+                    widget.configure(style="CardLabel.Complete.TLabel")
                 else:
                     # Reset to default style
-                    widget.configure(foreground="")
-            
+                    widget.configure(style="CardLabel.TLabel")
+
             # Recursively process children
             for child in widget.winfo_children():
                 self._set_card_text_color(child, color)
-                
+
         except Exception as e:
             logger.debug(f"Error setting text color: {str(e)}")
             
