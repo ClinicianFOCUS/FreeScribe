@@ -64,10 +64,35 @@ def test_base_recognizer_interface(test_recognizer):
     """Test BaseIntentRecognizer interface implementation."""
     # Test initialization
     test_recognizer.initialize()
-    
     # Test intent recognition
     intents = test_recognizer.recognize_intent("test text")
     assert isinstance(intents, list)
+
+def test_intent_metadata_edge_cases():
+    """Test edge cases for the metadata field in Intent."""
+    # Metadata missing (should default to empty dict or raise error depending on model)
+    intent = Intent(
+        name="meta_missing",
+        confidence=0.5
+    )
+    assert hasattr(intent, "metadata")
+    assert isinstance(intent.metadata, dict)
+    # Metadata set to None (should raise ValidationError)
+    with pytest.raises(ValidationError) as exc_info:
+        Intent(
+            name="meta_none",
+            confidence=0.5,
+            metadata=None
+        )
+    assert "metadata" in str(exc_info.value)
+    # Metadata with unexpected type (e.g., list)
+    with pytest.raises(ValidationError) as exc_info:
+        Intent(
+            name="meta_wrong_type",
+            confidence=0.5,
+            metadata=["not", "a", "dict"]
+        )
+    assert "metadata" in str(exc_info.value)
 
 def test_base_recognizer_abstract_methods():
     """Test that BaseIntentRecognizer cannot be instantiated directly."""

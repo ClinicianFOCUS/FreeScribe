@@ -32,9 +32,9 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import utils.whisper.Constants
 import UI.LoadingWindow
 import numpy as np
-import logging
+from utils.log_config import logger
+from enum import Enum
 
-logger = logging.getLogger(__name__)
 
 stt_local_model = None
 
@@ -49,6 +49,11 @@ SAMPLE_RATE = 16000
 class TranscribeError(Exception):
     pass
 
+class WhisperModelStatus(Enum):
+    """
+    Enum to represent the status of the Whisper model.
+    """
+    ERROR = 1
 
 def get_selected_whisper_architecture(app_settings):
     """
@@ -74,9 +79,13 @@ def load_model_with_loading_screen(root, app_settings):
     Args:
         root: The root window to bind the loading screen to.
     """
-
-    model_id = get_model_from_settings(app_settings)
-
+    global stt_local_model
+    try:
+       model_id = get_model_from_settings(app_settings)
+    except Exception as e:
+        logger.exception("Failed to get model ID from settings")
+        stt_local_model = WhisperModelStatus.ERROR
+        return
     loading_screen = UI.LoadingWindow.LoadingWindow(
         root,
         title="Speech to Text",
@@ -134,8 +143,12 @@ def _load_stt_model_macos(app_settings):
     torch_dtype = torch.float32
 
     # Model ID to load and pull from hugging face
-    model_id = get_model_from_settings(app_settings)
-
+    try:
+        model_id = get_model_from_settings(app_settings)
+    except Exception as e:
+        logger.exception("Failed to get model ID from settings")
+        stt_local_model = WhisperModelStatus.ERROR
+        return
     print("Loading STT model: ", model_id)
 
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
@@ -174,10 +187,12 @@ def _load_stt_model_windows(app_settings):
 
     with stt_model_loading_thread_lock:
 
-        def on_cancel_whisper_load():
-            cancel_await_thread.set()
-
-        model_name = get_model_from_settings(app_settings)
+        try:
+            model_name = get_model_from_settings(app_settings)
+        except Exception as e:
+            logger.exception("Failed to get model ID from settings")
+            stt_local_model = WhisperModelStatus.ERROR
+            return
         print(f"Loading STT model: {model_name}")
 
         try:
@@ -381,7 +396,7 @@ def is_whisper_valid():
         bool: True if the Whisper model is loaded and valid, False otherwise.
     """
 
-    return stt_local_model is not None
+    return stt_local_model is not None and stt_local_model != WhisperModelStatus.ERROR
 
 
 def is_whisper_lock():
@@ -407,3 +422,23 @@ def get_model_from_settings(app_settings):
     return utils.whisper.Constants.WhisperModels.find_by_label(
         label_name
     ).get_platform_value()
+
+def get_whisper_model():
+    """
+    Get the currently loaded Whisper model.
+
+    Returns:
+        WhisperModel: The loaded Whisper model instance.
+    """
+   
+    return stt_local_model
+
+def set_whisper_model(model):
+    """
+    Set the Whisper model to a new instance.
+
+    Args:
+        model (WhisperModel): The new Whisper model instance to set.
+    """
+    global stt_local_model
+    stt_local_model = model

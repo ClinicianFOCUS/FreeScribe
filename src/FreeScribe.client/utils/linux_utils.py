@@ -12,7 +12,7 @@ if utils.system.is_linux():
     from Xlib import display, error, X
     from Xlib.protocol import event as xlib_event
 
-    logger = logger.getLogger(__name__)
+    logger = logging.getLogger(__name__)
 
     # Lock file path for Linux - use temp directory which is guaranteed to exist and be writable
     LINUX_LOCK_PATH = os.path.join(tempfile.gettempdir(), f'FreeScribe_{os.getuid()}.lock')

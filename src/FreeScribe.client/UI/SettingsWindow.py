@@ -41,9 +41,6 @@ class SettingsWindow():
     ----------
     OPENAI_API_KEY : str
         The API key for OpenAI integration.
-    AISCRIBE : str
-        Placeholder for the first AI Scribe settings.
-    AISCRIBE2 : str
         Placeholder for the second AI Scribe settings.
     # API_STYLE : str FUTURE FEATURE REVISION
     #     The API style to be used (default is 'OpenAI'). FUTURE FEATURE
@@ -61,13 +58,8 @@ class SettingsWindow():
         Loads settings from a JSON file and updates the internal state.
     save_settings_to_file():
         Saves the current settings to a JSON file.
-    save_settings(openai_api_key, aiscribe_text, aiscribe2_text, 
-                  settings_window):
+    save_settings(openai_api_key, settings_window):
         Saves the current settings, including API keys, IP addresses, and user-defined parameters.
-    load_aiscribe_from_file():
-        Loads the first AI Scribe text from a file.
-    load_aiscribe2_from_file():
-        Loads the second AI Scribe text from a file.
     clear_settings_file(settings_window):
         Clears the content of settings files and closes the settings window.
     """
@@ -77,7 +69,7 @@ class SettingsWindow():
     STATE_FILES_DIR = "install_state"
     DEFAULT_WHISPER_ARCHITECTURE = Architectures.CPU.architecture_value
     DEFAULT_LLM_ARCHITECTURE = Architectures.CPU.architecture_value
-    AUTO_DETECT_LANGUAGE_CODES = ["", "auto", "Auto Detect", "None", "None (Auto Detect)"]
+    AUTO_DETECT_LANGUAGE_CODES = ["", " ","auto", "Auto Detect", "None", "None (Auto Detect)"]
 
     DEFAULT_SETTINGS_TABLE = {
             SettingsKeys.LOCAL_LLM_MODEL.value: "gemma2:2b-instruct-q8_0",
@@ -116,7 +108,7 @@ class SettingsWindow():
             "Current Mic": "None",
             SettingsKeys.WHISPER_REAL_TIME.value: True,
             "Real Time Audio Length": 3,
-            "Real Time Silence Length": 1,
+            "Real Time Silence Length": 1.1,
             "Silence cut-off": 0.035,
             "LLM Container Name": "ollama",
             "LLM Caddy Container Name": "caddy-ollama",
@@ -126,8 +118,7 @@ class SettingsWindow():
             "Auto Shutdown Containers on Exit": True,
             "Use Docker Status Bar": False,
             "Show Welcome Message": True,
-            "Enable Scribe Template": False,
-            "Use Pre-Processing": FeatureToggle.PRE_PROCESSING,
+            SettingsKeys.USE_PRE_PROCESSING.value: False,
             "Use Post-Processing": FeatureToggle.POST_PROCESSING,
             "AI Server Self-Signed Certificates": False,
             SettingsKeys.S2T_SELF_SIGNED_CERT.value: False,
@@ -148,6 +139,11 @@ class SettingsWindow():
             # Google Maps API settings
             SettingsKeys.GOOGLE_MAPS_API_KEY.value: "",  # Will be set by user
             SettingsKeys.ENABLE_FILE_LOGGER.value: False,
+            SettingsKeys.STORE_NOTES_LOCALLY.value: False,
+            SettingsKeys.STORE_RECORDINGS_LOCALLY.value: False,
+            SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
+            # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
+            SettingsKeys.BEST_OF.value: 1,
         }
 
     def __init__(self):
@@ -155,8 +151,6 @@ class SettingsWindow():
         self.OPENAI_API_KEY = "None"
         # self.API_STYLE = "OpenAI" # FUTURE FEATURE REVISION
         self.main_window = None
-        self.scribe_template_values = []
-        self.scribe_template_mapping = {}
         
         # Initialize setting types dictionary
         self.setting_types = {}
@@ -172,7 +166,8 @@ class SettingsWindow():
 
         self.general_settings = [
             "Show Welcome Message",
-            "Show Scrub PHI"
+            "BlankSpace",
+            "Show Scrub PHI",      
         ]
 
         self.whisper_settings = [
@@ -211,7 +206,6 @@ class SettingsWindow():
             # "top_a",
             "top_k",
             "top_p",
-            SettingsKeys.BEST_OF.value,
             # "typical",
             # "sampler_order",
             # "singleline",
@@ -219,9 +213,18 @@ class SettingsWindow():
             # "frmtrmblln",
             SettingsKeys.LOCAL_LLM_CONTEXT_WINDOW.value,
             SettingsKeys.Enable_Word_Count_Validation.value,
-            SettingsKeys.Enable_AI_Conversation_Validation.value,
-            SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value,
+            SettingsKeys.USE_PRE_PROCESSING.value,
+
         ]
+        
+        if FeatureToggle.LLM_CONVO_PRESCREEN:
+            self.adv_ai_settings.append(SettingsKeys.Enable_AI_Conversation_Validation.value)
+
+        if FeatureToggle.BEST_OF:
+            self.adv_ai_settings.append(SettingsKeys.BEST_OF.value)
+
+        if FeatureToggle.FACTS_CHECK:
+            self.adv_ai_settings.append(SettingsKeys.FACTUAL_CONSISTENCY_VERIFICATION.value)
 
         self.adv_whisper_settings = [
             # "Real Time Audio Length",
@@ -230,22 +233,30 @@ class SettingsWindow():
             SettingsKeys.WHISPER_CPU_COUNT.value,
             # SettingsKeys.WHISPER_VAD_FILTER.value,
             SettingsKeys.WHISPER_COMPUTE_TYPE.value,
+            "Real Time Audio Length",
             # left out for now, dont need users tinkering and default is good and tested.
             # SettingsKeys.SILERO_SPEECH_THRESHOLD.value, 
             SettingsKeys.USE_TRANSLATE_TASK.value,
             SettingsKeys.WHISPER_LANGUAGE_CODE.value,
-            SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value,
         ]
+
+        if FeatureToggle.HALLUCINATION_CLEANING:
+            self.adv_whisper_settings.append(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value)
 
 
         self.adv_general_settings = [
-            # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
+            SettingsKeys.STORE_RECORDINGS_LOCALLY.value,
+            SettingsKeys.STORE_NOTES_LOCALLY.value,
+            SettingsKeys.ENABLE_FILE_LOGGER.value,
             SettingsKeys.USE_LOW_MEM_MODE.value,
         ]
 
         self.developer_settings = [
-            SettingsKeys.ENABLE_FILE_LOGGER.value,
+            "Real Time Silence Length",
+            "BlankSpace", # Represents the Whisper Initial Prompt
+            SettingsKeys.Enable_AI_Conversation_Validation.value,
+            SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value,
         ]
 
         self.editable_settings = SettingsWindow.DEFAULT_SETTINGS_TABLE
@@ -262,41 +273,8 @@ class SettingsWindow():
         # saves newest value, but not saved to config file yet
         self.editable_settings_entries = {}
         self.load_settings_from_file()
-        self.AISCRIBE = self.load_aiscribe_from_file() or "AI, please transform the following conversation into a concise SOAP note. Do not assume any medical data, vital signs, or lab values. Base the note strictly on the information provided in the conversation. Ensure that the SOAP note is structured appropriately with Subjective, Objective, Assessment, and Plan sections. Strictly extract facts from the conversation. Here's the conversation:"
-        self.AISCRIBE2 = self.load_aiscribe2_from_file() or "Remember, the Subjective section should reflect the patient's perspective and complaints as mentioned in the conversation. The Objective section should only include observable or measurable data from the conversation. The Assessment should be a summary of your understanding and potential diagnoses, considering the conversation's content. The Plan should outline the proposed management, strictly based on the dialogue provided. Do not add any information that did not occur and do not make assumptions. Strictly extract facts from the conversation."
-        self.get_dropdown_values_and_mapping()
         self._create_settings_and_aiscribe_if_not_exist()    
         
-    def get_dropdown_values_and_mapping(self):
-        """
-        Reads the 'options.txt' file to populate dropdown values and their mappings.
-
-        This function attempts to read a file named 'options.txt' to extract templates
-        that consist of three lines: a title, aiscribe, and aiscribe2. These templates
-        are then used to populate the dropdown values and their corresponding mappings.
-        If the file is not found, default values are used instead.
-
-        :raises FileNotFoundError: If 'options.txt' is not found, a message is printed
-                                and default values are used.
-        """
-        self.scribe_template_values = []
-        self.scribe_template_mapping = {}
-        try:
-            with open('options.txt', 'r') as file:
-                content = file.read().strip()
-            templates = content.split('\n\n')
-            for template in templates:
-                lines = template.split('\n')
-                if len(lines) == 3:
-                    title, aiscribe, aiscribe2 = lines
-                    self.scribe_template_values.append(title)
-                    self.scribe_template_mapping[title] = (aiscribe, aiscribe2)
-        except FileNotFoundError:
-            logger.info("options.txt not found, using default values.")
-            # Fallback default options if file not found
-            self.scribe_template_values = ["Settings Template"]
-            self.scribe_template_mapping["Settings Template"] = (self.AISCRIBE, self.AISCRIBE2)
-
     def convert_setting_value(self, setting: str, value: Any) -> Any:
         """
         Convert a setting value to the appropriate type based on the setting name.
@@ -329,7 +307,8 @@ class SettingsWindow():
             else:
                 return str(value)
         except (ValueError, TypeError):
-            logger.warning(f"Warning: Could not convert {setting} value to {target_type}")
+            logging.warning(f"Warning: Could not convert {setting} value to {target_type}")
+
             return value
 
     def load_settings_from_file(self, filename='settings.txt'):
@@ -347,7 +326,7 @@ class SettingsWindow():
                 try:
                     settings = json.load(file)
                 except json.JSONDecodeError:
-                    logger.error("Error loading settings file. Using default settings.")
+                    logger.exception("Failed to decode JSON from settings file")
                     return self.OPENAI_API_KEY
 
                 self.OPENAI_API_KEY = settings.get("openai_api_key", self.OPENAI_API_KEY)
@@ -361,10 +340,7 @@ class SettingsWindow():
 
                 if self.editable_settings["Use Docker Status Bar"] and self.main_window is not None:
                     self.main_window.create_docker_status_bar()
-                
-                if self.editable_settings["Enable Scribe Template"] and self.main_window is not None:
-                    self.main_window.create_scribe_template()
-                
+                            
                 return self.OPENAI_API_KEY
         except FileNotFoundError:
             logger.info("Settings file not found. Using default settings.")
@@ -393,7 +369,7 @@ class SettingsWindow():
         with open(get_resource_path('settings.txt'), 'w') as file:
             json.dump(settings, file)
 
-    def save_settings(self, openai_api_key, aiscribe_text, aiscribe2_text, settings_window,
+    def save_settings(self, openai_api_key, settings_window,
                     silence_cutoff):
         """
         Save the current settings, including IP addresses, API keys, and user-defined parameters.
@@ -402,11 +378,10 @@ class SettingsWindow():
         of the Settings instance.
 
         :param str openai_api_key: The OpenAI API key for authentication.
-        :param str aiscribe_text: The text for the first AI Scribe.
-        :param str aiscribe2_text: The text for the second AI Scribe.
         :param tk.Toplevel settings_window: The settings window instance to be destroyed after saving.
         """
-        self.OPENAI_API_KEY = openai_api_key
+        # Ensure no leading/trailing spaces
+        self.OPENAI_API_KEY = openai_api_key.strip()
         # self.API_STYLE = api_style
 
         self.editable_settings["Silence cut-off"] = silence_cutoff
@@ -416,41 +391,19 @@ class SettingsWindow():
             # Convert the value to the appropriate type based on the setting name
             self.editable_settings[setting] = self.convert_setting_value(setting, value)
 
+            # trim any blank spaces or new char lines for endpoints and API keys
+            if setting in [SettingsKeys.LLM_ENDPOINT.value, 
+                          SettingsKeys.WHISPER_ENDPOINT.value,
+                          SettingsKeys.WHISPER_SERVER_API_KEY.value]:
+                value = entry.get()
+                self.editable_settings[setting] = value.strip()
+
+
         self.save_settings_to_file()
 
-        self.AISCRIBE = aiscribe_text
-        self.AISCRIBE2 = aiscribe2_text
+        ret_value = True
 
-        with open(get_resource_path('aiscribe.txt'), 'w') as f:
-            f.write(self.AISCRIBE)
-        with open(get_resource_path('aiscribe2.txt'), 'w') as f:
-            f.write(self.AISCRIBE2)
-
-    def load_aiscribe_from_file(self):
-        """
-        Load the AI Scribe text from a file.
-
-        :returns: The AI Scribe text, or None if the file does not exist or is empty.
-        :rtype: str or None
-        """
-        try:
-            with open(get_resource_path('aiscribe.txt'), 'r') as f:
-                return f.read()
-        except FileNotFoundError:
-            return None
-
-    def load_aiscribe2_from_file(self):
-        """
-        Load the second AI Scribe text from a file.
-
-        :returns: The second AI Scribe text, or None if the file does not exist or is empty.
-        :rtype: str or None
-        """
-        try:
-            with open(get_resource_path('aiscribe2.txt'), 'r') as f:
-                return f.read()
-        except FileNotFoundError:
-            return None
+        return ret_value
 
     def __clear_settings_file(self):
         """
@@ -458,8 +411,6 @@ class SettingsWindow():
         """
         # Open the files and immediately close them to clear their contents.
         open(get_resource_path('settings.txt'), 'w').close()  
-        open(get_resource_path('aiscribe.txt'), 'w').close()
-        open(get_resource_path('aiscribe2.txt'), 'w').close()
         logger.info("Settings file cleared.")
 
     def __keep_network_clear_settings(self):
@@ -498,7 +449,7 @@ class SettingsWindow():
         Clears the content of settings files and closes the settings window.
 
         This method attempts to open and clear the contents of three text files:
-        `settings.txt`, `aiscribe.txt`, and `aiscribe2.txt`. After clearing the
+        `settings.txt`. After clearing the
         files, it displays a message box to notify the user that the settings
         have been reset and closes the `settings_window`. If an error occurs
         during this process, the exception will be caught and printed.
@@ -523,7 +474,7 @@ class SettingsWindow():
             settings_window.destroy()
         except Exception as e:
             # Print any exception that occurs during file handling or window destruction.
-            logger.error(f"Error clearing settings files: {e}")
+            logger.exception("Failed to clear settings file")
             messagebox.showerror("Error", "An error occurred while clearing settings. Please try again.")
 
     def get_available_models(self,endpoint=None):
@@ -550,9 +501,12 @@ class SettingsWindow():
             logger.info("Invalid LLM Endpoint")
             return ["Invalid LLM Endpoint", "Custom"]
 
+        if endpoint.endswith("/"):
+            endpoint = endpoint[:-1]
+
         try:
             verify = not self.editable_settings["AI Server Self-Signed Certificates"]
-            response = requests.get(endpoint + "/models", headers=headers, timeout=1.0, verify=verify)
+            response = requests.get(endpoint + "/models", headers=headers, verify=verify, timeout=10.0)
             response.raise_for_status()  # Raise an error for bad responses
             models = response.json().get("data", [])  # Extract the 'data' field
             
@@ -563,8 +517,7 @@ class SettingsWindow():
             available_models.append("Custom")
             return available_models
         except requests.RequestException as e:
-            # messagebox.showerror("Error", f"Failed to fetch models: {e}. Please ensure your OpenAI API key is correct.") 
-            logger.error(str(e))
+            logger.exception("Failed to fetch models from endpoint")
             return ["Failed to load models", "Custom"]
 
     def update_models_dropdown(self, dropdown, endpoint=None):
@@ -644,8 +597,8 @@ class SettingsWindow():
                 unload_flag = True
         # in case context_window value is invalid
         except (ValueError, TypeError) as e:
-            logger.exception(f"Failed to determine reload/unload model: {str(e)}")
-        logger.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
+            logging.exception("Failed to determine reload/unload model")
+        logging.info(f"load_or_unload_model {unload_flag=}, {reload_flag=}")
         return unload_flag, reload_flag
 
 
@@ -722,15 +675,9 @@ class SettingsWindow():
         # Save updated settings to file
         self.save_settings_to_file()
         
-        # Ensure AIScribe files exist, create them if missing
-        if not os.path.exists(get_resource_path('aiscribe.txt')):
-            logger.info("AIScribe file not found. Creating default AIScribe file.")
-            with open(get_resource_path('aiscribe.txt'), 'w') as f:
-                f.write(self.AISCRIBE)
-        if not os.path.exists(get_resource_path('aiscribe2.txt')):
-            logger.info("AIScribe2 file not found. Creating default AIScribe2 file.")
-            with open(get_resource_path('aiscribe2.txt'), 'w') as f:
-                f.write(self.AISCRIBE2)
+        ret_value = True
+
+        return ret_value
 
     def get_available_architectures(self):
         """

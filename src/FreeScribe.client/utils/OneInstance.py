@@ -163,9 +163,12 @@ class OneInstance:
         pids = self.get_running_instance_pids()
         logger.info(f"not killed {pids=}")
         if not pids and dialog:
+            # if no PIDs left, we can continue and destroy the dialog
             dialog.destroy()
             dialog.return_status = False
         elif dialog:
+            # if PIDs still exist, show error message
+            # failed to terminate existing instance
             messagebox.showerror("Error", "Failed to terminate existing instance")
             dialog.destroy()
             dialog.return_status = True
