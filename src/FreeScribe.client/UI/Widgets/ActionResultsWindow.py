@@ -106,7 +106,9 @@ class ActionResultsWindow:
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
             # Make the scrollable frame fill the canvas width
             canvas_width = self.canvas.winfo_width()
-            if canvas_width > 1:  # Ensure canvas has been drawn
+            if canvas_width > CANVAS_LAYOUT_THRESHOLD:  # Check if canvas width exceeds the threshold
+                # The threshold value ensures the canvas has been drawn and is not in its initial state (width=0).
+                self.canvas.itemconfig(self.canvas_window, width=canvas_width)
                 self.canvas.itemconfig(self.canvas_window, width=canvas_width)
         
         self.scrollable_frame.bind("<Configure>", configure_scroll_region)
