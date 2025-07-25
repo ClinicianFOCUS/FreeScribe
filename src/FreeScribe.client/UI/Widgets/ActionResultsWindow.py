@@ -419,9 +419,9 @@ class ActionResultsWindow:
         try:
             # Get the action instance from the result data
             action = result["data"].get("action")
-            if action and hasattr(action, 'complete_action'):
+            if action:
                 # Call the action's complete_action method
-                success = action.complete_action(result["data"])
+                success = action()
                 if success:
                     logger.info(f"Action completed successfully for: {result.get('display_name', 'Unknown')}")
                 else:

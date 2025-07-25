@@ -75,23 +75,25 @@ class ShowDirectionsAction(BaseAction):
             )
             
             transport_icon = self._get_transport_mode_icon(transport_mode)
-            
+            data={
+                "title": f"Directions to {destination}",
+                "type": "directions",
+                "url": url,
+                "destination": destination,
+                "transport_mode": transport_mode,
+                "transport_mode_icon": transport_icon,
+                "clickable": True,
+                "click_url": url,  # This is what the UI will use
+                "has_action": True,
+                "auto_complete": False,
+                "action": self
+            }
+
+            data["action"] = lambda: self.complete_action(data)
             return ActionResult(
                 success=True,
                 message=f"{transport_icon} Directions to {destination}",
-                data={
-                    "title": f"Directions to {destination}",
-                    "type": "directions",
-                    "url": url,
-                    "destination": destination,
-                    "transport_mode": transport_mode,
-                    "transport_mode_icon": transport_icon,
-                    "clickable": True,
-                    "click_url": url,  # This is what the UI will use
-                    "has_action": True,
-                    "auto_complete": False,
-                    "action": self
-                }
+                data=data
             )
             
         except Exception as e:

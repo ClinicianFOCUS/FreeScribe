@@ -161,21 +161,25 @@ class PrintMapAction(BaseAction):
                         data={"type": "error", "error": str(e)},
                     )
                 
+                data = {
+                    "title": f"Route to {destination}",
+                    "type": "map",
+                    "clickable": True,
+                    "click_url": str(map_path),
+                    "has_action": True,
+                    "auto_complete": False,
+                    "action": self.complete_action,
+                    "additional_info": {
+                        "map_image_path": str(map_path)
+                    }
+                }
+
+                data["action"] = lambda: self.complete_action(data)
+
                 return ActionResult(
                     success=True,
                     message=f"Route to {destination}",
-                    data={
-                        "title": f"Route to {destination}",
-                        "type": "map",
-                        "clickable": True,
-                        "click_url": str(map_path),
-                        "has_action": True,
-                        "auto_complete": False,
-                        "action": self,
-                        "additional_info": {
-                            "map_image_path": str(map_path)
-                        }
-                    }
+                    data=data
                 )
             else:  # show_map or find_location
                 # Create static map URL centered on location
@@ -203,21 +207,26 @@ class PrintMapAction(BaseAction):
                         data={"type": "error", "error": str(e)},
                     )
                 
+                data={
+                    "title": f"{destination} Map",
+                    "type": "map",
+                    "clickable": True,
+                    "click_url": str(map_path),
+                    "has_action": True,
+                    "auto_complete": False,
+                    "action": self,
+                    "additional_info": {
+                        "map_image_path": str(map_path)
+                    }
+                }
+
+                data["action"] = lambda: self.complete_action(data)
+
+                
                 return ActionResult(
                     success=True,
                     message=f"Click the map to view {destination}",
-                    data={
-                        "title": f"{destination} Map",
-                        "type": "map",
-                        "clickable": True,
-                        "click_url": str(map_path),
-                        "has_action": True,
-                        "auto_complete": True,
-                        "action": self,
-                        "additional_info": {
-                            "map_image_path": str(map_path)
-                        }
-                    }
+                    data=data
                 )
             
         except Exception as e:
