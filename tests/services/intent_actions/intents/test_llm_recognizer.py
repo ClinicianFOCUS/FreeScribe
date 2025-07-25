@@ -94,12 +94,83 @@ def test_medical_intent_result_validation():
             }
         )
     assert "urgency_level" in str(exc_info.value)
+    # Test missing required field: intent_name
+    with pytest.raises(ValidationError) as exc_info:
+        MedicalIntentResult(
+            # intent_name is missing
+            description="test",
+            required_action="test",
+            urgency_level=1,
+            relevant_parameters={
+                "destination": "",
+                "transport_mode": "driving",
+                "patient_mobility": "",
+                "appointment_time": "",
+                "additional_context": ""
+            }
+        )
+    assert "intent_name" in str(exc_info.value)
+    # Test missing required field: description
+    with pytest.raises(ValidationError) as exc_info:
+        MedicalIntentResult(
+            intent_name="test_intent",
+            # description is missing
+            required_action="test",
+            urgency_level=1,
+            relevant_parameters={
+                "destination": "",
+                "transport_mode": "driving",
+                "patient_mobility": "",
+                "appointment_time": "",
+                "additional_context": ""
+            }
+        )
+    assert "description" in str(exc_info.value)
 
 def test_recognizer_initialization(recognizer):
     """Test LLMIntentRecognizer initialization."""
     assert recognizer.model_endpoint == "http://localhost:11434"
     assert recognizer.api_key is None
     assert recognizer.agent is not None
+    
+def test_recognizer_multiple_intents(monkeypatch, recognizer):
+    """Test recognizer returns and handles multiple intents."""
+    # Mock response with multiple intents
+    mock_intents = [
+        type("Intent", (), {
+            "name": "intent_one",
+            "confidence": 0.85,
+            "metadata": {
+                "description": "First intent",
+                "required_action": "action_one"
+            }
+        })(),
+        type("Intent", (), {
+            "name": "intent_two",
+            "confidence": 0.8,
+            "metadata": {
+                "description": "Second intent",
+                "required_action": "action_two"
+            }
+        })(),
+    ]
+    def mock_recognize_intent(self, text):
+        return mock_intents
+    monkeypatch.setattr(type(recognizer), "recognize_intent", mock_recognize_intent)
+    result = recognizer.recognize_intent("test text with multiple intents")
+    assert len(result) == 2
+    assert result[0].name == "intent_one"
+    assert result[0].confidence == 0.85
+    assert result[0].metadata == {
+        "description": "First intent",
+        "required_action": "action_one"
+    }
+    assert result[1].name == "intent_two"
+    assert result[1].confidence == 0.8
+    assert result[1].metadata == {
+        "description": "Second intent",
+        "required_action": "action_two"
+    }
 
 def test_recognizer_intent_recognition(recognizer, mock_llm_response):
     """Test intent recognition process."""

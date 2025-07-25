@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
 from utils.file_utils import get_file_path
+from utils.log_config import logger
 import utils.system
 import UI.Helpers
-
+import time
 
 class LoadingWindow:
     """
@@ -66,64 +67,59 @@ class LoadingWindow:
         :param note_text: Optional note text to display below the initial text
         :type note_text: str or None
         """
+        self.title = title
+        self.initial_text = initial_text
+        self.note_text = note_text
+        self.parent = parent
+        self.on_cancel = on_cancel
+        self.cancelled = False
+        self.ui_built = False
+    
+        if self.parent:
+            self.parent.after(0, self.build_ui)
+
+    def build_ui(self):
         try:
-            self.title = title
-            self.initial_text = initial_text
-            self.note_text = note_text
-            self.parent = parent
-            self.on_cancel = on_cancel
-            self.cancelled = False
+            logger.debug("Building LoadingWindow UI")
+            self.popup = tk.Toplevel(self.parent)
+            self.popup.title(self.title)
+            # Adjust geometry based on whether note_text is provided
+            if self.note_text:
+                self.popup.geometry("360x180")  # Increased height for note text
+            else:
+                self.popup.geometry("280x105")  # Default height
+            self.popup.iconbitmap(get_file_path('assets','logo.ico'))
 
-            self.popup = tk.Toplevel(parent)
-            self.popup.title(title)
-
-            # Default windows size
-            size = (
-                LoadingWindow.MACOS_SIZE
-                if utils.system.is_macos()
-                else LoadingWindow.WINDOWS_SIZE
-            )
-
-            if note_text:
-                size = (
-                    size[0] + LoadingWindow.NOTE_OFFSET[0],
-                    size[1] + LoadingWindow.NOTE_OFFSET[1],
-                )
-
-            self.popup.geometry(f"{size[0]}x{size[1]}")
-
-            UI.Helpers.set_window_icon(self.popup)
-
-            if parent:
+            if self.parent:
                 # Center the popup window on the parent window
-                parent.update_idletasks()
+                self.parent.update_idletasks()
                 x = (
-                    parent.winfo_x()
-                    + (parent.winfo_width() - self.popup.winfo_reqwidth()) // 2
+                    self.parent.winfo_x()
+                    + (self.parent.winfo_width() - self.popup.winfo_reqwidth()) // 2
                 )
                 y = (
-                    parent.winfo_y()
-                    + (parent.winfo_height() - self.popup.winfo_reqheight()) // 2
+                    self.parent.winfo_y()
+                    + (self.parent.winfo_height() - self.popup.winfo_reqheight()) // 2
                 )
                 self.popup.geometry(f"+{x}+{y}")
-                self.popup.transient(parent)
-
+                self.popup.transient(self.parent)
+                
                 # Disable the parent window
-                UI.Helpers.disable_parent_window(parent, self.popup)
+                UI.Helpers.disable_parent_window(self.parent, self.popup)
 
             # Use label and progress bar
-            self.label = tk.Label(self.popup, text=initial_text)
-            self.label.pack(pady=(10, 5))
-            self.progress = ttk.Progressbar(self.popup, mode="indeterminate")
-            self.progress.pack(padx=20, pady=(0, 10), fill="x")
+            self.label = tk.Label(self.popup, text=self.initial_text)
+            self.label.pack(pady=(10,5))
+            self.progress = ttk.Progressbar(self.popup, mode='indeterminate')
+            self.progress.pack(padx=20, pady=(0,10), fill='x')
             self.progress.start()
 
             # Add note text if provided
-            if note_text:
+            if self.note_text:
                 font_size = 11 if utils.system.is_macos() else 9
                 self.note_label = tk.Label(
                     self.popup,
-                    text=note_text,
+                    text=self.note_text,
                     wraplength=350,
                     justify="center",
                     font=("TkDefaultFont", font_size),
@@ -142,10 +138,14 @@ class LoadingWindow:
 
             # Disable closing of the popup manually
             self.popup.protocol("WM_DELETE_WINDOW", lambda: None)
+            
+            logger.debug("LoadingWindow UI built successfully")
+            self.ui_built = True
         except Exception:
+            logger.exception("Error creating LoadingWindow")
             # Enable the window on exception
-            if parent:
-                UI.Helpers.enable_parent_window(parent, self.popup)
+            if self.parent:
+                UI.Helpers.enable_parent_window(self.parent, self.popup)
             raise
 
     def _handle_cancel(self):
@@ -158,6 +158,7 @@ class LoadingWindow:
             try:
                 self.on_cancel()
             except Exception:
+                logger.exception("Error in on_cancel callback")
                 self.destroy()
 
         self.destroy()
@@ -182,13 +183,38 @@ class LoadingWindow:
         >>> # Do some processing
         >>> popup.destroy()  # Properly clean up and close the window
         """
-        if self.popup:
-            # Enable the parent window
-            if self.parent:
-                UI.Helpers.enable_parent_window(self.parent, self.popup)
+        # wait for the UI to be built
+        def _destroy_ui():
+            start_time = time.time()
+            logger.debug("Waiting for LoadingWindow UI to be built")
+            while not self.ui_built:
+                elapsed_time = time.time() - start_time
+                if int(elapsed_time) % 2 == 0 or elapsed_time < 1:
+                    logger.info(f"Waiting for LoadingWindowUI to build (elapsed={elapsed_time}s, built={self.ui_built})")
+                time.sleep(0.1)
+            
+            logger.debug("LoadingWindow UI is built, proceeding to destroy it")
+            if self.popup:
+                # Enable the parent window
+                if self.parent:
+                    logger.debug("Enabling parent window")
+                    UI.Helpers.enable_parent_window(self.parent, self.popup)
 
-            if self.progress.winfo_exists():
-                self.progress.stop()
+                if hasattr(self, 'progress') and self.progress:
+                    logger.debug("Stopping progress bar animation")
+                    if self.progress.winfo_exists():
+                        # Stop the progress bar animation
+                        self.progress.stop()
 
-            if self.popup.winfo_exists():
-                self.popup.destroy()
+                if self.popup.winfo_exists():
+                    logger.debug("Destroying popup window")
+                    self.popup.destroy()
+
+        if self.parent and hasattr(self.parent, 'after'):
+            logger.debug("Using parent.after to destroy LoadingWindow UI")
+            self.parent.after(0, _destroy_ui)
+        else:
+            # Call the destroy function directly if parent is not available
+            logger.debug("Parent not available, calling _destroy_ui directly")
+            _destroy_ui()
+
