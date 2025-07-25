@@ -416,12 +416,14 @@ class ActionResultsWindow:
                     state="disabled",
                     cursor="arrow"
                 )
+                # Schedule auto-completion to run after UI is updated
+                self.window.after(0, lambda: self._complete_action(result, action_button))
             else:
                 action_button = ttk.Button(
                     footer,
                     text="Complete Action",
                     cursor="hand2",
-                    command=lambda: self._complete_action(result)
+                    command=lambda: self._complete_action(result, action_button)
                 )
         else:
             # No action available - show disabled button
@@ -450,11 +452,13 @@ class ActionResultsWindow:
         for result in results:
             self.add_result(result)
             
-    def _complete_action(self, result: Dict[str, Any]) -> None:
+    def _complete_action(self, result: Dict[str, Any], button: ttk.Button, checkbox: ttk.Checkbutton) -> None:
         """
         Handle the complete action button click.
-        
+
         :param result: The action result data
+        :param button: The button widget to update
+        :param checkbox: The checkbox widget to update
         """
         try:
             # Get the action instance from the result data
@@ -469,7 +473,16 @@ class ActionResultsWindow:
             else:
                 # Fallback to generic logging if no action instance available
                 logger.info(f"Completing action for: {result.get('display_name', 'Unknown')}")
-            
+
+            # Update the button text and disable it
+            if result["data"].get("auto_complete", False):
+                button.config(text="Action Automatically Completed", state="disabled")
+            else:
+                button.config(text="Action Manually Completed", state="disabled")
+
+            # Check the checkbox
+            checkbox.invoke()  # Simulate checking the checkbox
+
         except Exception as e:
             logger.exception(f"Error completing action: {str(e)}")
             
