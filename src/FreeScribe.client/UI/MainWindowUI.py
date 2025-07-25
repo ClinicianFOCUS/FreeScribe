@@ -41,7 +41,6 @@ class MainWindowUI:
         self.is_status_bar_enabled = False  # Flag to indicate if the Docker status bar is enabled
         self.app_settings = settings  # Application settings
         self.logic = mw.MainWindow(self.app_settings)  # Logic to control the container behavior
-        self.scribe_template = None
         self.setting_window = SettingsWindowUI(self.app_settings, self, self.root)  # Settings window
         UI.Helpers.set_window_icon(self.root)
         self.debug_window_open = False  # Flag to indicate if the debug window is open
@@ -87,13 +86,6 @@ class MainWindowUI:
         self.root.attributes('-topmost', True)  # Set the window to be always on top
         self.root.focus_force()  # Force focus on the window
         self.root.after_idle(self.root.attributes, '-topmost', False)  # Reset the always on top attribute after idle
-        
-
-    def update_aiscribe_texts(self, event):
-        if self.scribe_template is not None:
-            selected_option = self.scribe_template.get()
-            if selected_option in self.app_settings.scribe_template_mapping:
-                self.app_settings.AISCRIBE, self.app_settings.AISCRIBE2 = self.app_settings.scribe_template_mapping[selected_option]
 
     def create_docker_status_bar(self):
         """
@@ -372,22 +364,6 @@ class MainWindowUI:
         """
         self._show_md_content(get_file_path('markdown','welcome.md'), 'Welcome', True)
     
-    def create_scribe_template(self, row=3, column=4, columnspan=3, pady=10, padx=10, sticky='nsew'):
-        """
-        Create a template for the Scribe application.
-        """
-        self.scribe_template = ttk.Combobox(self.root, values=self.app_settings.scribe_template_values, width=35, state="readonly")
-        self.scribe_template.current(0)
-        self.scribe_template.bind("<<ComboboxSelected>>", self.app_settings.scribe_template_values)
-        self.scribe_template.grid(row=row, column=column, columnspan=columnspan, pady=pady, padx=padx, sticky=sticky)
-    
-    def destroy_scribe_template(self):
-        """
-        Destroy the Scribe template if it exists.
-        """
-        if self.scribe_template is not None:
-            self.scribe_template.destroy()
-            self.scribe_template = None
 
     def _background_availbility_docker_check(self):
         """
