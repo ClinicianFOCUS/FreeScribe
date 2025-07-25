@@ -417,13 +417,13 @@ class ActionResultsWindow:
                     cursor="arrow"
                 )
                 # Schedule auto-completion to run after UI is updated
-                self.window.after(0, lambda: self._complete_action(result, action_button))
+                self.window.after(0, lambda: self._complete_action(result, action_button, completed_checkbox))
             else:
                 action_button = ttk.Button(
                     footer,
                     text="Complete Action",
                     cursor="hand2",
-                    command=lambda: self._complete_action(result, action_button)
+                    command=lambda: self._complete_action(result, action_button, completed_checkbox)
                 )
         else:
             # No action available - show disabled button
