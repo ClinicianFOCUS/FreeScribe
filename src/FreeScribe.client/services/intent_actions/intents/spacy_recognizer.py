@@ -300,10 +300,9 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             # Add patterns to matcher
             for pattern in self.patterns:
                 self.matcher.add(pattern.intent_name, pattern.patterns)
-            
-            for pattern in self.patterns:
                 logger.info(f"Loaded pattern: {pattern.intent_name}")
                 logger.debug(f"Pattern details: {pattern.patterns}")
+            
                 
             for entity in self.custom_entities:
                 logger.info(f"Loaded custom entity: {entity.entity_name}")
