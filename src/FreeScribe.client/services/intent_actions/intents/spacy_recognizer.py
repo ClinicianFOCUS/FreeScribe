@@ -256,8 +256,13 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
 
     def _setup_entity_ruler(self) -> None:
         """Set up the EntityRuler with pattern matching."""
-        # Add EntityRuler to pipeline using string name
-        self.nlp.add_pipe("entity_ruler", before="ner")
+        # Check if EntityRuler is already in the pipeline
+        if "entity_ruler" not in self.nlp.pipe_names:
+            self.nlp.add_pipe("entity_ruler", before="ner")
+            logger.info("EntityRuler added to pipeline")
+        else:
+            logger.info("EntityRuler already exists in pipeline")
+        
         self.entity_ruler = self.nlp.get_pipe("entity_ruler")
         
         # Convert custom entities to EntityRuler format
