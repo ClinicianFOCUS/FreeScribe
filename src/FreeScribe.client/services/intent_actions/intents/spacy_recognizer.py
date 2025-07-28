@@ -314,29 +314,30 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             logger.error(f"Failed to initialize SpaCy Intent Recognizer: {e}")
             raise
     
+    # Label mapping for parameter extraction
+    LABEL_MAP = {
+        "destination": ["LOCATION", "GPE", "ORG", "FAC"],
+        "appointment_time": ["TIME"],
+        "transport_mode": ["TRANSPORT"],
+        "document_type": ["DOCUMENT"],
+        "print_type": ["PRINT_TYPE"],
+    }
+    
     def _extract_parameters(self, doc) -> Dict[str, str]:
-        """Extract parameters from recognized entities."""
-        params = {
-            "destination": "",
+        """Extract parameters from recognized entities using mapping-driven approach."""
+        params = {k: "" for k in self.LABEL_MAP}
+        params.update({
             "transport_mode": "driving",  # Default to driving
-            "appointment_time": "",
             "patient_mobility": "",
-            "additional_context": "",
-            "document_type": "",  # Added parameter for document type
-            "print_type": ""      # New parameter for print type
-        }
+            "additional_context": ""
+        })
         
         for ent in doc.ents:
-            if ent.label_ in ["LOCATION", "ORG", "GPE", "FAC"]:  # Support multiple location-like entities
-                params["destination"] = ent.text
-            elif ent.label_ == "TIME":
-                params["appointment_time"] = ent.text
-            elif ent.label_ == "TRANSPORT":  # Use TRANSPORT label for transport mode
-                params["transport_mode"] = ent.text.lower()  # Normalize to lowercase
-            elif ent.label_ == "DOCUMENT":   # Add support for document type
-                params["document_type"] = ent.text
-            elif ent.label_ == "PRINT_TYPE":  # Add support for print type
-                params["print_type"] = ent.text
+            for key, labels in self.LABEL_MAP.items():
+                if ent.label_ in labels:
+                    value = ent.text.lower() if key == "transport_mode" else ent.text
+                    params[key] = value
+                    break
         
         return params
         
