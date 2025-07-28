@@ -19,7 +19,7 @@ exported_patterns = [
         intent_name="greet",
         patterns=[
             [{"LOWER": "greet"}, {"ENT_TYPE": "GREETING_TARGET"}],
-            [ {"LOWER": "hello"}, {"ENT_TYPE": "GREETING_TARGET"}],
+            [{"LOWER": "hello"}, {"ENT_TYPE": "GREETING_TARGET"}],
         ],
         required_entities=[],
         confidence_weights={"pattern_match": 1.0, "entity_match": 0.0}
