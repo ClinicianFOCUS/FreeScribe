@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .intents import SpacyIntentRecognizer, Intent
 from .actions import BaseAction, PrintMapAction, ShowDirectionsAction
-from .plugin_manager import discover_action_plugin_files, load_actions_from_files, get_plugins_dir, INTENT_ACTION_DIR
+from .plugin_manager import load_plugin_actions, get_plugins_dir, INTENT_ACTION_DIR
 
 
 logger = logging.getLogger(__name__)
@@ -28,28 +28,31 @@ class IntentActionManager:
         :param google_maps_api_key: Optional Google Maps API key. If not provided, will try to get from settings.
         """
         self.maps_directory = maps_directory
+        self.google_maps_api_key = google_maps_api_key
         
-        # Initialize recognizer
+        # Initialize recognizer but don't load plugins yet
         self.intent_recognizer = SpacyIntentRecognizer()
+        
+        # Initialize basic actions
+        self.actions: List[BaseAction] = []
+        
+        # Defer initialization to a separate method
+        self.initialize()
+    
+    def initialize(self):
+        """Initialize the recognizer and load all actions."""
+        # Initialize recognizer (this will load plugin patterns)
         self.intent_recognizer.initialize()
         
-        # Register actions
-        self.actions: List[BaseAction] = [
-            PrintMapAction(maps_directory, google_maps_api_key),
+        # Register built-in actions
+        self.actions = [
+            PrintMapAction(self.maps_directory, self.google_maps_api_key),
             ShowDirectionsAction()
         ]
 
-        plugin_file_list = discover_action_plugin_files(get_plugins_dir(INTENT_ACTION_DIR))
-
-        plugin_classes = load_actions_from_files(plugin_file_list)
-
-        # Register plugin actions
-        for action_cls in plugin_classes:
-            try:
-                self.actions.append(action_cls)
-                logger.info(f"Registered plugin action: {action_cls.action_id}")
-            except Exception as e:
-                logger.error(f"Failed to instantiate action {action_cls}: {e}")
+        # Load plugin actions
+        plugin_actions = load_plugin_actions(get_plugins_dir(INTENT_ACTION_DIR))
+        self.actions.extend(plugin_actions)
         
         # Register action handlers
         for action in self.actions:

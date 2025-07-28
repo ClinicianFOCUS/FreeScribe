@@ -244,7 +244,7 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         """
         self.custom_entities.append(entity_pattern)
         if self.entity_ruler is not None:
-            # Convert SpacyEntityPattern to EntityRuler format
+            # Convert SpacyEntityPattern to EntityRuler format and add patterns
             entity_patterns = []
             for pattern_list in entity_pattern.patterns:
                 entity_patterns.append({
