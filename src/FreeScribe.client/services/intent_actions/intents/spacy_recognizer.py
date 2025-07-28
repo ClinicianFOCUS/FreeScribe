@@ -4,6 +4,7 @@ import re
 import spacy
 from spacy.matcher import Matcher
 from spacy.matcher import PhraseMatcher
+from spacy.pipeline import EntityRuler
 from spacy.tokens import Span
 from spacy.language import Language
 from pydantic import BaseModel, Field, field_validator
@@ -137,7 +138,7 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         self.model_name = model_name
         self.nlp = None
         self.matcher = None
-        self.entity_matcher = None
+        self.entity_ruler = None
         self.custom_entities = []
         self.document_types = []
         self.patterns = [
@@ -219,22 +220,9 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             )
         ]
 
-        # Load plugin patterns and entities
-        intent_patterns, entity_patterns = load_plugin_intent_patterns(get_plugins_dir(INTENT_ACTION_DIR))
-        
-        for pattern in intent_patterns:
-            self.add_pattern(pattern)
-            
-        for entity in entity_patterns:
-            self.add_entity_pattern(entity)
-
-        for pattern in self.patterns:
-            logger.info(f"Loaded pattern: {pattern.intent_name}")
-            logger.debug(f"Pattern details: {pattern.patterns}")
-            
-        for entity in self.custom_entities:
-            logger.info(f"Loaded custom entity: {entity.entity_name}")
-            logger.debug(f"Entity pattern details: {entity.patterns}")
+        # Store plugin patterns and entities for later initialization
+        self._plugin_intent_patterns = []
+        self._plugin_entity_patterns = []
     
     def add_pattern(self, pattern: SpacyIntentPattern) -> None:
         """
@@ -255,38 +243,37 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         :type entity_pattern: SpacyEntityPattern
         """
         self.custom_entities.append(entity_pattern)
-        if self.entity_matcher is not None and self.nlp is not None:
-            self.entity_matcher.add(entity_pattern.entity_name, entity_pattern.patterns)
-            logger.info(f"Added entity pattern {entity_pattern.entity_name} to matcher")
+        if self.entity_ruler is not None:
+            # Convert SpacyEntityPattern to EntityRuler format
+            entity_patterns = []
+            for pattern_list in entity_pattern.patterns:
+                entity_patterns.append({
+                    "label": entity_pattern.entity_name,
+                    "pattern": pattern_list
+                })
+            self.entity_ruler.add_patterns(entity_patterns)
+            logger.info(f"Added entity pattern {entity_pattern.entity_name} to EntityRuler")
 
-    def _setup_custom_entity_component(self) -> None:
-        """Set up the custom entity component with pattern matching."""
-        # Add entity patterns to the entity matcher
-        self.entity_matcher = Matcher(self.nlp.vocab)
+    def _setup_entity_ruler(self) -> None:
+        """Set up the EntityRuler with pattern matching."""
+        # Add EntityRuler to pipeline using string name
+        self.nlp.add_pipe("entity_ruler", before="ner")
+        self.entity_ruler = self.nlp.get_pipe("entity_ruler")
         
+        # Convert custom entities to EntityRuler format
+        entity_patterns = []
         for entity_pattern in self.custom_entities:
-            self.entity_matcher.add(entity_pattern.entity_name, entity_pattern.patterns)
-            logger.info(f"Added entity pattern {entity_pattern.entity_name} to entity matcher")
-        
-        # Register a custom component to add custom entities
-        if not Language.has_factory("custom_entity_component"):
-            @Language.component("custom_entity_component")
-            def custom_entity_component(doc):
-                matches = self.entity_matcher(doc)
-                entities = []
-                for match_id, start, end in matches:
-                    label = self.nlp.vocab.strings[match_id]
-                    entities.append(Span(doc, start, end, label=label))
+            for pattern_list in entity_pattern.patterns:
+                entity_patterns.append({
+                    "label": entity_pattern.entity_name,
+                    "pattern": pattern_list
+                })
                 
-                # Only add non-overlapping entities
-                filtered_entities = spacy.util.filter_spans(list(doc.ents) + entities)
-                doc.ents = filtered_entities
-                return doc
-            
-            # Add the component to the pipeline
-            if "custom_entity_component" not in self.nlp.pipe_names:
-                self.nlp.add_pipe("custom_entity_component", after="ner")
-                logger.info("Added custom entity component to pipeline")
+        if entity_patterns:
+            self.entity_ruler.add_patterns(entity_patterns)
+            logger.info(f"Added {len(entity_patterns)} entity patterns to EntityRuler")
+        
+        logger.info("Added EntityRuler to pipeline")
 
     def initialize(self) -> None:
         """
@@ -298,13 +285,29 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             self.nlp = spacy.load(self.model_name)
             self.matcher = Matcher(self.nlp.vocab)
             
+            # Load plugin patterns and entities
+            intent_patterns, entity_patterns = load_plugin_intent_patterns(get_plugins_dir(INTENT_ACTION_DIR))
+            
+            for pattern in intent_patterns:
+                self.add_pattern(pattern)
+                
+            for entity in entity_patterns:
+                self.add_entity_pattern(entity)
+            
+            # Setup EntityRuler
+            self._setup_entity_ruler()
+            
             # Add patterns to matcher
             for pattern in self.patterns:
                 self.matcher.add(pattern.intent_name, pattern.patterns)
             
-            # Setup custom entity component
-            self._setup_custom_entity_component()
-        
+            for pattern in self.patterns:
+                logger.info(f"Loaded pattern: {pattern.intent_name}")
+                logger.debug(f"Pattern details: {pattern.patterns}")
+                
+            for entity in self.custom_entities:
+                logger.info(f"Loaded custom entity: {entity.entity_name}")
+                logger.debug(f"Entity pattern details: {entity.patterns}")
             
             logger.info("SpaCy Intent Recognizer initialized successfully")
         except Exception as e:
