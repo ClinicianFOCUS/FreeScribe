@@ -3,11 +3,51 @@ from typing import List, Dict, Optional, Pattern
 import re
 import spacy
 from spacy.matcher import Matcher
+from spacy.matcher import PhraseMatcher
+from spacy.pipeline import EntityRuler
+from spacy.tokens import Span
+from spacy.language import Language
 from pydantic import BaseModel, Field, field_validator
+from services.intent_actions.plugin_manager import load_plugin_intent_patterns, get_plugins_dir, INTENT_ACTION_DIR
 
 from .base import BaseIntentRecognizer, Intent
 
 logger = logging.getLogger(__name__)
+
+class SpacyEntityPattern(BaseModel):
+    """
+    Pattern definition for SpaCy entity recognition.
+    
+    :param entity_name: Name of the entity type
+    :type entity_name: str
+    :param patterns: List of token patterns for the spaCy Matcher
+    :type patterns: List[List[Dict[str, str]]]
+    """
+    entity_name: str = Field(..., min_length=1, description="Name of the entity type to be recognized")
+    patterns: List[List[Dict[str, str]]] = Field(..., min_length=1, description="List of token patterns for the spaCy Matcher")
+    
+    @field_validator("patterns")
+    @classmethod
+    def validate_patterns(cls, v):
+        """
+        Validate that patterns are properly formatted.
+        
+        :param v: List of patterns
+        :type v: List[List[Dict[str, str]]]
+        :return: Validated patterns
+        :rtype: List[List[Dict[str, str]]]
+        :raises ValueError: If patterns are invalid
+        """
+        if not v:
+            raise ValueError("Patterns cannot be empty")
+        
+        for pattern in v:
+            if not isinstance(pattern, list):
+                raise ValueError("Each pattern must be a list of dictionaries")
+            if not all(isinstance(token, dict) for token in pattern):
+                raise ValueError("Each token in a pattern must be a dictionary")
+        
+        return v
 
 class SpacyIntentPattern(BaseModel):
     """
@@ -98,6 +138,9 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         self.model_name = model_name
         self.nlp = None
         self.matcher = None
+        self.entity_ruler = None
+        self.custom_entities = []
+        self.document_types = []
         self.patterns = [
             SpacyIntentPattern(
                 intent_name="show_directions",
@@ -176,6 +219,10 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
                 confidence_weights={"pattern_match": 1.0, "entity_match": 0.0}  # Focus on pattern matching
             )
         ]
+
+        # Store plugin patterns and entities for later initialization
+        self._plugin_intent_patterns = []
+        self._plugin_entity_patterns = []
     
     def add_pattern(self, pattern: SpacyIntentPattern) -> None:
         """
@@ -187,7 +234,52 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         self.patterns.append(pattern)
         if self.matcher is not None:
             self.matcher.add(pattern.intent_name, pattern.patterns)
-    
+
+    def add_entity_pattern(self, entity_pattern: SpacyEntityPattern) -> None:
+        """
+        Add a new entity pattern to the recognizer.
+        
+        :param entity_pattern: Entity pattern to add
+        :type entity_pattern: SpacyEntityPattern
+        """
+        self.custom_entities.append(entity_pattern)
+        if self.entity_ruler is not None:
+            # Convert SpacyEntityPattern to EntityRuler format and add patterns
+            entity_patterns = []
+            for pattern_list in entity_pattern.patterns:
+                entity_patterns.append({
+                    "label": entity_pattern.entity_name,
+                    "pattern": pattern_list
+                })
+            self.entity_ruler.add_patterns(entity_patterns)
+            logger.info(f"Added entity pattern {entity_pattern.entity_name} to EntityRuler")
+
+    def _setup_entity_ruler(self) -> None:
+        """Set up the EntityRuler with pattern matching."""
+        # Check if EntityRuler is already in the pipeline
+        if "entity_ruler" not in self.nlp.pipe_names:
+            self.nlp.add_pipe("entity_ruler", before="ner")
+            logger.info("EntityRuler added to pipeline")
+        else:
+            logger.info("EntityRuler already exists in pipeline")
+        
+        self.entity_ruler = self.nlp.get_pipe("entity_ruler")
+        
+        # Convert custom entities to EntityRuler format
+        entity_patterns = []
+        for entity_pattern in self.custom_entities:
+            for pattern_list in entity_pattern.patterns:
+                entity_patterns.append({
+                    "label": entity_pattern.entity_name,
+                    "pattern": pattern_list
+                })
+                
+        if entity_patterns:
+            self.entity_ruler.add_patterns(entity_patterns)
+            logger.info(f"Added {len(entity_patterns)} entity patterns to EntityRuler")
+        
+        logger.info("Added EntityRuler to pipeline")
+
     def initialize(self) -> None:
         """
         Initialize SpaCy model and configure the matcher.
@@ -198,15 +290,61 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             self.nlp = spacy.load(self.model_name)
             self.matcher = Matcher(self.nlp.vocab)
             
+            # Load plugin patterns and entities
+            intent_patterns, entity_patterns = load_plugin_intent_patterns(get_plugins_dir(INTENT_ACTION_DIR))
+            
+            for pattern in intent_patterns:
+                self.add_pattern(pattern)
+                
+            for entity in entity_patterns:
+                self.add_entity_pattern(entity)
+            
+            # Setup EntityRuler
+            self._setup_entity_ruler()
+            
             # Add patterns to matcher
             for pattern in self.patterns:
                 self.matcher.add(pattern.intent_name, pattern.patterns)
+                logger.info(f"Loaded pattern: {pattern.intent_name}")
+                logger.debug(f"Pattern details: {pattern.patterns}")
+            
+                
+            for entity in self.custom_entities:
+                logger.info(f"Loaded custom entity: {entity.entity_name}")
+                logger.debug(f"Entity pattern details: {entity.patterns}")
             
             logger.info("SpaCy Intent Recognizer initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize SpaCy Intent Recognizer: {e}")
             raise
     
+    # Label mapping for parameter extraction
+    LABEL_MAP = {
+        "destination": ["LOCATION", "GPE", "ORG", "FAC"],
+        "appointment_time": ["TIME"],
+        "transport_mode": ["TRANSPORT"],
+        "document_type": ["DOCUMENT"],
+        "print_type": ["PRINT_TYPE"],
+    }
+    
+    def _extract_parameters(self, doc) -> Dict[str, str]:
+        """Extract parameters from recognized entities using mapping-driven approach."""
+        params = {k: "" for k in self.LABEL_MAP}
+        params.update({
+            "transport_mode": "driving",  # Default to driving
+            "patient_mobility": "",
+            "additional_context": ""
+        })
+        
+        for ent in doc.ents:
+            for key, labels in self.LABEL_MAP.items():
+                if ent.label_ in labels:
+                    value = ent.text.lower() if key == "transport_mode" else ent.text
+                    params[key] = value
+                    break
+        
+        return params
+        
     def _calculate_confidence(self, pattern: SpacyIntentPattern, doc, matches: List) -> float:
         """
         Calculate confidence score based on pattern matches and entity presence.
@@ -227,27 +365,7 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             
         logger.debug(f"No matches found for pattern {pattern.intent_name}")
         return 0.0
-    
-    def _extract_parameters(self, doc) -> Dict[str, str]:
-        """Extract parameters from recognized entities."""
-        params = {
-            "destination": "",
-            "transport_mode": "driving",  # Default to driving
-            "appointment_time": "",
-            "patient_mobility": "",
-            "additional_context": ""
-        }
-        
-        for ent in doc.ents:
-            if ent.label_ in ["LOCATION", "ORG", "GPE", "FAC"]:  # Support multiple location-like entities
-                params["destination"] = ent.text
-            elif ent.label_ == "TIME":
-                params["appointment_time"] = ent.text
-            elif ent.label_ == "TRANSPORT":  # Use TRANSPORT label for transport mode
-                params["transport_mode"] = ent.text.lower()  # Normalize to lowercase
-        
-        return params
-    
+     
     def recognize_intent(self, text: str) -> List[Intent]:
         """
         Recognize medical intents from the conversation text using SpaCy.
