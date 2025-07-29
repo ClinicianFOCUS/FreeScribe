@@ -56,18 +56,16 @@ class PrintDocumentAction(BaseAction):
     def execute(self, intent_name: str, metadata: dict) -> ActionResult:
         # Try to extract the document name from entities
         doc_name = None
-        entities = metadata.get("parameters", [])
-        for ent in entities:
-            if ent == "document_type":
-                doc_name = entities[ent]
-                break
+        entities = metadata.get("parameters", {})
+        if "document_type" in entities:
+            doc_name = entities["document_type"]
 
         if not doc_name:
             print("No document name found in metadata.")
             return ActionResult(
-                success=True,
-                message="Hello, World!",
-                data={"type": "info", "content": "Hello, World!"}
+                success=False,
+                message="No document name found in metadata.",
+                data={"type": "error", "content": "No document name could be extracted from the provided metadata."}
             )
 
         # # Try to find the document (case-insensitive match)
@@ -75,6 +73,12 @@ class PrintDocumentAction(BaseAction):
         matched_doc = next((k for k in self.documents if k.lower() == doc_name.lower()), None)
         logger.info(f"Matched document: {matched_doc}")
 
+        if not matched_doc:
+            return ActionResult(
+                success=False,
+                message=f"Document '{doc_name}' not found in configuration.",
+                data={"type": "error", "content": f"No document matching '{doc_name}' was found in the configured documents."}
+            )
 
         # Here you would add your actual print logic
         # For now, just simulate success
@@ -87,22 +91,30 @@ class PrintDocumentAction(BaseAction):
         if platform.system() == "Windows":
             if file_ext in ['.webp', '.jpg', '.jpeg', '.png', '.gif', '.bmp']:
                 # For images, try to convert then open
-                import tempfile
-                from PIL import Image
-                
-                # Create a temporary PDF file
-                temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-                temp_pdf.close()
-                
-                # Convert image to PDF
-                img = Image.open(self.documents[matched_doc])
-                # Convert to RGB if needed
-                if img.mode != 'RGB':
-                    img = img.convert('RGB')
-                img.save(temp_pdf.name, 'PDF', resolution=100.0)
-                
-                # Just open the PDF file instead of trying to print directly
-                os.startfile(temp_pdf.name)
+                try:
+                    import tempfile
+                    from PIL import Image
+                    
+                    # Create a temporary PDF file
+                    temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                    temp_pdf.close()
+                    
+                    # Convert image to PDF
+                    img = Image.open(self.documents[matched_doc])
+                    # Convert to RGB if needed
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    img.save(temp_pdf.name, 'PDF', resolution=100.0)
+                    
+                    # Just open the PDF file instead of trying to print directly
+                    os.startfile(temp_pdf.name)
+                except ImportError:
+                    logger.error("PIL (Pillow) is not installed. Cannot convert image to PDF.")
+                    return ActionResult(
+                        success=False,
+                        message="PIL library not available for image conversion.",
+                        data={"type": "error", "content": "PIL (Pillow) library is required for image conversion but is not installed."}
+                    )
             else:
                 # For other files, just open them
                 os.startfile(self.documents[matched_doc])
