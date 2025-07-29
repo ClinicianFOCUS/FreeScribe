@@ -117,7 +117,7 @@ class PrintDocumentAction(BaseAction):
                         from PIL import Image
                         
                         # Create a temporary PDF file
-                        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                        temp_pdf = tempfile.NamedTemporaryFile(delete=True, suffix='.pdf')
                         temp_pdf.close()
                         
                         # Convert image to PDF
