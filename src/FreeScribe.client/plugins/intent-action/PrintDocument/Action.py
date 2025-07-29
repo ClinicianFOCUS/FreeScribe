@@ -63,7 +63,7 @@ class PrintDocumentAction(BaseAction):
                 break
 
         if not doc_name:
-            print("No document name found in metadata.")
+            logger.warning("No document name found in metadata.")
             return ActionResult(
                 success=True,
                 message="Hello, World!",
