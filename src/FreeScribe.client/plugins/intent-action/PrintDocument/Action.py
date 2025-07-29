@@ -73,50 +73,75 @@ class PrintDocumentAction(BaseAction):
                 data={"type": "error", "content": f"No document matching '{doc_name}' was found in the configured documents."}
             )
 
-        # Here you would add your actual print logic
-        # For now, just simulate success
-        #send to system print dialog
-        import subprocess
-        import platform
-        
-        file_ext = os.path.splitext(self.documents[matched_doc])[1].lower()
-        
-        if platform.system() == "Windows":
-            if file_ext in ['.webp', '.jpg', '.jpeg', '.png', '.gif', '.bmp']:
-                # For images, try to convert then open
-                try:
-                    import tempfile
-                    from PIL import Image
-                    
-                    # Create a temporary PDF file
-                    temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-                    temp_pdf.close()
-                    
-                    # Convert image to PDF
-                    img = Image.open(self.documents[matched_doc])
-                    # Convert to RGB if needed
-                    if img.mode != 'RGB':
-                        img = img.convert('RGB')
-                    img.save(temp_pdf.name, 'PDF', resolution=100.0)
-                    
-                    # Just open the PDF file instead of trying to print directly
-                    os.startfile(temp_pdf.name)
-                except ImportError:
-                    logger.error("PIL (Pillow) is not installed. Cannot convert image to PDF.")
-                    return ActionResult(
-                        success=False,
-                        message="PIL library not available for image conversion.",
-                        data={"type": "error", "content": "PIL (Pillow) library is required for image conversion but is not installed."}
-                    )
-            else:
-                # For other files, just open them
-                os.startfile(self.documents[matched_doc])
+        data={
+            "type": "info",
+            "document_name": doc_name,
+            "matched_doc": matched_doc,
+            "file_path": self.documents[matched_doc],
+            "has_action": True,
+            "auto_complete": False,
+        }
 
+        data["action"] = lambda: self.complete_action(data)
+
+        # Return success with document info for completion
         return ActionResult(
             success=True,
-            message=f"Printing document {doc_name} guide",
-            data={"type": "info"}
+            message=f"Ready to print document {doc_name}",
+            data=data
         )
+
+    def complete_action(self, result_data: dict) -> bool:
+        """
+        Complete the action by opening/printing the document.
+        
+        :param result_data: Data returned from the action execution
+        :return: True if the action was successfully completed
+        """
+        try:
+            file_path = result_data.get("file_path")
+            if not file_path:
+                logger.error("No file path provided in result data")
+                return False
+
+            import subprocess
+            import platform
+            
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            if platform.system() == "Windows":
+                if file_ext in ['.webp', '.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+                    # For images, try to convert then open
+                    try:
+                        import tempfile
+                        from PIL import Image
+                        
+                        # Create a temporary PDF file
+                        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                        temp_pdf.close()
+                        
+                        # Convert image to PDF
+                        img = Image.open(file_path)
+                        # Convert to RGB if needed
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        img.save(temp_pdf.name, 'PDF', resolution=100.0)
+                        
+                        # Just open the PDF file instead of trying to print directly
+                        os.startfile(temp_pdf.name)
+                    except ImportError:
+                        logger.error("PIL (Pillow) is not installed. Cannot convert image to PDF.")
+                        return False
+                else:
+                    # For other files, just open them
+                    os.startfile(file_path)
+            
+            logger.info(f"Successfully opened document: {file_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error completing print document action: {e}")
+            return False
 
     def get_ui_data(self) -> dict:
         return {
