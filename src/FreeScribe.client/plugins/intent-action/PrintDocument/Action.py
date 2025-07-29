@@ -5,13 +5,6 @@ from utils.log_config import logger
 
 DOCUMENTS_YAML = os.path.join(os.path.dirname(__file__), "documents.yaml")
 
-import os
-import yaml
-from services.intent_actions.actions.base import BaseAction, ActionResult
-from utils.log_config import logger
-
-DOCUMENTS_YAML = os.path.join(os.path.dirname(__file__), "documents.yaml")
-
 def load_documents_config():
     """Load document file paths from the YAML configuration."""
     if not os.path.exists(DOCUMENTS_YAML):
