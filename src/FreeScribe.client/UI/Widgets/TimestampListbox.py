@@ -1,4 +1,3 @@
-import logging
 import tkinter as tk
 import tkinter.messagebox as messagebox
 from utils.log_config import logger
@@ -34,7 +33,24 @@ class TimestampListbox(tk.Listbox):
         # Setup right-click menu
         self.menu = tk.Menu(self, tearoff=0)
         self.menu.add_command(label="Rename", command=self.start_edit)
+        self.menu.add_command(label="Delete", command=lambda: self.remove_entry(self.curselection()))
         self.bind("<Button-3>", self.on_right_click)
+    
+    def remove_entry(self, selection):
+        """Remove the selected entry from the Listbox and update response history.
+
+        :param selection: The index of the selected entry
+        :type selection: tuple
+        """
+        if not selection:
+            return
+
+        index = selection[0]
+        self.delete(index)
+
+        # Remove the corresponding entry from the response history
+        if index < len(self.response_history):
+            del self.response_history[index]
 
     def on_right_click(self, event):
         """Handle right-click events to show context menu.
@@ -101,13 +117,15 @@ class TimestampListbox(tk.Listbox):
                 self.edit_index = None
         except tk.TclError as e:
             # Handle Tkinter-specific errors (e.g., widget-related issues)
+            logger.exception(f"Failed to update timestamp: {str(e)}")
             messagebox.showerror("UI Error", f"Failed to update timestamp: {str(e)}")
         except ValueError as e:
             # Handle validation errors
+            logger.exception(f"Invalid timestamp format: {str(e)}")
             messagebox.showwarning("Invalid Input", f"Invalid timestamp format: {str(e)}")
         except Exception as e:
             # Log unexpected errors and re-raise them
-            logger.error(f"Critical error while confirming timestamp edit: {str(e)}")
+            logger.exception(f"Critical error while confirming timestamp edit: {str(e)}")
             raise  # Re-raise unexpected exceptions to prevent silent failures
 
     def cancel_edit(self):
@@ -129,8 +147,9 @@ class TimestampListbox(tk.Listbox):
             messagebox.showerror("UI Error", f"Failed to update timestamp: {str(e)}")
         except ValueError as e:
             # Handle validation errors
+            logger.exception(f"Invalid timestamp format: {str(e)}")
             messagebox.showwarning("Invalid Input", f"Invalid timestamp format: {str(e)}")
         except Exception as e:
             # Log unexpected errors and re-raise them
-            logger.error(f"Critical error while confirming timestamp edit: {str(e)}")
+            logger.exception(f"Critical error while confirming timestamp edit: {str(e)}")
             raise  # Re-raise unexpected exceptions to prevent silent failures

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .intents import SpacyIntentRecognizer, Intent
 from .actions import BaseAction, PrintMapAction, ShowDirectionsAction
+from .plugin_manager import load_plugin_actions, get_plugins_dir, INTENT_ACTION_DIR
 
 
 logger = logging.getLogger(__name__)
@@ -27,16 +28,31 @@ class IntentActionManager:
         :param google_maps_api_key: Optional Google Maps API key. If not provided, will try to get from settings.
         """
         self.maps_directory = maps_directory
+        self.google_maps_api_key = google_maps_api_key
         
-        # Initialize recognizer
+        # Initialize recognizer but don't load plugins yet
         self.intent_recognizer = SpacyIntentRecognizer()
+        
+        # Initialize basic actions
+        self.actions: List[BaseAction] = []
+        
+        # Defer initialization to a separate method
+        self.initialize()
+    
+    def initialize(self):
+        """Initialize the recognizer and load all actions."""
+        # Initialize recognizer (this will load plugin patterns)
         self.intent_recognizer.initialize()
         
-        # Register actions
-        self.actions: List[BaseAction] = [
-            PrintMapAction(maps_directory, google_maps_api_key),
+        # Register built-in actions
+        self.actions = [
+            PrintMapAction(self.maps_directory, self.google_maps_api_key),
             ShowDirectionsAction()
         ]
+
+        # Load plugin actions
+        plugin_actions = load_plugin_actions(get_plugins_dir(INTENT_ACTION_DIR))
+        self.actions.extend(plugin_actions)
         
         # Register action handlers
         for action in self.actions:
@@ -71,6 +87,7 @@ class IntentActionManager:
                 if result.success:
                     # Add UI data
                     ui_data = action.get_ui_data()
+                    logger.info(f"FULL DATA: {result}")
                     results.append({
                         "action_id": action.action_id,
                         "display_name": action.display_name,

@@ -22,7 +22,7 @@ from spacy.tokens import Doc
 import os
 
 from UI.LoadingWindow import LoadingWindow
-from UI.SettingsConstant import SettingsKeys
+from UI.SettingsConstant import SettingsKeys, FeatureToggle
 
 # Create a punctuation string without apostrophe
 punct_without_apostrophe = string.punctuation.replace("'", "")
@@ -152,7 +152,7 @@ class WhisperHallucinationCleaner:
             return f"Failed to load spaCy model. {e}"
         except Exception as e:
             error_msg = f"Failed to initialize spaCy model: {str(e)}"
-            self.logger.error(error_msg)
+            self.logger.exception(error_msg)
             return error_msg
 
     def unload_model(self):
@@ -288,10 +288,10 @@ def load_hallucination_cleaner_model(root, settings) -> None:
     2. Settings change: new_value exists, compare with previous setting
     """
     # Get current enabled state from settings
-    current_enabled = settings.editable_settings.get(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value)
+    current_enabled = settings.editable_settings.get(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value) and FeatureToggle.HALLUCINATION_CLEANING
 
     # Get new value from settings panel if it exists
-    setting_entry = settings.editable_settings_entries.get(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value)
+    setting_entry = settings.editable_settings_entries.get(SettingsKeys.ENABLE_HALLUCINATION_CLEAN.value) and FeatureToggle.HALLUCINATION_CLEANING
     new_enabled = setting_entry.get() if setting_entry else None
 
     default_logger.info(f"Hallucination cleaner - Current: {current_enabled}, New: {new_enabled}")

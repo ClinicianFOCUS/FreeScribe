@@ -13,6 +13,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+CANVAS_LAYOUT_THRESHOLD = 1  # Minimum width for canvas layout to apply
+
 class ActionResultsWindow:
     """
     Window for displaying intent action results.
@@ -44,6 +46,20 @@ class ActionResultsWindow:
         # Bind to parent window events
         self.parent.bind("<Configure>", self._on_parent_moved)
         
+        # Initialize label styles
+        self._init_label_styles()
+        
+    def _init_label_styles(self):
+        """
+        Initialize custom label styles for card labels.
+        Should be called once, e.g., in __init__.
+        """
+        style = ttk.Style()
+        # Default label style for cards
+        style.configure("CardLabel.TLabel", foreground="black")
+        # Completed card label style
+        style.configure("CardLabel.Complete.TLabel", foreground="gray50")
+        
     def _create_window(self) -> None:
         """Create the window and its widgets."""
         if self.window is not None:
@@ -63,6 +79,14 @@ class ActionResultsWindow:
         
         # Set window attributes to keep it below other windows
         self.window.attributes('-topmost', False)
+        
+        # Configure custom styles for completed cards
+        style = ttk.Style()
+        try:
+            style.configure("CompletedCard.TFrame", background="gray90")
+        except tk.TclError:
+            # Fallback if style configuration fails
+            pass
         
         # Create main container frame
         main_container = ttk.Frame(self.window)
@@ -94,14 +118,23 @@ class ActionResultsWindow:
         self.scrollable_frame = ttk.Frame(self.canvas)
         
         # Configure scrolling
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
+        def configure_scroll_region(event=None):
+            if hasattr(self, 'canvas_window') and self.canvas_window:  # Guard against undefined canvas_window
+                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                # Make the scrollable frame fill the canvas width
+                canvas_width = self.canvas.winfo_width()
+                if canvas_width > CANVAS_LAYOUT_THRESHOLD:  # Ensure canvas has been drawn
+                    self.canvas.itemconfig(self.canvas_window, width=canvas_width)
+        
+
+        self.scrollable_frame.bind("<Configure>", configure_scroll_region)
         
         # Create the window in the canvas
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Bind canvas resize to update frame width
+        self.canvas.bind("<Configure>", configure_scroll_region)
         
         # Pack canvas and scrollbar
         self.canvas.pack(side="left", fill="both", expand=True)
@@ -240,7 +273,7 @@ class ActionResultsWindow:
         icon = ttk.Label(left_frame, text=result["ui"]["icon"])
         icon.pack(side="left", padx=5)
         
-        title = ttk.Label(left_frame, text=result["display_name"], style="CardTitle.TLabel")
+        title = ttk.Label(left_frame, text=result["display_name"], style="CardLabel.TLabel")
         title.pack(side="left", padx=5)
         
         # Right side: delete button
@@ -256,7 +289,7 @@ class ActionResultsWindow:
         # Add message
         message = ttk.Label(
             card, 
-            # text=result["message"], 
+            text=result["message"], 
             wraplength=350
         )
         message.pack(fill="x", padx=10, pady=5)
@@ -286,7 +319,7 @@ class ActionResultsWindow:
                     map_label = ttk.Label(card, image=photo)
                     map_label.pack(pady=5)
                 except Exception as e:
-                    print(f"Error loading map image: {e}")
+                    logger.exception(f"Error loading map image: {e}")
                     
         elif "additional_info" in result["data"]:
             info = result["data"]["additional_info"]
@@ -321,7 +354,7 @@ class ActionResultsWindow:
                     instruction.pack(pady=2)
                 
                 except Exception as e:
-                    print(f"Error loading map image: {e}")
+                    logger.exception(f"Error loading map image: {e}")
             
             # Add other info
             if "floor" in info:
@@ -347,6 +380,61 @@ class ActionResultsWindow:
                     s = ttk.Label(card, text=f"• {step}", wraplength=330)
                     s.pack(pady=1)
                     
+        # Add footer with action button and completion checkbox
+        footer = ttk.Frame(card)
+        footer.pack(fill="x", padx=5, pady=(10, 5))
+        
+        # Add completed checkbox in bottom right - pack directly to footer
+        completed_var = tk.BooleanVar()
+        
+        completed_checkbox = ttk.Checkbutton(
+            footer,
+            variable=completed_var,
+            cursor="hand2",
+            command=lambda: self._toggle_card_completed(card, completed_var.get(), result)
+        )
+        completed_checkbox.pack(side="right")
+        
+        complete_label = ttk.Label(footer, text="Complete:")
+        complete_label.pack(side="right", padx=(0, 5))
+        
+        # Get data members with defaults
+        has_action = result["data"].get("has_action", False)
+        auto_complete = result["data"].get("auto_complete", True)
+        
+        # If auto_complete is True and has_action is True, trigger the action automatically
+        if has_action and auto_complete:
+            # Schedule auto-completion to run after UI is updated
+            self.window.after(0, lambda: self._complete_action(result))
+        
+        # Left side: action button (always show)
+        if has_action:
+            if auto_complete:
+                action_button = ttk.Button(
+                    footer,
+                    text="Auto Completing Action",
+                    state="disabled",
+                    cursor="arrow"
+                )
+                # Schedule auto-completion to run after UI is updated
+                self.window.after(0, lambda: self._complete_action(result, action_button, completed_checkbox))
+            else:
+                action_button = ttk.Button(
+                    footer,
+                    text="Complete Action",
+                    cursor="hand2",
+                    command=lambda: self._complete_action(result, action_button, completed_checkbox)
+                )
+        else:
+            # No action available - show disabled button
+            action_button = ttk.Button(
+                footer,
+                text="No Action",
+                state="disabled",
+                cursor="arrow"
+            )
+        action_button.pack(side="left")
+                    
         # Add separator
         ttk.Separator(self.scrollable_frame).pack(fill="x", padx=10, pady=10)
         
@@ -363,6 +451,93 @@ class ActionResultsWindow:
         """
         for result in results:
             self.add_result(result)
+            
+    def _complete_action(self, result: Dict[str, Any], button: ttk.Button, checkbox: ttk.Checkbutton) -> None:
+        """
+        Handle the complete action button click.
+
+        :param result: The action result data
+        :param button: The button widget to update
+        :param checkbox: The checkbox widget to update
+        """
+        try:
+            # Get the action instance from the result data
+            action = result["data"].get("action")
+            if action:
+                # Call the action's complete_action method
+                success = action()
+                if success:
+                    logger.info(f"Action completed successfully for: {result.get('display_name', 'Unknown')}")
+                else:
+                    logger.warning(f"Action completion failed for: {result.get('display_name', 'Unknown')}")
+            else:
+                # Fallback to generic logging if no action instance available
+                logger.info(f"Completing action for: {result.get('display_name', 'Unknown')}")
+
+            # Update the button text and disable it
+            if result["data"].get("auto_complete", False):
+                button.config(text="Action Automatically Completed", state="disabled")
+            else:
+                button.config(text="Action Manually Completed", state="disabled")
+
+            # Check the checkbox
+            checkbox.invoke()  # Simulate checking the checkbox
+
+        except Exception as e:
+            logger.exception(f"Error completing action: {str(e)}")
+            
+    def _toggle_card_completed(self, card: ttk.Frame, is_completed: bool, result: Dict[str, Any]) -> None:
+        """
+        Toggle the completed state of a card, greying it out when completed.
+
+        :param card: The card frame to toggle
+        :param is_completed: Whether the card is marked as completed
+        :param result: The result data associated with the card
+        """
+        try:
+            # Update the result data with the completed state
+            result['completed'] = is_completed
+
+            # Configure card appearance based on completion state
+            if is_completed:
+                # Grey out the card
+                card.configure(style="CompletedCard.TFrame")
+                # Make all text elements in the card appear greyed out
+                self._set_card_text_color(card, "gray50")
+            else:
+                # Restore normal appearance
+                card.configure(style="Card.TFrame")
+                # Restore normal text colors
+                self._set_card_text_color(card, None)
+                
+        except (AttributeError, tk.TclError) as e:
+            logger.error(f"Error toggling card completion: {str(e)}")
+        except Exception as e:
+            logger.critical(f"Unexpected error toggling card completion: {str(e)}")
+            raise
+    
+    def _set_card_text_color(self, widget, color) -> None:
+        """
+        Recursively set label style for all label widgets in a card.
+
+        :param widget: The widget to process
+        :param color: The color to set (None for default)
+        """
+        try:
+            # Process current widget if it's a label
+            if isinstance(widget, ttk.Label):
+                if color == "gray50":
+                    widget.configure(style="CardLabel.Complete.TLabel")
+                else:
+                    # Reset to default style
+                    widget.configure(style="CardLabel.TLabel")
+
+            # Recursively process children
+            for child in widget.winfo_children():
+                self._set_card_text_color(child, color)
+
+        except Exception as e:
+            logger.debug(f"Error setting text color: {str(e)}")
             
     def _delete_card(self, card: ttk.Frame) -> None:
         """
@@ -438,4 +613,4 @@ class ActionResultsWindow:
         if event.num == 4 or event.delta > 0:  # Scroll up
             self.canvas.yview_scroll(-1, "units")
         elif event.num == 5 or event.delta < 0:  # Scroll down
-            self.canvas.yview_scroll(1, "units") 
+            self.canvas.yview_scroll(1, "units")

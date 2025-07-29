@@ -65,6 +65,7 @@ def test_verify_factual_consistency_partial_match(partial_match_texts):
 @pytest.mark.parametrize("original,summary,expected", [
     ("Some text", "", (True, [], 1.0)),  # Empty summary
     ("", "Some summary", (False, [], 0.0)),  # Empty original
+    ("", "", (True, [], 1.0)),  # Both original and summary empty
 ])
 def test_verify_factual_consistency_empty_inputs(original, summary, expected):
     """Test verification with empty inputs

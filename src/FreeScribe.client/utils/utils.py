@@ -1,3 +1,4 @@
+import ctypes
 from utils.file_utils import get_file_path
 from utils.log_config import logger
 
@@ -42,6 +43,6 @@ def get_application_version():
             with open(get_file_path('__version__'), 'r') as file:
                 version_str = file.read().strip()
         except Exception as e:
-            logger.error(f"Error loading version file ({type(e).__name__}). {e}")
+            logger.exception("Failed to read version file")
         finally:
             return version_str
