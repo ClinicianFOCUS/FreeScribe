@@ -1,4 +1,5 @@
 from services.intent_actions.actions.base import BaseAction, ActionResult
+from utils.log_config import logger
 
 class HelloWorldAction(BaseAction):
     """
@@ -44,11 +45,32 @@ class HelloWorldAction(BaseAction):
         :param metadata: Additional metadata related to the intent.
         :return: An ActionResult object containing the result of the action execution.
         """
+        data= {
+            "type": "info",
+            "content": "Hello, World!",
+            "auto_complete": True,
+            "has_action": True
+        }
+
+        data["action"] = lambda: self.complete_action(data)
+
         return ActionResult(
             success=True,
             message="Hello, World!",
-            data={"type": "info", "content": "Hello, World!"}
+            data=data
         )
+
+    def complete_action(self, result_data):
+        """
+        Complete the action after execution.
+        
+        :param result_data: Data returned from the action execution.
+        :return: True if the action was completed successfully, False otherwise.
+        """
+        # Here we could implement any finalization logic if needed
+        logger.info("HelloWorldAction completed successfully.")
+        return True
+
 
     def get_ui_data(self) -> dict:
         """
