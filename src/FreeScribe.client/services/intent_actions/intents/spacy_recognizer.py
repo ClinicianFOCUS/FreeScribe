@@ -323,10 +323,21 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             
             logger.debug(f"Processing text: {text}")
             
+            # Get all matches at once to support multiple intents in the same sentence
+            all_matches = self.matcher(doc)
+            logger.debug(f"Found {len(all_matches)} total matches in text")
+            
+            # Group matches by intent name
+            matches_by_intent = {}
+            for match_id, start, end in all_matches:
+                intent_name = self.matcher.vocab.strings[match_id]
+                if intent_name not in matches_by_intent:
+                    matches_by_intent[intent_name] = []
+                matches_by_intent[intent_name].append((match_id, start, end))
+            
+            # Process each pattern that has matches
             for pattern in self.patterns:
-                # Get matches for this specific pattern
-                matches = self.matcher(doc)
-                matches = [m for m in matches if self.matcher.vocab.strings[m[0]] == pattern.intent_name]
+                matches = matches_by_intent.get(pattern.intent_name, [])
                 
                 logger.debug(f"Found {len(matches)} matches for pattern {pattern.intent_name}")
                 
