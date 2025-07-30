@@ -297,18 +297,8 @@ class ActionResultsWindow:
         # Handle result based on type
         result_type = result["data"].get("type")
         
-        if result_type == "directions":
-            # Create clickable link for directions
-            directions_link = ttk.Label(
-                card,
-                text=result["message"],
-                cursor="hand2",
-                foreground="blue"
-            )
-            directions_link.pack(pady=0, padx=0)
-            directions_link.bind("<Button-1>", lambda e: webbrowser.open(result["data"]["click_url"]))
-            
-            # If there's a map image, show it below the link
+        if result_type == "directions":                    
+            # If there's a map image, show it below the info
             if "additional_info" in result["data"] and "map_image_path" in result["data"]["additional_info"]:
                 try:
                     image = Image.open(result["data"]["additional_info"]["map_image_path"])
@@ -414,9 +404,15 @@ class ActionResultsWindow:
                 # Schedule auto-completion to run after UI is updated
                 self.window.after(0, lambda: self._complete_action(result, action_button, completed_checkbox))
             else:
+                # For directions, show a more specific button text
+                if result_type == "directions":
+                    button_text = "Open Directions"
+                else:
+                    button_text = "Complete Action"
+                    
                 action_button = ttk.Button(
                     footer,
-                    text="Complete Action",
+                    text=button_text,
                     cursor="hand2",
                     command=lambda: self._complete_action(result, action_button, completed_checkbox)
                 )
@@ -430,7 +426,7 @@ class ActionResultsWindow:
             )
         action_button.pack(side="left")
 
-                # If auto_complete is True and has_action is True, trigger the action automatically
+        # If auto_complete is True and has_action is True, trigger the action automatically
         if has_action and auto_complete:
             # Schedule auto-completion to run after UI is updated
             self.window.after(0, lambda: self._complete_action(result, action_button, completed_checkbox))

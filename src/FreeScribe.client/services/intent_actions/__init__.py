@@ -12,7 +12,6 @@ from .intents import (
     MedicalIntentResult
 )
 from .actions import (
-    PrintMapAction,
     BaseAction,
     ActionResult
 )
@@ -24,6 +23,5 @@ __all__ = [
     'BaseIntentRecognizer',
     'BaseAction',
     'LLMIntentRecognizer',
-    'MedicalIntentResult',
-    'PrintMapAction'
+    'MedicalIntentResult'
 ] 
