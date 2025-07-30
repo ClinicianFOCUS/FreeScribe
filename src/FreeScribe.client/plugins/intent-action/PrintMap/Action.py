@@ -223,7 +223,7 @@ class PrintMapAction(BaseAction):
         try:
             map_path = result_data.get("additional_info", {}).get("map_image_path")
             if map_path and os.path.exists(map_path):
-                os.startfile(map_path)
+                webbrowser.open(Path(map_path).absolute().as_uri())
                 logger.info(f"Opened map file: {map_path}")
                 return True
             else:
