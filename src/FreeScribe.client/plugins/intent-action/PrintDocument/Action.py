@@ -84,6 +84,13 @@ class PrintDocumentAction(BaseAction):
                 data={"type": "error", "content": f"No document matching '{doc_name}' was found in the configured documents."}
             )
 
+        if not self.documents[matched_doc]:
+            return ActionResult(
+                success=False,
+                message=f"Document '{matched_doc}' has no file path configured.",
+                data={"type": "error", "content": f"The document '{matched_doc}' does not have a valid file path configured."}
+            )
+
         data={
             "type": "info",
             "document_name": doc_name,
