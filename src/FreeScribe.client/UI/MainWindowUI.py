@@ -14,6 +14,7 @@ from UI.DebugWindow import DebugPrintWindow
 from UI.RecordingsManager import RecordingsManager
 from UI.LogWindow import LogWindow
 from UI.SettingsWindow import SettingsWindow
+from UI.PluginWindow import show_plugin_manager
 from utils.log_config import logger
 from pathlib import Path
 
@@ -265,6 +266,31 @@ class MainWindowUI:
         self._create_settings_menu()
         self._create_help_menu()
         self.__create_data_menu()
+
+        # Intent-Action menu
+        intent_action_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Intent-Action", menu=intent_action_menu)
+        intent_action_menu.add_command(
+            label="Plugin Manager", 
+            command=self.show_plugin_manager_window,
+            accelerator="Ctrl+Shift+P"
+    )
+
+    def show_plugin_manager_window(self):
+        """Show the plugin manager window."""
+        try:            
+            # Get the intent manager from the main application if available
+            intent_manager = getattr(self, 'intent_manager', None)
+            if not intent_manager and hasattr(self.root, 'intent_manager'):
+                intent_manager = self.root.intent_manager
+                
+            show_plugin_manager(self.root, intent_manager)
+        except ImportError as e:
+            logger.error(f"Failed to import plugin manager: {e}")
+            messagebox.showerror("Error", "Plugin manager is not available.")
+        except Exception as e:
+            logger.error(f"Error opening plugin manager: {e}")
+            messagebox.showerror("Error", f"Failed to open plugin manager: {str(e)}")
 
     def _destroy_menu_bar(self):
         """
