@@ -1,5 +1,7 @@
 import os
 import yaml
+import tempfile
+from PIL import Image
 from services.intent_actions.actions.base import BaseAction, ActionResult
 from utils.log_config import logger
 from utils.file_utils import get_resource_path
@@ -121,41 +123,29 @@ class PrintDocumentAction(BaseAction):
             if not file_path:
                 logger.error("No file path provided in result data")
                 return False
-
-            import subprocess
-            import platform
             
             file_ext = os.path.splitext(file_path)[1].lower()
             
-            if platform.system() == "Windows":
-                if file_ext in ['.webp', '.jpg', '.jpeg', '.png', '.gif', '.bmp']:
-                    # For images, try to convert then open
-                    try:
-                        import tempfile
-                        from PIL import Image
-                        
-                        # Create a temporary PDF file
-                        temp_pdf = tempfile.NamedTemporaryFile(delete=True, suffix='.pdf')
-                        temp_pdf.close()
-                        
-                        # Convert image to PDF
-                        img = Image.open(file_path)
-                        # Convert to RGB if needed
-                        if img.mode != 'RGB':
-                            img = img.convert('RGB')
-                        img.save(temp_pdf.name, 'PDF', resolution=100.0)
-                        
-                        # Just open the PDF file instead of trying to print directly
-                        os.startfile(temp_pdf.name)
-                    except ImportError:
-                        logger.error("PIL (Pillow) is not installed. Cannot convert image to PDF.")
-                        return False
-                else:
-                    # For other files, just open them
-                    os.startfile(file_path)
-            
-            logger.info(f"Successfully opened document: {file_path}")
-            return True
+            if file_ext in ['.webp', '.jpg', '.jpeg', '.png', '.gif', '.bmp']:              
+                # Create a temporary PDF file
+                temp_pdf = tempfile.NamedTemporaryFile(delete=True, suffix='.pdf')
+                temp_pdf.close()
+                
+                # Convert image to PDF
+                img = Image.open(file_path)
+                # Convert to RGB if needed
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                img.save(temp_pdf.name, 'PDF', resolution=100.0)
+                
+                # Just open the PDF file instead of trying to print directly
+                os.startfile(temp_pdf.name)
+             
+                logger.info(f"Successfully opened document: {file_path}")
+                return True
+            else:
+                logger.warning(f"Unsupported file type: {file_ext}. Only image files are supported for printing.")
+                return False
             
         except Exception as e:
             logger.error(f"Error completing print document action: {e}")
