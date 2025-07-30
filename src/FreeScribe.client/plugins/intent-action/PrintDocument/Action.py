@@ -67,7 +67,7 @@ class PrintDocumentAction(BaseAction):
             doc_name = entities["document_type"]
 
         if not doc_name:
-            print("No document name found in metadata.")
+            logger.warning("No document name found in metadata.")
             return ActionResult(
                 success=False,
                 message="No document name found in metadata.",
