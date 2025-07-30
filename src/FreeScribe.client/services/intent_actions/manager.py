@@ -24,8 +24,8 @@ class IntentActionManager:
         """
         Initialize the intent action manager.
         
-        :param maps_directory: Directory to store map images
-        :param google_maps_api_key: Optional Google Maps API key. If not provided, will try to get from settings.
+        This method sets up the intent recognizer and defers further initialization
+        (e.g., loading actions) to the `initialize` method.
         """
         
         # Initialize recognizer but don't load plugins yet
