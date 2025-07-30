@@ -75,9 +75,7 @@ class PrintDocumentAction(BaseAction):
             )
 
         # # Try to find the document (case-insensitive match)
-        logger.info(f"reconized documents: {self.documents}")
         matched_doc = next((k for k in self.documents if k.lower() == doc_name.lower()), None)
-        logger.info(f"Matched document: {matched_doc}")
 
         if not matched_doc:
             return ActionResult(
