@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .intents import SpacyIntentRecognizer, Intent
-from .actions import BaseAction, PrintMapAction, ShowDirectionsAction
+from .actions import BaseAction
 from .plugin_manager import load_plugin_actions, get_plugins_dir, INTENT_ACTION_DIR
 
 
@@ -20,15 +20,13 @@ class IntentActionManager:
     providing a unified interface for processing transcribed text.
     """
     
-    def __init__(self, maps_directory: Path, google_maps_api_key: Optional[str] = None):
+    def __init__(self):
         """
         Initialize the intent action manager.
         
         :param maps_directory: Directory to store map images
         :param google_maps_api_key: Optional Google Maps API key. If not provided, will try to get from settings.
         """
-        self.maps_directory = maps_directory
-        self.google_maps_api_key = google_maps_api_key
         
         # Initialize recognizer but don't load plugins yet
         self.intent_recognizer = SpacyIntentRecognizer()
@@ -46,8 +44,6 @@ class IntentActionManager:
         
         # Register built-in actions
         self.actions = [
-            PrintMapAction(self.maps_directory, self.google_maps_api_key),
-            ShowDirectionsAction()
         ]
 
         # Load plugin actions
@@ -87,7 +83,6 @@ class IntentActionManager:
                 if result.success:
                     # Add UI data
                     ui_data = action.get_ui_data()
-                    logger.info(f"FULL DATA: {result}")
                     results.append({
                         "action_id": action.action_id,
                         "display_name": action.display_name,

@@ -55,7 +55,7 @@ class FeatureToggle:
     DOCKER_STATUS_BAR = False
     POST_PROCESSING = False
     PRE_PROCESSING = False
-    INTENT_ACTION = False
+    INTENT_ACTION = True
     HALLUCINATION_CLEANING = False
     FACTS_CHECK = False
     BEST_OF = False

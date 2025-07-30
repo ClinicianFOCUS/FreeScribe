@@ -51,10 +51,7 @@ class MainWindowUI:
             # Initialize intent action system
             maps_dir = Path(get_file_path('assets', 'maps'))
             maps_dir.mkdir(parents=True, exist_ok=True)
-            self.intent_manager = IntentActionManager(
-                maps_dir,
-                self.app_settings.editable_settings.get("Google Maps API Key", "")
-            )
+            self.intent_manager = IntentActionManager()
             self.action_window = ActionResultsWindow(self.root)
             self.action_window.hide()  # Hide initially
 

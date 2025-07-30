@@ -141,82 +141,24 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
         self.entity_ruler = None
         self.custom_entities = []
         self.document_types = []
+        
+        # Initialize plugin pattern storage
+        self.plugin_intent_patterns = []
+        self.plugin_entity_patterns = []
+        
+        # Only keep appointment patterns - directions and maps are now in plugins
         self.patterns = [
-            SpacyIntentPattern(
-                intent_name="show_directions",
-                patterns=[
-                    [{"LOWER": "go"}, {"LOWER": "to"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "get"}, {"LOWER": "to"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "go"}, {"LOWER": "to"}],
-                    [{"LOWER": "directions"}, {"LOWER": "to"}],
-                    [{"LOWER": "how"}, {"LOWER": "to"}, {"LOWER": "get"}, {"LOWER": "to"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}],
-                    [{"LOWER": "find"}],
-                    [{"LOWER": "show"}, {"LOWER": "me"}, {"LOWER": "to"}],
-                    # New patterns for hospital-specific queries
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "get"}, {"LOWER": "to"}, {"ENT_TYPE": "ORG"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"ENT_TYPE": "ORG"}],
-                    [{"LOWER": "need"}, {"LOWER": "directions"}, {"LOWER": "to"}, {"ENT_TYPE": "ORG"}],
-                    [{"LOWER": "show"}, {"LOWER": "me"}, {"LOWER": "how"}, {"LOWER": "to"}, {"LOWER": "get"}, {"LOWER": "to"}, {"ENT_TYPE": "ORG"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LOWER": "main"}, {"LOWER": "entrance"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "find"}, {"ENT_TYPE": "ORG"}],
-                    [{"LOWER": "show"}, {"LOWER": "me"}, {"LOWER": "the"}, {"LOWER": "way"}, {"LOWER": "to"}],
-                    # Emergency room specific patterns
-                    [{"LOWER": "get"}, {"LOWER": "to"}, {"LOWER": "emergency"}, {"LOWER": "room"}],
-                    [{"LOWER": "find"}, {"LOWER": "emergency"}, {"LOWER": "room"}],
-                    # Cardiac care specific patterns
-                    [{"LOWER": "find"}, {"LEMMA": "cardiac"}, {"LEMMA": "care"}],
-                    [{"LOWER": "get"}, {"LOWER": "to"}, {"LEMMA": "cardiac"}, {"LEMMA": "care"}],
-                    # Cafeteria specific patterns
-                    [{"LOWER": "way"}, {"LOWER": "to"}, {"LOWER": "cafeteria"}],
-                    [{"LOWER": "find"}, {"LOWER": "cafeteria"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "cafeteria"}],
-                    # New patterns for example texts
-                    [{"LOWER": "need"}, {"LOWER": "directions"}, {"LOWER": "to"}],
-                    [{"LOWER": "show"}, {"LOWER": "me"}, {"LOWER": "how"}, {"LOWER": "to"}, {"LOWER": "get"}, {"LOWER": "to"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "find"}],
-                    [{"LOWER": "show"}, {"LOWER": "me"}, {"LOWER": "the"}, {"LOWER": "way"}, {"LOWER": "to"}],
-                    # Department-specific patterns
-                    [{"LOWER": "get"}, {"LOWER": "to"}, {"LOWER": "the"}, {"LEMMA": "department"}],
-                    [{"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "department"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LEMMA": "department"}],
-                    # Wing/entrance patterns
-                    [{"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "wing"}],
-                    [{"LOWER": "get"}, {"LOWER": "to"}, {"LOWER": "the"}, {"LEMMA": "wing"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LEMMA": "entrance"}],
-                    [{"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "entrance"}],
-                ],
-                required_entities=[],  # Keep empty to allow matching without entities
-                confidence_weights={"pattern_match": 1.0, "entity_match": 0.0}
-            ),
             SpacyIntentPattern(
                 intent_name="schedule_appointment",
                 patterns=[
                     [{"LEMMA": "schedule"}, {"LOWER": "appointment"}],
                     [{"LEMMA": "book"}, {"LOWER": "appointment"}],
                     [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "see"}],
-                    # New appointment-related patterns
+                    # Appointment-related patterns
                     [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "get"}, {"LOWER": "to"}, {"ENT_TYPE": "ORG"}, {"LOWER": "for"}, {"LOWER": "appointment"}],
                     [{"LOWER": "appointment"}, {"LOWER": "at"}, {"ENT_TYPE": "TIME"}],
                 ],
                 required_entities=["TIME", "ORG"]
-            ),
-            # New pattern for location queries
-            SpacyIntentPattern(
-                intent_name="find_location",
-                patterns=[
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LEMMA": "cafeteria"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LEMMA": "entrance"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LEMMA": "wing"}],
-                    [{"LOWER": "where"}, {"LOWER": "is"}, {"LOWER": "the"}, {"LEMMA": "department"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "cafeteria"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "entrance"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "wing"}],
-                    [{"LOWER": "need"}, {"LOWER": "to"}, {"LOWER": "find"}, {"LOWER": "the"}, {"LEMMA": "department"}],
-                ],
-                required_entities=[],  # No entity requirements for better matching
-                confidence_weights={"pattern_match": 1.0, "entity_match": 0.0}  # Focus on pattern matching
             )
         ]
 
@@ -412,4 +354,4 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             
         except Exception as e:
             logger.error(f"Error recognizing intent with SpaCy: {e}")
-            return [] 
+            return []
