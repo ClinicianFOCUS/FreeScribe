@@ -9,7 +9,7 @@ from .intents import SpacyIntentRecognizer, Intent
 from .actions import BaseAction
 from .plugin_manager import load_plugin_actions, get_plugins_dir, INTENT_ACTION_DIR
 
-from .actions import BaseAction, PrintMapAction, ShowDirectionsAction
+from .actions import BaseAction
 from .plugin_manager import (
     load_plugin_actions, 
     get_plugins_dir, 
@@ -44,8 +44,6 @@ class IntentActionManager:
         
         # Initialize built-in actions (separate from plugin actions)
         self.builtin_actions: List[BaseAction] = [
-            PrintMapAction(self.maps_directory, self.google_maps_api_key),
-            ShowDirectionsAction()
         ]
         
         # Defer initialization to a separate method
@@ -73,43 +71,6 @@ class IntentActionManager:
         plugin_actions = plugin_state.get_all_actions()
         return self.builtin_actions + plugin_actions
     
-    def reload_plugins(self):
-        """Reload all plugins."""
-        logger.info("Reloading all plugins...")
-        
-        # Reload plugins (this clears and reloads all)
-        load_plugin_actions(get_plugins_dir(INTENT_ACTION_DIR))
-        
-        # Reinitialize recognizer with new patterns
-        self.intent_recognizer.initialize()
-        
-        total_actions = len(self.get_all_actions())
-        logger.info(f"Reloaded plugins. Total actions: {total_actions}")
-    
-    def add_plugin(self, plugin_name: str) -> bool:
-        """
-        Add a specific plugin to the manager.
-        
-        :param plugin_name: Name of the plugin folder
-        :return: True if successfully added, False otherwise
-        """
-        try:
-            result = load_specific_plugin(plugin_name)
-            
-            if result.get("actions"):
-                logger.info(f"Added {len(result['actions'])} actions from plugin {result['name']}")
-            
-            # Reinitialize recognizer to include new patterns
-            if result.get("intent_patterns") or result.get("entity_patterns"):
-                self.intent_recognizer.initialize()
-                logger.info(f"Reinitialized recognizer with new patterns from {result['name']}")
-            
-            return bool(result)
-            
-        except Exception as e:
-            logger.error(f"Failed to add plugin {plugin_name}: {e}")
-            return False
-    
     def remove_plugin(self, plugin_name: str) -> bool:
         """
         Remove a specific plugin from the manager.
@@ -129,7 +90,8 @@ class IntentActionManager:
             
             if removed_plugin:
                 logger.info(f"Removed plugin {plugin_name} with {len(removed_plugin.get('actions', []))} actions")
-                # Reinitialize recognizer to remove patterns
+                # Clear and reinitialize recognizer to remove patterns completely
+                self.intent_recognizer = SpacyIntentRecognizer()
                 self.intent_recognizer.initialize()
                 return True
             
@@ -151,7 +113,8 @@ class IntentActionManager:
             
             if result:
                 logger.info(f"Reloaded plugin {plugin_name}")
-                # Reinitialize recognizer
+                # Clear and reinitialize recognizer completely
+                self.intent_recognizer = SpacyIntentRecognizer()
                 self.intent_recognizer.initialize()
                 return True
             
@@ -159,6 +122,46 @@ class IntentActionManager:
             
         except Exception as e:
             logger.error(f"Failed to reload plugin {plugin_name}: {e}")
+            return False
+    
+    def reload_plugins(self):
+        """Reload all plugins."""
+        logger.info("Reloading all plugins...")
+        
+        # Reload plugins (this clears and reloads all)
+        load_plugin_actions(get_plugins_dir(INTENT_ACTION_DIR))
+        
+        # Create fresh recognizer and initialize with new patterns
+        self.intent_recognizer = SpacyIntentRecognizer()
+        self.intent_recognizer.initialize()
+        
+        total_actions = len(self.get_all_actions())
+        logger.info(f"Reloaded plugins. Total actions: {total_actions}")
+    
+    def add_plugin(self, plugin_name: str) -> bool:
+        """
+        Add a specific plugin to the manager.
+        
+        :param plugin_name: Name of the plugin folder
+        :return: True if successfully added, False otherwise
+        """
+        try:
+            result = load_specific_plugin(plugin_name)
+            
+            if result.get("actions"):
+                logger.info(f"Added {len(result['actions'])} actions from plugin {result['name']}")
+            
+            # Reinitialize recognizer to include new patterns
+            if result.get("intent_patterns") or result.get("entity_patterns"):
+                # Create fresh recognizer and initialize with all patterns
+                self.intent_recognizer = SpacyIntentRecognizer()
+                self.intent_recognizer.initialize()
+                logger.info(f"Reinitialized recognizer with new patterns from {result['name']}")
+            
+            return bool(result)
+            
+        except Exception as e:
+            logger.error(f"Failed to add plugin {plugin_name}: {e}")
             return False
     
     def get_plugin_info(self) -> Dict[str, Any]:
