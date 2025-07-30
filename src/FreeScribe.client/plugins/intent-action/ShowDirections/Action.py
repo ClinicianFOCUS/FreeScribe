@@ -3,9 +3,10 @@ Action to generate directions URL for display in the UI.
 """
 
 import logging
+import webbrowser
 from typing import Any, Dict
 from urllib.parse import quote_plus
-from .base import BaseAction, ActionResult
+from services.intent_actions.actions.base import BaseAction, ActionResult
 
 logger = logging.getLogger(__name__)
 
@@ -82,17 +83,15 @@ class ShowDirectionsAction(BaseAction):
                 "destination": destination,
                 "transport_mode": transport_mode,
                 "transport_mode_icon": transport_icon,
-                "clickable": True,
-                "click_url": url,  # This is what the UI will use
                 "has_action": True,
-                "auto_complete": False,
-                "action": self
+                "auto_complete": False,  # Don't auto-complete, wait for user to click button
+                "directions_url": url  # Store the URL for the complete_action function
             }
 
             data["action"] = lambda: self.complete_action(data)
             return ActionResult(
                 success=True,
-                message=f"{transport_icon} Directions to {destination}",
+                message=f"Ready to show directions to {destination}",
                 data=data
             )
             
@@ -106,14 +105,26 @@ class ShowDirectionsAction(BaseAction):
 
     def complete_action(self, result_data: Dict[str, Any]) -> bool:
         """
-        Complete the action with the provided result data.
+        Complete the action by opening the directions URL in the browser.
         
         :param result_data: Data returned from the action execution
         :return: True if the action was completed successfully
         """
-        # This action does not require any additional completion logic
-        logger.info("ShowDirectionsAction completed successfully.")
-        return True
+        try:
+            directions_url = result_data.get("directions_url") or result_data.get("url")
+            
+            if directions_url:
+                # Open directions in default web browser
+                webbrowser.open(directions_url)
+                logger.info(f"Opened directions URL: {directions_url}")
+                return True
+            else:
+                logger.error("No directions URL found in result data")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error opening directions URL: {e}")
+            return False
 
     def get_ui_data(self) -> Dict[str, Any]:
         """Get UI configuration for displaying results."""
@@ -130,4 +141,7 @@ class ShowDirectionsAction(BaseAction):
             "bicycling": "🚲",
             "transit": "🚌"
         }
-        return icons.get(mode, "🚗") 
+        return icons.get(mode, "🚗")
+
+# Export the action for plugin loader
+exported_actions = [ShowDirectionsAction]
