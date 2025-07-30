@@ -2,7 +2,7 @@ documents:
   - blood_pressure:
     - document_id: blood_pressure
       document_name: Blood Pressure
-      file_path: "BloodPressureHandout.pdf"
+      file_path: "BloodPressure.jpeg"
       patterns:
         - [{"LOWER": "blood"}, {"LOWER": "pressure"}]
         - [{"LOWER": "blood"}, {"LOWER": "pressure"}, {"LOWER": "handout"}]
@@ -10,7 +10,7 @@ documents:
   - blood_sugar:
     - document_id: blood_sugar
       document_name: Blood Sugar
-      file_path: "C:\\Users\\alexs\\AppData\\Local\\Temp\\tmpv6k39plm.pdf"
+      file_path: "BloodSugar.pdf"
       patterns:
         - [{"LOWER": "blood"}, {"LOWER": "sugar"}]
         - [{"LOWER": "blood"}, {"LOWER": "sugar"}, {"LOWER": "handout"}]
@@ -18,7 +18,7 @@ documents:
   - keto_diet:
     - document_id: keto_diet
       document_name: Keto Diet
-      file_path: "C:\\Users\\alexs\\AppData\\Local\\Temp\\tmpqyudzvho.pdf"
+      file_path: "Keto.png"
       patterns:
         - [{"LOWER": "keto"}, {"LOWER": "diet"}]
         - [{"LOWER": "keto"}, {"LOWER": "diet"}, {"LOWER": "guide"}]

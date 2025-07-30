@@ -1,5 +1,6 @@
 import os
 import yaml
+
 from services.intent_actions.intents.spacy_recognizer import SpacyIntentPattern, SpacyEntityPattern
 
 DOCUMENTS_YAML = os.path.join(os.path.dirname(__file__), "documents.yaml")
@@ -33,25 +34,8 @@ def generate_entity_patterns():
         )
     ]
 
-def generate_document_map():
-    """Generate document mapping from the documents configuration."""
-    config = load_documents_config()
-    document_map = {}
-    
-    # Create mapping from document_id to file_path
-    for doc_entry in config.get("documents", []):
-        for doc_name, doc_details in doc_entry.items():
-            doc_info = doc_details[0] if doc_details else {}
-            doc_id = doc_info.get("document_id", "")
-            file_path = doc_info.get("file_path", "")
-            if doc_id and file_path:
-                document_map[doc_id] = file_path
-    
-    return document_map
-
 # Generated entity patterns and document map
 exported_entities = generate_entity_patterns()
-entity_to_document_map = generate_document_map()
 
 # Intent patterns
 exported_patterns = [

@@ -2,8 +2,10 @@ import os
 import yaml
 from services.intent_actions.actions.base import BaseAction, ActionResult
 from utils.log_config import logger
+from utils.file_utils import get_resource_path
 
 DOCUMENTS_YAML = os.path.join(os.path.dirname(__file__), "documents.yaml")
+DOCUMENTS_PATH = get_resource_path("plugins/intent-action/PrintDocument/documents")
 
 def load_documents_config():
     """Load document file paths from the YAML configuration."""
@@ -20,6 +22,15 @@ def load_documents_config():
                 doc_info = doc_details[0] if doc_details else {}
                 doc_id = doc_info.get("document_name", "")
                 file_path = doc_info.get("file_path", "")
+                # if is absoulte path use it if not get resource path
+                if not os.path.isabs(file_path):
+                    file_path = DOCUMENTS_PATH + os.sep + file_path
+                    logger.debug(f"Using relative path for {doc_id}: {file_path}")
+                else:
+                    file_path = file_path.strip()
+
+                doc_info["file_path"] = file_path
+
                 if doc_id and file_path:
                     documents[doc_id] = file_path
                     
