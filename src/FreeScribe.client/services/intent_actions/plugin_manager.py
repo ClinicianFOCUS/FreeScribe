@@ -191,9 +191,10 @@ def show_consolidated_plugin_errors(plugin_name: str) -> None:
                     if isinstance(widget, tk.Tk):
                         root = widget
                         break
-        except:
+        except Exception as e:
             root = None
-        
+            logger.error(f"Error getting root window: {e}")
+
         # Create a popup window with scrollable text
         error_window = tk.Toplevel(root) if root else tk.Toplevel()
         error_window.title(f"Plugin Load Errors - {plugin_name}")
