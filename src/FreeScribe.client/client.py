@@ -2426,6 +2426,7 @@ if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
     # Populate the UI with the loaded notes
     populate_ui_with_notes()
 
+window._init_post_load()
 
 root.mainloop()
 

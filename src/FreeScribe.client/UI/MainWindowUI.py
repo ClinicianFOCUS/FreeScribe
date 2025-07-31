@@ -48,6 +48,13 @@ class MainWindowUI:
 
         self.warning_bar = None # Warning bar
         
+        self.current_docker_status_check_id = None  # ID for the current Docker status check
+        self.current_container_status_check_id = None  # ID for the current container status check
+        self.root.bind("<<ProcessDataTab>>", self.__create_data_menu)  # Bind the destroy event to clean up resources
+
+        self.manage_app_data_menu = None  # Manage App Data menu
+
+    def _init_post_load(self):
         if FeatureToggle.INTENT_ACTION:
             # Initialize intent action system
             maps_dir = Path(get_file_path('assets', 'maps'))
@@ -55,12 +62,6 @@ class MainWindowUI:
             self.intent_manager = IntentActionManager()
             self.action_window = ActionResultsWindow(self.root)
             self.action_window.hide()  # Hide initially
-
-        self.current_docker_status_check_id = None  # ID for the current Docker status check
-        self.current_container_status_check_id = None  # ID for the current container status check
-        self.root.bind("<<ProcessDataTab>>", self.__create_data_menu)  # Bind the destroy event to clean up resources
-
-        self.manage_app_data_menu = None  # Manage App Data menu
 
     def load_main_window(self):
         """
@@ -269,8 +270,7 @@ class MainWindowUI:
         self.menu_bar.add_cascade(label="Intent-Action", menu=intent_action_menu)
         intent_action_menu.add_command(
             label="Plugin Manager", 
-            command=self.show_plugin_manager_window,
-            accelerator="Ctrl+Shift+P"
+            command=self.show_plugin_manager_window
     )
 
     def show_plugin_manager_window(self):
