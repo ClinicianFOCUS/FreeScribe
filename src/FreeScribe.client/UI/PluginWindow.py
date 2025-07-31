@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
+import sys
+import subprocess
 from pathlib import Path
 from threading import Thread
 from typing import Dict, Any, Optional
@@ -143,6 +145,39 @@ class PluginManagerWindow:
         
         # Handle window close
         self.window.protocol("WM_DELETE_WINDOW", self.close_window)
+    
+    def _confirm_then(self, title: str, msg: str, func, *args):
+        """Show confirmation dialog and execute function if confirmed."""
+        if messagebox.askyesno(title, msg):
+            func(*args)
+
+    def _run_task(self,
+                  title: str,
+                  task_fn,
+                  args: tuple=(),
+                  success_msg: str = None,
+                  on_success=None,
+                  refresh: bool = True):
+        """Run task_fn(*args) in a thread, update status, call on_success(result)."""
+        def _worker():
+            try:
+                self.set_status(f"{title}...", "blue")
+                result = task_fn(*args)
+                if success_msg:
+                    if callable(success_msg):
+                        msg = success_msg(result)
+                    else:
+                        msg = success_msg.format(result=result)
+                    self.set_status(msg, "green")
+                if on_success:
+                    on_success(result)
+                if refresh:
+                    self.window.after(100, self.refresh_plugin_list)
+            except Exception as e:
+                logger.error(f"{title} failed: {e}")
+                self.window.after(0, lambda: self.set_status(f"Error {title}: {e}", "red"))
+
+        Thread(target=_worker, daemon=True).start()
         
     def refresh_plugin_list(self):
         """Refresh the list of loaded plugins."""
@@ -155,6 +190,7 @@ class PluginManagerWindow:
             # Get plugin info
             plugin_info = get_loaded_plugins_info()
             loaded_plugins = plugin_info.get("loaded_plugins", [])
+            logger.debug(f"Plugin window refresh: found {len(loaded_plugins)} plugins: {loaded_plugins}")
             
             # Add plugins to listbox
             for plugin_name in sorted(loaded_plugins):
@@ -337,34 +373,19 @@ class PluginManagerWindow:
     
     def load_plugin_threaded(self, plugin_name: str):
         """Load a plugin in a separate thread."""
-        def load_worker():
-            try:
-                self.set_status(f"Loading plugin: {plugin_name}...", "blue")
+        def task_fn(name):
+            if self.intent_manager:
+                return self.intent_manager.add_plugin(name)
+            else:
+                result = load_specific_plugin(name)
+                return bool(result.get("name"))
                 
-                # Load the plugin
-                result = load_specific_plugin(plugin_name)
-                
-                if result.get("name"):
-                    # Update intent manager if available
-                    if self.intent_manager:
-                        success = self.intent_manager.add_plugin(plugin_name)
-                        if success:
-                            self.set_status(f"Successfully loaded plugin: {result['name']}", "green")
-                        else:
-                            self.set_status(f"Failed to add plugin to manager: {result['name']}", "red")
-                    else:
-                        self.set_status(f"Loaded plugin: {result['name']} (Manager not available)", "orange")
-                    
-                    # Schedule UI refresh
-                    self.window.after(100, self.refresh_plugin_list)
-                else:
-                    self.set_status("Failed to load plugin", "red")
-                    
-            except Exception as e:
-                logger.error(f"Error loading plugin: {e}")
-                self.window.after(0, lambda: self.set_status(f"Error loading plugin: {str(e)}", "red"))
-        
-        Thread(target=load_worker, daemon=True).start()
+        self._run_task(
+            title=f"Loading {plugin_name}",
+            task_fn=task_fn,
+            args=(plugin_name,),
+            success_msg=f"Successfully loaded {plugin_name}"
+        )
     
     def unload_selected_plugin(self):
         """Unload the selected plugin."""
@@ -374,42 +395,27 @@ class PluginManagerWindow:
             return
             
         plugin_name = self.plugin_listbox.get(selection[0])
-        
-        # Confirm unload
-        if not messagebox.askyesno("Confirm Unload", f"Are you sure you want to unload '{plugin_name}'?"):
-            return
-            
-        self.unload_plugin_threaded(plugin_name)
+        self._confirm_then(
+            "Confirm Unload",
+            f"Are you sure you want to unload '{plugin_name}'?",
+            self.unload_plugin_threaded,
+            plugin_name
+        )
     
     def unload_plugin_threaded(self, plugin_name: str):
         """Unload a plugin in a separate thread."""
-        def unload_worker():
-            try:
-                self.set_status(f"Unloading plugin: {plugin_name}...", "blue")
+        def task_fn(name):
+            if self.intent_manager:
+                return self.intent_manager.remove_plugin(name)
+            else:
+                return unload_plugin(name)
                 
-                # Unload from intent manager if available
-                if self.intent_manager:
-                    success = self.intent_manager.remove_plugin(plugin_name)
-                    if success:
-                        self.set_status(f"Successfully unloaded plugin: {plugin_name}", "green")
-                    else:
-                        self.set_status(f"Failed to unload plugin: {plugin_name}", "red")
-                else:
-                    # Unload directly
-                    result = unload_plugin(plugin_name)
-                    if result:
-                        self.set_status(f"Unloaded plugin: {plugin_name}", "green")
-                    else:
-                        self.set_status(f"Failed to unload plugin: {plugin_name}", "red")
-                
-                # Schedule UI refresh
-                self.window.after(100, self.refresh_plugin_list)
-                
-            except Exception as e:
-                logger.error(f"Error unloading plugin: {e}")
-                self.window.after(0, lambda: self.set_status(f"Error unloading plugin: {str(e)}", "red"))
-        
-        Thread(target=unload_worker, daemon=True).start()
+        self._run_task(
+            title=f"Unloading {plugin_name}",
+            task_fn=task_fn,
+            args=(plugin_name,),
+            success_msg=f"Unloaded {plugin_name}"
+        )
     
     def reload_selected_plugin(self):
         """Reload the selected plugin."""
@@ -418,39 +424,23 @@ class PluginManagerWindow:
             messagebox.showwarning("No Selection", "Please select a plugin to reload.")
             return
             
-        plugin_name = self.plugin_listbox.get(selection[0])
-        self.reload_plugin_threaded(plugin_name)
+        self.reload_plugin_threaded(self.plugin_listbox.get(selection[0]))
     
     def reload_plugin_threaded(self, plugin_name: str):
         """Reload a plugin in a separate thread."""
-        def reload_worker():
-            try:
-                self.set_status(f"Reloading plugin: {plugin_name}...", "blue")
+        def task_fn(name):
+            if self.intent_manager:
+                return self.intent_manager.reload_plugin(name)
+            else:
+                result = reload_plugin(name)
+                return bool(result.get("name"))
                 
-                # Reload the plugin
-                result = reload_plugin(plugin_name)
-                
-                if result.get("name"):
-                    # Update intent manager if available
-                    if self.intent_manager:
-                        success = self.intent_manager.reload_plugin(plugin_name)
-                        if success:
-                            self.set_status(f"Successfully reloaded plugin: {plugin_name}", "green")
-                        else:
-                            self.set_status(f"Failed to reload plugin in manager: {plugin_name}", "red")
-                    else:
-                        self.set_status(f"Reloaded plugin: {plugin_name}", "green")
-                    
-                    # Schedule UI refresh
-                    self.window.after(100, self.refresh_plugin_list)
-                else:
-                    self.set_status("Failed to reload plugin", "red")
-                    
-            except Exception as e:
-                logger.error(f"Error reloading plugin: {e}")
-                self.window.after(0, lambda: self.set_status(f"Error reloading plugin: {str(e)}", "red"))
-        
-        Thread(target=reload_worker, daemon=True).start()
+        self._run_task(
+            title=f"Reloading {plugin_name}",
+            task_fn=task_fn,
+            args=(plugin_name,),
+            success_msg=f"Successfully reloaded {plugin_name}"
+        )
     
     def unload_all_plugins(self):
         """Unload all plugins after confirmation."""
@@ -461,43 +451,40 @@ class PluginManagerWindow:
             messagebox.showinfo("No Plugins", "No plugins are currently loaded.")
             return
             
-        # Confirm unload all
-        if not messagebox.askyesno(
-            "Confirm Unload All", 
-            f"Are you sure you want to unload all {plugin_count} plugins?\n\nThis action cannot be undone."
-        ):
-            return
+        self._confirm_then(
+            "Confirm Unload All",
+            f"Unload all {plugin_count} plugins? This cannot be undone.",
+            self._do_unload_all
+        )
+
+    def _do_unload_all(self):
+        """Execute unload all plugins operation."""
+        def task_fn():
+            unloaded_count = unload_all_plugins()
+            # Reinitialize the intent manager to clear patterns after unloading all plugins
+            if self.intent_manager:
+                self.intent_manager._reinit_recognizer()
+            return unloaded_count
             
-        def unload_all_worker():
-            try:
-                self.set_status("Unloading all plugins...", "blue")
-                
-                # Unload all plugins
-                unloaded_count = unload_all_plugins()
-                
-                # Clear intent manager actions if available
-                if self.intent_manager:
-                    self.intent_manager.reload_plugins()
-                
-                self.set_status(f"Successfully unloaded {unloaded_count} plugins", "green")
-                
-                # Schedule UI refresh
-                self.window.after(100, self.refresh_plugin_list)
-                
-            except Exception as e:
-                logger.error(f"Error unloading all plugins: {e}")
-                self.window.after(0, lambda: self.set_status(f"Error unloading all plugins: {str(e)}", "red"))
-        
-        Thread(target=unload_all_worker, daemon=True).start()
+        def format_success(result):
+            return f"Successfully unloaded {result} plugins"
+            
+        self._run_task(
+            title="Unloading all plugins",
+            task_fn=task_fn,
+            success_msg=format_success
+        )
     
     def browse_plugin_directory(self):
         """Open the plugin directory in file explorer."""
         try:
             plugin_dir = get_plugins_dir(INTENT_ACTION_DIR)
             if os.name == 'nt':  # Windows
-                os.startfile(plugin_dir)
-            elif os.name == 'posix':  # macOS and Linux
-                os.system(f'open "{plugin_dir}"' if sys.platform == 'darwin' else f'xdg-open "{plugin_dir}"')
+                subprocess.run(["explorer", plugin_dir], check=False)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.run(["open", plugin_dir], check=False)
+            else:  # Linux and other Unix-like systems
+                subprocess.run(["xdg-open", plugin_dir], check=False)
         except Exception as e:
             logger.error(f"Error opening plugin directory: {e}")
             messagebox.showerror("Error", f"Could not open plugin directory: {str(e)}")

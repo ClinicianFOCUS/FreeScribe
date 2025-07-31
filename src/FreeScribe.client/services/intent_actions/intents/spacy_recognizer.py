@@ -232,33 +232,59 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             self.nlp = spacy.load(self.model_name)
             self.matcher = Matcher(self.nlp.vocab)
             
-            # Load plugin patterns and entities
-            intent_patterns, entity_patterns = load_plugin_intent_patterns(get_plugins_dir(INTENT_ACTION_DIR))
-            
-            for pattern in intent_patterns:
-                self.add_pattern(pattern)
+            # Load plugin patterns and entities with error handling
+            try:
+                intent_patterns, entity_patterns = load_plugin_intent_patterns(get_plugins_dir(INTENT_ACTION_DIR))
                 
-            for entity in entity_patterns:
-                self.add_entity_pattern(entity)
+                for pattern in intent_patterns:
+                    try:
+                        self.add_pattern(pattern)
+                    except Exception as e:
+                        logger.error(f"Failed to add intent pattern {getattr(pattern, 'intent_name', 'unknown')}: {e}")
+                        continue
+                    
+                for entity in entity_patterns:
+                    try:
+                        self.add_entity_pattern(entity)
+                    except Exception as e:
+                        logger.error(f"Failed to add entity pattern {getattr(entity, 'entity_name', 'unknown')}: {e}")
+                        continue
+                        
+            except Exception as e:
+                logger.error(f"Failed to load plugin patterns, continuing with built-in patterns only: {e}")
+                # Continue initialization with just built-in patterns
             
             # Setup EntityRuler
             self._setup_entity_ruler()
             
             # Add patterns to matcher
             for pattern in self.patterns:
-                self.matcher.add(pattern.intent_name, pattern.patterns)
-                logger.info(f"Loaded pattern: {pattern.intent_name}")
-                logger.debug(f"Pattern details: {pattern.patterns}")
+                try:
+                    self.matcher.add(pattern.intent_name, pattern.patterns)
+                except Exception as e:
+                    logger.error(f"Failed to add pattern {pattern.intent_name} to matcher: {e}")
+                    continue
             
-                
-            for entity in self.custom_entities:
-                logger.info(f"Loaded custom entity: {entity.entity_name}")
-                logger.debug(f"Entity pattern details: {entity.patterns}")
-            
+            pattern_list = [p.patterns for p in self.patterns]
+            logger.info(f"Adding {len(pattern_list)} patterns to matcher")
+            logger.debug(f"Patterns: {pattern_list}")
+
+            entity_list = [entity.entity_name for entity in self.custom_entities]
+            logger.info(f"Adding {len(entity_list)} custom entities to EntityRuler")
+            logger.debug(f"Loaded custom entities: {entity_list}")
+
             logger.info("SpaCy Intent Recognizer initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize SpaCy Intent Recognizer: {e}")
-            raise
+            # Don't re-raise the exception to prevent application crash
+            # Initialize with minimal functionality
+            try:
+                self.nlp = spacy.load(self.model_name)
+                self.matcher = Matcher(self.nlp.vocab)
+                logger.warning("SpaCy recognizer initialized with minimal functionality due to errors")
+            except Exception as fallback_error:
+                logger.error(f"Even fallback initialization failed: {fallback_error}")
+                raise fallback_error
     
     # Label mapping for parameter extraction
     LABEL_MAP = {

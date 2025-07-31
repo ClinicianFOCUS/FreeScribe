@@ -1,10 +1,14 @@
 import os
 import threading
+import datetime
 from pathlib import Path
 from utils.log_config import logger
 import importlib.util
 from utils.file_utils import get_resource_path
 from typing import List, Tuple, Optional, TypeVar, Any, Dict
+import tkinter as tk
+from tkinter import messagebox
+import traceback
 
 T = TypeVar("T")
 
@@ -17,22 +21,17 @@ class PluginState:
         self._loaded_plugins: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.RLock()
     
-    def add_module(self, module_name: str, module: Any) -> None:
+    def add_module(self, plugin_name: str, module_name: str, module: Any) -> None:
         """Add a module to the tracking (for cleanup purposes)."""
         with self._lock:
-            # Extract plugin name from module_name (format: plugin_name_file_stem)
-            parts = module_name.split('_')
-            if len(parts) >= 2:
-                plugin_name = '_'.join(parts[:-1])
-                if plugin_name in self._loaded_plugins:
-                    if "modules" not in self._loaded_plugins[plugin_name]:
-                        self._loaded_plugins[plugin_name]["modules"] = {}
-                    self._loaded_plugins[plugin_name]["modules"][module_name] = module
+            if plugin_name in self._loaded_plugins:
+                if "modules" not in self._loaded_plugins[plugin_name]:
+                    self._loaded_plugins[plugin_name]["modules"] = {}
+                self._loaded_plugins[plugin_name]["modules"][module_name] = module
     
     def add_plugin(self, plugin_name: str, actions: List[Any], intent_patterns: List[Any], entity_patterns: List[Any], modules: Dict[str, Any]) -> None:
         """Add a complete plugin to the loaded state."""
         with self._lock:
-            import datetime
             self._loaded_plugins[plugin_name] = {
                 "actions": actions,
                 "intent_patterns": intent_patterns,
@@ -119,9 +118,185 @@ class PluginState:
 # Global plugin state instance
 _plugin_state = PluginState()
 
+# Track which plugins have already shown error dialogs to prevent duplicates
+_error_dialogs_shown = set()
+
+# Track errors for each plugin to consolidate them
+_plugin_errors: Dict[str, List[Dict[str, str]]] = {}
+
 def get_plugin_state() -> PluginState:
     """Get the global plugin state instance."""
     return _plugin_state
+
+def add_plugin_error(plugin_name: str, file_path: str, error: Exception, error_type: str = "Loading") -> None:
+    """
+    Add an error to the plugin's error list for later consolidation.
+    
+    :param plugin_name: Name of the plugin that failed
+    :param file_path: Path to the file that caused the error
+    :param error: The exception that occurred
+    :param error_type: Type of error (e.g., "Action Loading", "Intent Loading", etc.)
+    """
+    if plugin_name not in _plugin_errors:
+        _plugin_errors[plugin_name] = []
+    
+    error_info = {
+        "type": error_type,
+        "file": file_path,
+        "error_class": type(error).__name__,
+        "error_message": str(error),
+        "traceback": traceback.format_exc()
+    }
+    
+    _plugin_errors[plugin_name].append(error_info)
+    logger.error(f"Added {error_type} error for plugin {plugin_name}: {error}")
+
+def show_consolidated_plugin_errors(plugin_name: str) -> None:
+    """
+    Show a consolidated error dialog for all errors encountered while loading a plugin.
+    
+    :param plugin_name: Name of the plugin that had errors
+    """
+    if plugin_name not in _plugin_errors or not _plugin_errors[plugin_name]:
+        return
+    
+    # Check if we've already shown an error dialog for this plugin
+    if plugin_name in _error_dialogs_shown:
+        logger.debug(f"Error dialog already shown for plugin {plugin_name}, skipping duplicate")
+        return
+    
+    # Mark this plugin as having shown an error dialog
+    _error_dialogs_shown.add(plugin_name)
+    
+    try:
+        errors = _plugin_errors[plugin_name]
+        
+        # Create the consolidated error message
+        error_message = f"Plugin '{plugin_name}' failed to load with {len(errors)} error(s):\n\n"
+        
+        for i, error_info in enumerate(errors, 1):
+            error_message += f"=== Error {i}: {error_info['type']} ===\n"
+            error_message += f"File: {error_info['file']}\n"
+            error_message += f"Error: {error_info['error_class']}: {error_info['error_message']}\n\n"
+            error_message += f"Traceback:\n{error_info['traceback']}\n"
+            error_message += "=" * 60 + "\n\n"
+        
+        # Get the root window if it exists
+        try:
+            # Try to get the root window
+            root = tk._default_root
+            if root is None:
+                # If no default root, get all windows and find the root
+                for widget in tk._default_root.winfo_children() if tk._default_root else []:
+                    if isinstance(widget, tk.Tk):
+                        root = widget
+                        break
+        except:
+            root = None
+        
+        # Create a popup window with scrollable text
+        error_window = tk.Toplevel(root) if root else tk.Toplevel()
+        error_window.title(f"Plugin Load Errors - {plugin_name}")
+        error_window.geometry("700x500")
+        error_window.resizable(True, True)
+        
+        # Make the window modal and on top
+        if root:
+            error_window.transient(root)
+        error_window.grab_set()
+        error_window.lift()  # Bring to front
+        error_window.attributes('-topmost', True)  # Stay on top
+        error_window.focus_force()  # Force focus
+        
+        # Main label
+        main_label = tk.Label(error_window, 
+                             text=f"Plugin '{plugin_name}' failed to load with {len(errors)} error(s) and has been removed.",
+                             font=("Arial", 12, "bold"),
+                             fg="red")
+        main_label.pack(pady=10)
+        
+        # Frame for the text area and scrollbar
+        text_frame = tk.Frame(error_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Text widget with scrollbar
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, font=("Courier", 9))
+        scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack the text widget and scrollbar
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Insert the error message
+        text_widget.insert(tk.END, error_message)
+        text_widget.config(state=tk.DISABLED)
+        
+        # OK button that also cleans up the tracking
+        def on_ok():
+            _error_dialogs_shown.discard(plugin_name)  # Remove from tracking when dialog is closed
+            _plugin_errors.pop(plugin_name, None)  # Clear the errors for this plugin
+            error_window.destroy()
+        
+        ok_button = tk.Button(error_window, text="OK", command=on_ok)
+        ok_button.pack(pady=10)
+        
+        # Center the window on the screen (or relative to parent if available)
+        error_window.update_idletasks()
+        
+        if root:
+            # Center relative to the root window
+            root_x = root.winfo_x()
+            root_y = root.winfo_y()
+            root_width = root.winfo_width()
+            root_height = root.winfo_height()
+            
+            dialog_width = error_window.winfo_width()
+            dialog_height = error_window.winfo_height()
+            
+            # Center on the root window
+            x = root_x + (root_width - dialog_width) // 2
+            y = root_y + (root_height - dialog_height) // 2
+        else:
+            # Center on screen
+            x = (error_window.winfo_screenwidth() // 2) - (error_window.winfo_width() // 2)
+            y = (error_window.winfo_screenheight() // 2) - (error_window.winfo_height() // 2)
+        
+        error_window.geometry(f"+{x}+{y}")
+        
+        # Ensure it's still on top after positioning
+        error_window.lift()
+        error_window.attributes('-topmost', True)
+        
+        # Allow user to disable topmost after a short delay (so they can interact with other windows if needed)
+        def disable_topmost():
+            try:
+                error_window.attributes('-topmost', False)
+            except:
+                pass  # Window might be destroyed
+        
+        error_window.after(3000, disable_topmost)  # Remove topmost after 3 seconds
+        
+        logger.error(f"Consolidated plugin error dialog shown for {plugin_name} with {len(errors)} errors")
+        
+    except Exception as dialog_error:
+        # Fallback to simple messagebox if the custom dialog fails
+        logger.error(f"Failed to show consolidated error dialog: {dialog_error}")
+        try:
+            error_summary = f"Plugin '{plugin_name}' failed to load with {len(_plugin_errors.get(plugin_name, []))} error(s)"
+            messagebox.showerror(f"Plugin Error - {plugin_name}", error_summary)
+        except Exception as fallback_error:
+            logger.error(f"Even fallback messagebox failed: {fallback_error}")
+        finally:
+            # Remove from tracking even if dialog failed
+            _error_dialogs_shown.discard(plugin_name)
+            _plugin_errors.pop(plugin_name, None)
+
+def show_plugin_error_dialog(plugin_name: str, file_path: str, error: Exception) -> None:
+    """
+    Legacy function for backward compatibility. Now adds to consolidated errors.
+    """
+    add_plugin_error(plugin_name, file_path, error, "General Loading")
 
 def load_exported_from_files(
     base_dir: Path, 
@@ -156,15 +331,43 @@ def load_exported_from_files(
                 
             spec.loader.exec_module(module)
             exported_items = getattr(module, export_name, [])
-            results.extend(exported_items)
+            
+            # Validate that exported_items is iterable
+            try:
+                iter(exported_items)
+                results.extend(exported_items)
+            except TypeError:
+                logger.error(f"Exported {export_name} from {file} is not iterable (type: {type(exported_items)})")
+                continue
             
             # Track the module in plugin state if plugin_name is provided
             if plugin_name:
-                _plugin_state.add_module(f"{plugin_name}_{file.stem}", module)
+                _plugin_state.add_module(plugin_name, f"{plugin_name}_{file.stem}", module)
             
             logger.debug(f"Loaded {export_name} from {file}")
+            
+        except SyntaxError as e:
+            logger.error(f"Syntax error in {file}: {e}")
+            # Add to consolidated errors but don't crash
+            if plugin_name:
+                add_plugin_error(plugin_name, str(file), e, f"Syntax Error in {export_name}")
+                # Remove the plugin from the loaded state if it was partially loaded
+                _plugin_state.remove_plugin(plugin_name)
+            # Continue processing other files instead of raising
+            continue
+            
         except Exception as e:
             logger.error(f"Failed to load {export_name} from {file}: {e}")
+            
+            # Add to consolidated errors and remove plugin if plugin_name is provided
+            if plugin_name:
+                add_plugin_error(plugin_name, str(file), e, f"Loading {export_name}")
+                # Remove the plugin from the loaded state if it was partially loaded
+                _plugin_state.remove_plugin(plugin_name)
+            
+            # Continue processing other files instead of raising
+            continue
+            
     return results
 
 def get_plugins_dir(subdir: Optional[str] = None) -> str:
@@ -194,6 +397,7 @@ def load_plugin_intent_patterns(plugins_dir: str = get_plugins_dir(INTENT_ACTION
     plugins_root = Path(plugins_dir)
     all_intent_patterns = []
     all_entity_patterns = []
+    failed_plugins = []
     
     # Iterate through each plugin folder
     for plugin_folder in plugins_root.iterdir():
@@ -201,31 +405,60 @@ def load_plugin_intent_patterns(plugins_dir: str = get_plugins_dir(INTENT_ACTION
             continue
             
         plugin_name = plugin_folder.name
-        logger.debug(f"Loading patterns from plugin: {plugin_name}")
+        logger.info(f"Loading intent patterns from plugin: {plugin_name}")
         
-        # Load intent patterns from this specific plugin folder
-        intent_patterns = load_exported_from_files(
-            plugin_folder, 
-            "Intent.py", 
-            "exported_patterns",
-            plugin_name=f"{plugin_name}_intents" if track_state else None,
-            recursive=False
-        )
-        
-        # Load entity patterns from this specific plugin folder
-        entity_patterns = load_exported_from_files(
-            plugin_folder, 
-            "Intent.py", 
-            "exported_entities",
-            plugin_name=f"{plugin_name}_entities" if track_state else None,
-            recursive=False
-        )
-        
-        all_intent_patterns.extend(intent_patterns)
-        all_entity_patterns.extend(entity_patterns)
-        
-        if intent_patterns or entity_patterns:
-            logger.info(f"Loaded {len(intent_patterns)} intent patterns and {len(entity_patterns)} entity patterns from plugin: {plugin_name}")
+        try:
+            # Load intent patterns from this plugin folder - use main plugin name, not separate tracking
+            intent_patterns = load_exported_from_files(
+                plugin_folder, 
+                "Intent.py", 
+                "exported_patterns",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            
+            # Load entity patterns from this plugin folder - use main plugin name, not separate tracking
+            entity_patterns = load_exported_from_files(
+                plugin_folder, 
+                "Intent.py", 
+                "exported_entities",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            
+            # Only add patterns if we successfully loaded them
+            if intent_patterns:
+                all_intent_patterns.extend(intent_patterns)
+                logger.info(f"Loaded {len(intent_patterns)} intent patterns from {plugin_name}")
+            
+            if entity_patterns:
+                all_entity_patterns.extend(entity_patterns)
+                logger.info(f"Loaded {len(entity_patterns)} entity patterns from {plugin_name}")
+                
+        except Exception as e:
+            logger.error(f"Failed to load patterns from plugin {plugin_name}: {e}")
+            failed_plugins.append(plugin_name)
+            
+            # Only show error dialog if one hasn't been shown already for this plugin
+            if plugin_name not in _error_dialogs_shown:
+                try:
+                    intent_file_path = plugin_folder / "Intent.py"
+                    if intent_file_path.exists():
+                        show_plugin_error_dialog(plugin_name, str(intent_file_path), e)
+                    else:
+                        show_plugin_error_dialog(plugin_name, f"{plugin_folder}/Intent.py (file not found)", e)
+                        
+                    # Remove only the main plugin from state
+                    _plugin_state.remove_plugin(plugin_name)
+                    
+                except Exception as dialog_error:
+                    logger.error(f"Failed to show error dialog for Intent.py failure: {dialog_error}")
+            
+            # Continue with other plugins instead of crashing
+            continue
+    
+    if failed_plugins:
+        logger.warning(f"Failed to load patterns from {len(failed_plugins)} plugins: {failed_plugins}")
     
     logger.info(f"Loaded {len(all_intent_patterns)} total intent patterns and {len(all_entity_patterns)} total entity patterns from plugin folders")
     return all_intent_patterns, all_entity_patterns
@@ -247,6 +480,9 @@ def load_specific_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(IN
     
     logger.info(f"Loading plugin: {plugin_name}")
     
+    # Clear any previous errors for this plugin
+    _plugin_errors.pop(plugin_name, None)
+    
     result = {
         "name": plugin_name,
         "actions": [],
@@ -255,44 +491,85 @@ def load_specific_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(IN
         "modules": {}
     }
     
+    plugin_had_errors = False
+    
     try:
         # Load actions from this plugin folder
-        action_classes = load_exported_from_files(
-            plugin_path, 
-            "*Action.py", 
-            "exported_actions",
-            plugin_name=plugin_name if track_state else None,
-            recursive=False
-        )
-        
-        for cls in action_classes:
-            try:
-                action_instance = cls()
-                result["actions"].append(action_instance)
-            except Exception as e:
-                logger.error(f"Failed to instantiate action {cls} from {plugin_name}: {e}")
+        try:
+            action_classes = load_exported_from_files(
+                plugin_path, 
+                "*Action.py", 
+                "exported_actions",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            
+            for cls in action_classes:
+                try:
+                    action_instance = cls()
+                    result["actions"].append(action_instance)
+                except Exception as e:
+                    logger.error(f"Failed to instantiate action {cls} from {plugin_name}: {e}")
+                    if track_state:
+                        add_plugin_error(plugin_name, f"Action class: {cls.__name__}", e, "Action Instantiation")
+                        plugin_had_errors = True
+                    # Continue with other actions instead of failing the entire plugin
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Failed to load actions from plugin {plugin_name}: {e}")
+            # Add to consolidated errors for Action.py loading failures
+            if track_state:
+                try:
+                    action_file_pattern = list(plugin_path.glob("*Action.py"))
+                    action_file_path = str(action_file_pattern[0]) if action_file_pattern else f"{plugin_path}/*Action.py (no files found)"
+                    add_plugin_error(plugin_name, action_file_path, e, "Action File Loading")
+                    plugin_had_errors = True
+                except Exception:
+                    pass
         
         # Load intent patterns from this plugin folder
-        intent_patterns = load_exported_from_files(
-            plugin_path, 
-            "Intent.py", 
-            "exported_patterns",
-            plugin_name=f"{plugin_name}_intents" if track_state else None,
-            recursive=False
-        )
-        entity_patterns = load_exported_from_files(
-            plugin_path, 
-            "Intent.py", 
-            "exported_entities",
-            plugin_name=f"{plugin_name}_entities" if track_state else None,
-            recursive=False
-        )
+        try:
+            intent_patterns = load_exported_from_files(
+                plugin_path, 
+                "Intent.py", 
+                "exported_patterns",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            entity_patterns = load_exported_from_files(
+                plugin_path, 
+                "Intent.py", 
+                "exported_entities",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            
+            result["intent_patterns"] = intent_patterns
+            result["entity_patterns"] = entity_patterns
+            
+        except Exception as e:
+            logger.error(f"Failed to load intent/entity patterns from plugin {plugin_name}: {e}")
+            # Add to consolidated errors for Intent.py loading failures
+            if track_state:
+                try:
+                    intent_file_path = plugin_path / "Intent.py"
+                    add_plugin_error(plugin_name, str(intent_file_path), e, "Intent/Entity Pattern Loading")
+                    plugin_had_errors = True
+                except Exception:
+                    pass
         
-        result["intent_patterns"] = intent_patterns
-        result["entity_patterns"] = entity_patterns
+        # Check if any errors occurred during loading
+        if plugin_name in _plugin_errors and _plugin_errors[plugin_name]:
+            plugin_had_errors = True
         
-        if track_state:
-            # Store the complete plugin as one unit
+        # Show consolidated error dialog if there were any errors
+        if plugin_had_errors and track_state:
+            show_consolidated_plugin_errors(plugin_name)
+            return {}  # Return empty result for failed plugin
+        
+        if track_state and (result["actions"] or result["intent_patterns"] or result["entity_patterns"]):
+            # Only store the plugin if we loaded something successfully
             _plugin_state.add_plugin(
                 plugin_name, 
                 result["actions"], 
@@ -308,6 +585,12 @@ def load_specific_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(IN
         
     except Exception as e:
         logger.error(f"Error loading plugin {plugin_name}: {e}")
+        # Add to consolidated errors for general plugin loading failures
+        if track_state:
+            add_plugin_error(plugin_name, str(plugin_path), e, "General Plugin Loading")
+            show_consolidated_plugin_errors(plugin_name)
+            _plugin_state.remove_plugin(plugin_name)
+        return {}
     
     return result
 
@@ -328,8 +611,12 @@ def load_plugin_actions(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR), t
     if track_state:
         # Clear existing plugins before loading new ones
         _plugin_state.clear_all()
+        # Also clear the error dialog tracking and plugin errors
+        _error_dialogs_shown.clear()
+        _plugin_errors.clear()
     
     all_actions = []
+    failed_plugins = []
     
     # Load each plugin
     for plugin_folder in plugins_root.iterdir():
@@ -337,10 +624,23 @@ def load_plugin_actions(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR), t
             continue
             
         plugin_name = plugin_folder.name
-        plugin_result = load_specific_plugin(plugin_name, plugins_dir, track_state)
-        all_actions.extend(plugin_result.get("actions", []))
+        try:
+            plugin_result = load_specific_plugin(plugin_name, plugins_dir, track_state)
+            if plugin_result:  # Only add actions if plugin loaded successfully
+                all_actions.extend(plugin_result.get("actions", []))
+            else:
+                failed_plugins.append(plugin_name)
+        except Exception as e:
+            logger.error(f"Failed to load plugin {plugin_name}: {e}")
+            failed_plugins.append(plugin_name)
+            continue
     
-    logger.info(f"Loaded {len(all_actions)} total actions from {len(_plugin_state.get_loaded_plugin_names())} plugins")
+    successful_plugins = len(_plugin_state.get_loaded_plugin_names())
+    logger.info(f"Loaded {len(all_actions)} total actions from {successful_plugins} plugins")
+    
+    if failed_plugins:
+        logger.warning(f"Failed to load {len(failed_plugins)} plugins: {failed_plugins}")
+    
     return all_actions
 
 def unload_plugin(plugin_name: str) -> Dict[str, Any]:
@@ -409,7 +709,7 @@ def get_plugin_actions_for_ui(plugin_name: str) -> List[Dict[str, Any]]:
     for action in actions:
         actions_info.append({
             "name": action.__class__.__name__,
-            "action_id": action.action_id,
+            "action_id": getattr(action, 'action_id', action.__class__.__name__),
             "display_name": getattr(action, 'display_name', action.__class__.__name__),
             "description": getattr(action, 'description', 'No description available'),
             "module": action.__module__
@@ -540,3 +840,85 @@ def get_available_plugins(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR))
             available_plugins.append(item.name)
     
     return available_plugins
+
+def clean_up_duplicate_plugin_entries():
+    """
+    Clean up any duplicate plugin entries that might exist from previous versions.
+    This removes entries like 'HelloWorld_intents' and 'HelloWorld_entities' if
+    a main 'HelloWorld' entry exists.
+    """
+    try:
+        plugin_state = get_plugin_state()
+        loaded_plugins = plugin_state.get_loaded_plugin_names().copy()
+        
+        # Find main plugins and their potential duplicates
+        main_plugins = set()
+        duplicate_entries = []
+        
+        for plugin_name in loaded_plugins:
+            if plugin_name.endswith('_intents') or plugin_name.endswith('_entities'):
+                # This is a potential duplicate entry
+                base_name = plugin_name.replace('_intents', '').replace('_entities', '')
+                if base_name in loaded_plugins:
+                    # Main plugin exists, mark this as a duplicate
+                    duplicate_entries.append(plugin_name)
+                else:
+                    # Main plugin doesn't exist, this might be a legitimate entry
+                    main_plugins.add(base_name)
+        
+        # Remove duplicate entries
+        for duplicate in duplicate_entries:
+            plugin_state.remove_plugin(duplicate)
+            logger.info(f"Cleaned up duplicate plugin entry: {duplicate}")
+        
+        if duplicate_entries:
+            logger.info(f"Cleaned up {len(duplicate_entries)} duplicate plugin entries")
+            
+    except Exception as e:
+        logger.error(f"Error cleaning up duplicate plugin entries: {e}")
+
+class PluginService:
+    """Service class for managing plugins with reduced boilerplate."""
+    
+    def __init__(self, plugin_dir: Path):
+        self.plugin_dir = plugin_dir
+
+    def load_all(self):
+        """Load all plugins from the plugin directory."""
+        load_plugin_actions(str(self.plugin_dir))
+
+    def load(self, name: str) -> Dict[str, Any]:
+        """Load a specific plugin by name."""
+        return load_specific_plugin(name, str(self.plugin_dir))
+
+    def unload(self, name: str) -> Dict[str, Any]:
+        """Unload a specific plugin by name."""
+        return unload_plugin(name)
+
+    def reload(self, name: Optional[str] = None) -> bool:
+        """Reload a specific plugin or all plugins if name is None."""
+        if name:
+            result = reload_plugin(name, str(self.plugin_dir))
+            return bool(result)
+        load_plugin_actions(str(self.plugin_dir))
+        return True
+
+    def state(self):
+        """Get the plugin state instance."""
+        return get_plugin_state()
+
+    def get_all_actions(self) -> List[Any]:
+        """Get all loaded actions from plugins."""
+        return self.state().get_all_actions()
+
+    def get_info(self) -> Dict[str, Any]:
+        """Get information about all loaded plugins."""
+        return get_loaded_plugins_info()
+
+    def get_details(self, name: str) -> Dict[str, Any]:
+        """Get detailed information about a specific plugin."""
+        return get_plugin_details_for_ui(name)
+
+    def list_for_ui(self) -> List[Dict[str, Any]]:
+        """Get all plugins formatted for UI display."""
+        return get_all_plugins_for_ui()
