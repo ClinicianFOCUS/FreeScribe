@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from .intents import SpacyIntentRecognizer, Intent
 from .actions import BaseAction
-from .plugin_manager import load_plugin_actions, get_plugins_dir, INTENT_ACTION_DIR
-
+from .plugin_manager import (
+    get_plugins_dir, 
+    INTENT_ACTION_DIR,
+    PluginService
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,31 +29,116 @@ class IntentActionManager:
         
         """
         
+        # Initialize plugin service
+        self.plugin_svc = PluginService(Path(get_plugins_dir(INTENT_ACTION_DIR)))
+        
         # Initialize recognizer but don't load plugins yet
         self.intent_recognizer = SpacyIntentRecognizer()
         
-        # Initialize basic actions
-        self.actions: List[BaseAction] = []
+        # Initialize built-in actions (separate from plugin actions)
+        self.builtin_actions: List[BaseAction] = [
+        ]
         
         # Defer initialization to a separate method
         self.initialize()
     
     def initialize(self):
         """Initialize the recognizer and load all actions."""
-        # Initialize recognizer (this will load plugin patterns)
-        self.intent_recognizer.initialize()
+        logger.info("IntentActionManager: Starting initialization...")
         
-        # Register built-in actions
-        self.actions = [
-        ]
+        # Load all plugins first
+        logger.info("IntentActionManager: Loading all plugins...")
+        self.plugin_svc.load_all()
+        
+        plugin_info = self.plugin_svc.get_info()
+        logger.info(f"IntentActionManager: Loaded {plugin_info.get('total_plugins', 0)} plugins")
+        
+        self._reinit_recognizer()
+        self.actions = self.builtin_actions + self.plugin_svc.get_all_actions()
+        for a in self.actions:
+            logger.info(f"Registered action handler: {getattr(a, 'action_id', a.__class__.__name__)}")
+        
+        logger.info("IntentActionManager: Initialization complete")
 
-        # Load plugin actions
-        plugin_actions = load_plugin_actions(get_plugins_dir(INTENT_ACTION_DIR))
-        self.actions.extend(plugin_actions)
+    def _reinit_recognizer(self):
+        """Reinitialize the intent recognizer."""
+        self.intent_recognizer = SpacyIntentRecognizer()
+        self.intent_recognizer.initialize()
+    
+    def get_all_actions(self) -> List[BaseAction]:
+        """Get all actions (built-in + plugin actions)."""
+        return self.builtin_actions + self.plugin_svc.get_all_actions()
+    
+    def remove_plugin(self, plugin_name: str) -> bool:
+        """
+        Remove a specific plugin from the manager.
         
-        # Register action handlers
-        for action in self.actions:
-            logger.info(f"Registered action handler: {action.action_id}")
+        :param plugin_name: Name of the plugin to remove
+        :return: True if successfully removed, False otherwise
+        """
+        try:
+            removed = self.plugin_svc.unload(plugin_name)
+            if removed:
+                self._reinit_recognizer()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to remove plugin {plugin_name}: {e}")
+            return False
+    
+    def reload_plugin(self, plugin_name: Optional[str] = None) -> bool:
+        """
+        Reload a specific plugin or all plugins if name is None.
+        
+        :param plugin_name: Name of the plugin to reload, or None for all
+        :return: True if successfully reloaded, False otherwise
+        """
+        try:
+            ok = self.plugin_svc.reload(plugin_name)
+            if ok:
+                self._reinit_recognizer()
+            return ok
+        except Exception as e:
+            logger.error(f"Failed to reload plugin {plugin_name}: {e}")
+            return False
+    
+    def reload_plugins(self):
+        """Reload all plugins."""
+        logger.info("Reloading all plugins...")        
+        ok = self.plugin_svc.reload()
+        if ok:
+            self._reinit_recognizer()
+        total_actions = len(self.get_all_actions())
+        logger.info(f"Reloaded plugins. Total actions: {total_actions}")
+    
+    def add_plugin(self, plugin_name: str) -> bool:
+        """
+        Add a specific plugin to the manager.
+        
+        :param plugin_name: Name of the plugin folder
+        :return: True if successfully added, False otherwise
+        """
+        try:
+            result = self.plugin_svc.load(plugin_name)
+            if result:
+                self._reinit_recognizer()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to add plugin {plugin_name}: {e}")
+            return False
+    
+    def get_plugin_info(self) -> Dict[str, Any]:
+        """Get information about loaded plugins."""
+        return self.plugin_svc.get_info()
+    
+    def get_plugin_details(self, plugin_name: str) -> Dict[str, Any]:
+        """Get detailed information about a specific plugin for UI."""
+        return self.plugin_svc.get_details(plugin_name)
+    
+    def get_all_plugins_info(self) -> List[Dict[str, Any]]:
+        """Get information about all plugins for UI."""
+        return self.plugin_svc.list_for_ui()
         
     def process_text(self, text: str) -> List[Dict[str, Any]]:
         """
@@ -62,9 +150,13 @@ class IntentActionManager:
         logger.debug(f"Processing text: {text}")
         results = []
         
+        # Get all current actions
+        all_actions = self.get_all_actions()
+        
         # Recognize intents
         intents = self.intent_recognizer.recognize_intent(text)
         logger.debug(f"Intents: {intents}")
+        
         # Process each intent
         for intent in intents:
             # Find all matching actions
@@ -91,15 +183,18 @@ class IntentActionManager:
                 
         return results
         
-    def _find_actions_for_intent(self, intent: Intent) -> List[BaseAction]:
+    def _find_actions_for_intent(
+        self, intent: Intent, actions: Optional[List[BaseAction]] = None
+    ) -> List[BaseAction]:
         """
         Find all action handlers that can handle the given intent.
         
         :param intent: Intent to find handlers for
+        :param actions: List of actions to search through, or None to use all actions
         :return: List of matching action handlers
         """
+        pool = actions if actions is not None else self.get_all_actions()
         return [
-            action
-            for action in self.actions
-            if action.can_handle_intent(intent.name, intent.metadata)
+            a for a in pool
+            if a.can_handle_intent(intent.name, intent.metadata)
         ]
