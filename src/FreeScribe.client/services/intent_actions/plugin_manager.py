@@ -717,20 +717,6 @@ def get_plugin_actions_for_ui(plugin_name: str) -> List[Dict[str, Any]]:
     
     return actions_info
 
-def get_plugin_modules_count(plugin_name: str) -> int:
-    """
-    Get the count of modules loaded for a specific plugin.
-    
-    :param plugin_name: Name of the plugin
-    :return: Number of modules loaded for this plugin
-    """
-    plugin_state = get_plugin_state()
-    plugin_info = plugin_state.get_plugin_info(plugin_name)
-    
-    if plugin_info:
-        return len(plugin_info.get("modules", {}))
-    return 0
-
 def get_plugin_details_for_ui(plugin_name: str) -> Dict[str, Any]:
     """
     Get detailed plugin information formatted for UI display.

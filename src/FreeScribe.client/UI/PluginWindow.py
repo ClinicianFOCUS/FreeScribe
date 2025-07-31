@@ -16,7 +16,6 @@ from services.intent_actions.plugin_manager import (
     unload_all_plugins,
     get_plugins_dir,
     INTENT_ACTION_DIR,
-    get_plugin_modules_count,
     get_plugin_details_for_ui
 )
 
@@ -293,9 +292,8 @@ class PluginManagerWindow:
             info_lines.extend([
                 "Plugin State:",
                 "-" * 20,
-                f"Is Loaded: {plugin_state.is_plugin_loaded(plugin_name)}",
-                f"Module Count: {get_plugin_modules_count(plugin_name)}"
-            ])
+                f"Is Loaded: {plugin_state.is_plugin_loaded(plugin_name)}"
+                ])
             
             # Insert text
             self.info_text.insert(tk.END, "\n".join(info_lines))
