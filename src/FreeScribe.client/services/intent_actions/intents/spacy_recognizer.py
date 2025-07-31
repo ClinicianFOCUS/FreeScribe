@@ -337,8 +337,11 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             
             # Process each pattern that has matches
             for pattern in self.patterns:
-                matches = matches_by_intent.get(pattern.intent_name, [])
+                if pattern.intent_name not in matches_by_intent:
+                    logger.debug(f"No matches found for pattern {pattern.intent_name}, skipping.")
+                    continue
                 
+                matches = matches_by_intent[pattern.intent_name]
                 logger.debug(f"Found {len(matches)} matches for pattern {pattern.intent_name}")
                 
                 confidence = self._calculate_confidence(pattern, doc, matches)
