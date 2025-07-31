@@ -17,6 +17,9 @@ from UI.SettingsWindow import SettingsWindow
 from UI.PluginWindow import show_plugin_manager
 from utils.log_config import logger
 from pathlib import Path
+import threading
+from tkinter import messagebox
+from UI.LoadingWindow import LoadingWindow
 
 DOCKER_CONTAINER_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker container status
 DOCKER_DESKTOP_CHECK_INTERVAL = 10000  # Interval in milliseconds to check the Docker Desktop status
@@ -55,13 +58,68 @@ class MainWindowUI:
         self.manage_app_data_menu = None  # Manage App Data menu
 
     def _init_post_load(self):
+        """Initialize post-load components in a threaded loading window."""
         if FeatureToggle.INTENT_ACTION:
-            # Initialize intent action system
-            maps_dir = Path(get_file_path('assets', 'maps'))
-            maps_dir.mkdir(parents=True, exist_ok=True)
-            self.intent_manager = IntentActionManager()
-            self.action_window = ActionResultsWindow(self.root)
-            self.action_window.hide()  # Hide initially
+            # Create cancel handler
+            cancel_requested = threading.Event()
+            
+            def on_cancel():
+                cancel_requested.set()
+                logger.info("Intent-Action initialization cancelled by user")
+            
+            # Show loading window with cancel support
+            loading_window = LoadingWindow(
+                parent=self.root,
+                title="Initializing",
+                initial_text="Initializing Intent-Action System...",
+                on_cancel=on_cancel,
+                note_text="This may take a moment to complete."
+            )
+            
+            # Run initialization in a separate thread
+            def init_thread():
+                try:
+                    if cancel_requested.is_set():
+                        return
+                    
+                    # Initialize intent action system
+                    self.root.after(0, lambda: setattr(loading_window.label, 'text', "Creating directories..."))
+                    maps_dir = Path(get_file_path('assets', 'maps'))
+                    maps_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    if cancel_requested.is_set():
+                        return
+                    
+                    # Update loading message
+                    self.root.after(0, lambda: setattr(loading_window.label, 'text', "Creating intent manager..."))
+                    self.intent_manager = IntentActionManager()
+                    
+                    if cancel_requested.is_set():
+                        return
+                    
+                    # Update loading message
+                    self.root.after(0, lambda: setattr(loading_window.label, 'text', "Setting up action window..."))
+                    self.action_window = ActionResultsWindow(self.root)
+                    self.action_window.hide()  # Hide initially
+                    
+                    # Close loading window on success
+                    if not cancel_requested.is_set():
+                        self.root.after(0, loading_window.destroy)
+                        logger.info("Intent-Action system initialized successfully")
+                    
+                except Exception as e:
+                    logger.error(f"Error initializing intent-action system: {e}")
+                    # Close loading window and show error
+                    self.root.after(0, loading_window.destroy)
+                    if not cancel_requested.is_set():
+                        self.root.after(0, lambda: messagebox.showerror(
+                            "Initialization Error", 
+                            f"Failed to initialize Intent-Action system:\n{str(e)}"
+                        ))
+            
+            # Start the initialization thread
+            init_thread = threading.Thread(target=init_thread, daemon=True)
+            init_thread.start()
 
     def load_main_window(self):
         """
