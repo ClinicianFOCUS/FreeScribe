@@ -883,12 +883,19 @@ class PluginService:
         return unload_plugin(name)
 
     def reload(self, name: Optional[str] = None) -> bool:
-        """Reload a specific plugin or all plugins if name is None."""
-        if name:
-            result = reload_plugin(name, str(self.plugin_dir))
-            return bool(result)
-        load_plugin_actions(str(self.plugin_dir))
-        return True
+        """Reload a specific plugin or all plugins if name is None.
+        
+        Returns True if reload succeeded, False otherwise.
+        """
+        try:
+            if name:
+                result = reload_plugin(name, str(self.plugin_dir))
+                return bool(result)
+            load_plugin_actions(str(self.plugin_dir))
+            return True
+        except Exception as e:
+            logger.error(f"Error reloading plugin(s): {e}")
+            return False
 
     def state(self):
         """Get the plugin state instance."""
