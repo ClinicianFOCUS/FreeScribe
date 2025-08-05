@@ -475,193 +475,437 @@ def load_specific_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(IN
     """
     plugin_path = Path(plugins_dir) / plugin_name
     
-    if not _validate_plugin_path(plugin_path):
+    if not plugin_path.exists() or not plugin_path.is_dir():
+        logger.error(f"Plugin directory does not exist: {plugin_path}")
         return {}
     
     logger.info(f"Loading plugin: {plugin_name}")
     
-    # Initialize plugin loading state
-    _prepare_plugin_loading(plugin_name)
-    
-    result = _create_plugin_result_template(plugin_name)
-    
-    # Load all plugin components
-    plugin_had_errors = _load_plugin_components(plugin_path, plugin_name, result, track_state)
-    
-    # Handle errors and finalize loading
-    return _finalize_plugin_loading(plugin_name, result, plugin_had_errors, track_state)
-
-
-def _validate_plugin_path(plugin_path: Path) -> bool:
-    """Validate that the plugin path exists and is a directory."""
-    if not plugin_path.exists() or not plugin_path.is_dir():
-        logger.error(f"Plugin directory does not exist: {plugin_path}")
-        return False
-    return True
-
-
-def _prepare_plugin_loading(plugin_name: str) -> None:
-    """Prepare for plugin loading by clearing previous errors."""
+    # Clear any previous errors for this plugin
     _plugin_errors.pop(plugin_name, None)
-
-
-def _create_plugin_result_template(plugin_name: str) -> Dict[str, Any]:
-    """Create the initial result template for plugin loading."""
-    return {
+    
+    result = {
         "name": plugin_name,
         "actions": [],
         "intent_patterns": [],
         "entity_patterns": [],
         "modules": {}
     }
-
-
-def _load_plugin_components(plugin_path: Path, plugin_name: str, result: Dict[str, Any], track_state: bool) -> bool:
-    """
-    Load all plugin components (actions, intents, entities).
-    Returns True if any errors occurred during loading.
-    """
+    
     plugin_had_errors = False
     
-    # Load actions
-    if _load_plugin_actions(plugin_path, plugin_name, result, track_state):
-        plugin_had_errors = True
-    
-    # Load intent and entity patterns
-    if _load_plugin_patterns(plugin_path, plugin_name, result, track_state):
-        plugin_had_errors = True
-    
-    # Check if any errors were recorded during loading
-    if plugin_name in _plugin_errors and _plugin_errors[plugin_name]:
-        plugin_had_errors = True
-    
-    return plugin_had_errors
-
-
-def _load_plugin_actions(plugin_path: Path, plugin_name: str, result: Dict[str, Any], track_state: bool) -> bool:
-    """
-    Load action classes from the plugin.
-    Returns True if errors occurred.
-    """
-    had_errors = False
-    
     try:
-        action_classes = load_exported_from_files(
-            plugin_path, 
-            "*Action.py", 
-            "exported_actions",
-            plugin_name=plugin_name if track_state else None,
-            recursive=False
-        )
+        # Load actions from this plugin folder
+        try:
+            action_classes = load_exported_from_files(
+                plugin_path, 
+                "*Action.py", 
+                "exported_actions",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            
+            for cls in action_classes:
+                try:
+                    action_instance = cls()
+                    result["actions"].append(action_instance)
+                except Exception as e:
+                    logger.error(f"Failed to instantiate action {cls} from {plugin_name}: {e}")
+                    if track_state:
+                        add_plugin_error(plugin_name, f"Action class: {cls.__name__}", e, "Action Instantiation")
+                        plugin_had_errors = True
+                    # Continue with other actions instead of failing the entire plugin
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Failed to load actions from plugin {plugin_name}: {e}")
+            # Add to consolidated errors for Action.py loading failures
+            if track_state:
+                try:
+                    action_file_pattern = list(plugin_path.glob("*Action.py"))
+                    action_file_path = str(action_file_pattern[0]) if action_file_pattern else f"{plugin_path}/*Action.py (no files found)"
+                    add_plugin_error(plugin_name, action_file_path, e, "Action File Loading")
+                    plugin_had_errors = True
+                except Exception:
+                    pass
         
-        for cls in action_classes:
-            if _instantiate_action_class(cls, plugin_name, result, track_state):
-                had_errors = True
-                
-    except Exception as e:
-        logger.error(f"Failed to load actions from plugin {plugin_name}: {e}")
-        if track_state:
-            action_file_path = _get_action_file_path(plugin_path)
-            add_plugin_error(plugin_name, action_file_path, e, "Action File Loading")
-            had_errors = True
-    
-    return had_errors
-
-
-def _instantiate_action_class(cls, plugin_name: str, result: Dict[str, Any], track_state: bool) -> bool:
-    """
-    Instantiate a single action class.
-    Returns True if an error occurred.
-    """
-    try:
-        action_instance = cls()
-        result["actions"].append(action_instance)
-        return False
-    except Exception as e:
-        logger.error(f"Failed to instantiate action {cls} from {plugin_name}: {e}")
-        if track_state:
-            add_plugin_error(plugin_name, f"Action class: {cls.__name__}", e, "Action Instantiation")
-        return True
-
-
-def _get_action_file_path(plugin_path: Path) -> str:
-    """Get the path to the action file for error reporting."""
-    try:
-        action_file_pattern = list(plugin_path.glob("*Action.py"))
-        return str(action_file_pattern[0]) if action_file_pattern else f"{plugin_path}/*Action.py (no files found)"
-    except Exception:
-        return f"{plugin_path}/*Action.py (error accessing files)"
-
-
-def _load_plugin_patterns(plugin_path: Path, plugin_name: str, result: Dict[str, Any], track_state: bool) -> bool:
-    """
-    Load intent and entity patterns from the plugin.
-    Returns True if errors occurred.
-    """
-    try:
-        intent_patterns = load_exported_from_files(
-            plugin_path, 
-            "Intent.py", 
-            "exported_patterns",
-            plugin_name=plugin_name if track_state else None,
-            recursive=False
-        )
+        # Load intent patterns from this plugin folder
+        try:
+            intent_patterns = load_exported_from_files(
+                plugin_path, 
+                "Intent.py", 
+                "exported_patterns",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            entity_patterns = load_exported_from_files(
+                plugin_path, 
+                "Intent.py", 
+                "exported_entities",
+                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                recursive=False
+            )
+            
+            result["intent_patterns"] = intent_patterns
+            result["entity_patterns"] = entity_patterns
+            
+        except Exception as e:
+            logger.error(f"Failed to load intent/entity patterns from plugin {plugin_name}: {e}")
+            # Add to consolidated errors for Intent.py loading failures
+            if track_state:
+                try:
+                    intent_file_path = plugin_path / "Intent.py"
+                    add_plugin_error(plugin_name, str(intent_file_path), e, "Intent/Entity Pattern Loading")
+                    plugin_had_errors = True
+                except Exception:
+                    pass
         
-        entity_patterns = load_exported_from_files(
-            plugin_path, 
-            "Intent.py", 
-            "exported_entities",
-            plugin_name=plugin_name if track_state else None,
-            recursive=False
-        )
+        # Check if any errors occurred during loading
+        if plugin_name in _plugin_errors and _plugin_errors[plugin_name]:
+            plugin_had_errors = True
         
-        result["intent_patterns"] = intent_patterns
-        result["entity_patterns"] = entity_patterns
-        return False
+        # Show consolidated error dialog if there were any errors
+        if plugin_had_errors and track_state:
+            show_consolidated_plugin_errors(plugin_name)
+            return {}  # Return empty result for failed plugin
+        
+        if track_state and (result["actions"] or result["intent_patterns"] or result["entity_patterns"]):
+            # Only store the plugin if we loaded something successfully
+            _plugin_state.add_plugin(
+                plugin_name, 
+                result["actions"], 
+                result["intent_patterns"], 
+                result["entity_patterns"],
+                result["modules"]
+            )
+        
+        logger.info(f"Successfully loaded plugin {plugin_name}: "
+                   f"{len(result['actions'])} actions, "
+                   f"{len(result['intent_patterns'])} intent patterns, "
+                   f"{len(result['entity_patterns'])} entity patterns")
         
     except Exception as e:
-        logger.error(f"Failed to load intent/entity patterns from plugin {plugin_name}: {e}")
+        logger.error(f"Error loading plugin {plugin_name}: {e}")
+        # Add to consolidated errors for general plugin loading failures
         if track_state:
-            intent_file_path = plugin_path / "Intent.py"
-            add_plugin_error(plugin_name, str(intent_file_path), e, "Intent/Entity Pattern Loading")
-        return True
-
-
-def _finalize_plugin_loading(plugin_name: str, result: Dict[str, Any], plugin_had_errors: bool, track_state: bool) -> Dict[str, Any]:
-    """
-    Finalize plugin loading by handling errors and updating state.
-    Returns the final result dictionary.
-    """
-    if plugin_had_errors and track_state:
-        show_consolidated_plugin_errors(plugin_name)
+            add_plugin_error(plugin_name, str(plugin_path), e, "General Plugin Loading")
+            show_consolidated_plugin_errors(plugin_name)
+            _plugin_state.remove_plugin(plugin_name)
         return {}
     
-    if track_state and _plugin_has_content(result):
-        _register_plugin_in_state(plugin_name, result)
-    
-    _log_plugin_loading_success(plugin_name, result)
     return result
 
+def load_plugin_actions(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR), track_state: bool = True) -> List[Any]:
+    """
+    Load and instantiate action classes from plugin folders.
+    Each folder in plugins_dir is treated as a separate plugin.
+    
+    :param track_state: Whether to track loaded plugins in the global state
+    :return: List of all action instances
+    """
+    plugins_root = Path(plugins_dir)
+    
+    if not plugins_root.exists():
+        logger.warning(f"Plugins directory does not exist: {plugins_dir}")
+        return []
+    
+    if track_state:
+        # Clear existing plugins before loading new ones
+        _plugin_state.clear_all()
+        # Also clear the error dialog tracking and plugin errors
+        _error_dialogs_shown.clear()
+        _plugin_errors.clear()
+    
+    all_actions = []
+    failed_plugins = []
+    
+    # Load each plugin
+    for plugin_folder in plugins_root.iterdir():
+        if not plugin_folder.is_dir():
+            continue
+            
+        plugin_name = plugin_folder.name
+        try:
+            plugin_result = load_specific_plugin(plugin_name, plugins_dir, track_state)
+            if plugin_result:  # Only add actions if plugin loaded successfully
+                all_actions.extend(plugin_result.get("actions", []))
+            else:
+                failed_plugins.append(plugin_name)
+        except Exception as e:
+            logger.error(f"Failed to load plugin {plugin_name}: {e}")
+            failed_plugins.append(plugin_name)
+            continue
+    
+    successful_plugins = len(_plugin_state.get_loaded_plugin_names())
+    logger.info(f"Loaded {len(all_actions)} total actions from {successful_plugins} plugins")
+    
+    if failed_plugins:
+        logger.warning(f"Failed to load {len(failed_plugins)} plugins: {failed_plugins}")
+    
+    return all_actions
 
-def _plugin_has_content(result: Dict[str, Any]) -> bool:
-    """Check if the plugin has any loaded content."""
-    return bool(result["actions"] or result["intent_patterns"] or result["entity_patterns"])
+def unload_plugin(plugin_name: str) -> Dict[str, Any]:
+    """
+    Unload a specific plugin.
+    
+    :param plugin_name: Name of the plugin to unload
+    :return: Dictionary with unloaded plugin data, empty if plugin wasn't loaded
+    """
+    try:
+        if not _plugin_state.is_plugin_loaded(plugin_name):
+            logger.warning(f"Plugin {plugin_name} is not currently loaded")
+            return {}
+        
+        removed_plugin = _plugin_state.remove_plugin(plugin_name)
+        logger.info(f"Successfully unloaded plugin: {plugin_name}")
+        return removed_plugin
+        
+    except Exception as e:
+        logger.error(f"Error unloading plugin {plugin_name}: {e}")
+        return {}
 
+def reload_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR)) -> Dict[str, Any]:
+    """
+    Reload a specific plugin (unload then load).
+    
+    :param plugin_name: Name of the plugin folder
+    :param plugins_dir: Base plugins directory
+    :return: Dictionary with loaded components
+    """
+    # Unload if currently loaded
+    if _plugin_state.is_plugin_loaded(plugin_name):
+        unload_plugin(plugin_name)
+    
+    # Load the plugin
+    return load_specific_plugin(plugin_name, plugins_dir, track_state=True)
 
-def _register_plugin_in_state(plugin_name: str, result: Dict[str, Any]) -> None:
-    """Register the successfully loaded plugin in the global state."""
-    _plugin_state.add_plugin(
-        plugin_name, 
-        result["actions"], 
-        result["intent_patterns"], 
-        result["entity_patterns"],
-        result["modules"]
-    )
+def get_loaded_plugins_info() -> Dict[str, Any]:
+    """
+    Get information about all loaded plugins.
+    
+    :return: Dictionary with plugin information
+    """
+    plugin_state = get_plugin_state()
+    loaded_plugins = plugin_state.get_loaded_plugin_names()
+    
+    return {
+        "total_plugins": len(loaded_plugins),
+        "loaded_plugins": loaded_plugins,  # Changed from "plugins" to "loaded_plugins"
+        "total_actions": len(plugin_state.get_all_actions()),
+        "total_intent_patterns": len(plugin_state.get_all_intent_patterns()),
+        "total_entity_patterns": len(plugin_state.get_all_entity_patterns())
+    }
 
+def get_plugin_actions_for_ui(plugin_name: str) -> List[Dict[str, Any]]:
+    """
+    Get actions for a specific plugin formatted for UI display.
+    
+    :param plugin_name: Name of the plugin
+    :return: List of action information dictionaries
+    """
+    plugin_state = get_plugin_state()
+    actions = plugin_state.get_plugin_actions(plugin_name)
+    
+    actions_info = []
+    for action in actions:
+        actions_info.append({
+            "name": action.__class__.__name__,
+            "action_id": getattr(action, 'action_id', action.__class__.__name__),
+            "display_name": getattr(action, 'display_name', action.__class__.__name__),
+            "description": getattr(action, 'description', 'No description available'),
+            "module": action.__module__
+        })
+    
+    return actions_info
 
-def _log_plugin_loading_success(plugin_name: str, result: Dict[str, Any]) -> None:
-    """Log successful plugin loading with component counts."""
-    logger.info(f"Successfully loaded plugin {plugin_name}: "
-               f"{len(result['actions'])} actions, "
-               f"{len(result['intent_patterns'])} intent patterns, "
-               f"{len(result['entity_patterns'])} entity patterns")
+def get_plugin_details_for_ui(plugin_name: str) -> Dict[str, Any]:
+    """
+    Get detailed plugin information formatted for UI display.
+    
+    :param plugin_name: Name of the plugin
+    :return: Dictionary with plugin details for UI
+    """
+    plugin_info = _plugin_state.get_plugin_info(plugin_name)
+    
+    if not plugin_info:
+        return {}
+    
+    # Format actions for UI
+    actions_info = []
+    for action in plugin_info["actions"]:
+        actions_info.append({
+            "name": action.__class__.__name__,
+            "module": action.__module__,
+            "description": getattr(action, 'description', 'No description available')
+        })
+    
+    # Format intent patterns for UI
+    intents_info = []
+    for pattern in plugin_info["intent_patterns"]:
+        intents_info.append({
+            "pattern": str(pattern),
+            "type": type(pattern).__name__
+        })
+    
+    # Format entity patterns for UI
+    entities_info = []
+    for pattern in plugin_info["entity_patterns"]:
+        entities_info.append({
+            "pattern": str(pattern),
+            "type": type(pattern).__name__
+        })
+    
+    return {
+        "name": plugin_name,
+        "summary": {
+            "actions": len(actions_info),
+            "intents": len(intents_info),
+            "entities": len(entities_info),
+            "loaded_at": plugin_info["loaded_at"].strftime("%Y-%m-%d %H:%M:%S")
+        },
+        "details": {
+            "actions": actions_info,
+            "intents": intents_info,
+            "entities": entities_info
+        }
+    }
+
+def get_all_plugins_for_ui() -> List[Dict[str, Any]]:
+    """
+    Get all plugins formatted for UI display.
+    
+    :return: List of plugin summaries for the main list
+    """
+    plugins_summary = []
+    for plugin_name in _plugin_state.get_loaded_plugin_names():
+        plugin_details = get_plugin_details_for_ui(plugin_name)
+        if plugin_details:
+            plugins_summary.append({
+                "name": plugin_name,
+                "display_name": plugin_name.replace("_", " ").title(),
+                "summary": plugin_details["summary"]
+            })
+    
+    return plugins_summary
+
+def unload_all_plugins() -> int:
+    """
+    Unload all currently loaded plugins.
+    
+    :return: Number of plugins that were unloaded
+    """
+    try:
+        loaded_plugin_names = _plugin_state.get_loaded_plugin_names().copy()  # Copy to avoid modification during iteration
+        unloaded_count = 0
+        
+        for plugin_name in loaded_plugin_names:
+            if unload_plugin(plugin_name):
+                unloaded_count += 1
+        
+        logger.info(f"Unloaded {unloaded_count} plugins")
+        return unloaded_count
+        
+    except Exception as e:
+        logger.error(f"Error unloading all plugins: {e}")
+        return 0
+
+def get_available_plugins(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR)) -> List[str]:
+    """
+    Get a list of available plugin names (folder names) in the plugins directory.
+    
+    :return: List of plugin folder names
+    """
+    plugins_root = Path(plugins_dir)
+    
+    if not plugins_root.exists():
+        logger.warning(f"Plugins directory does not exist: {plugins_dir}")
+        return []
+    
+    available_plugins = []
+    for item in plugins_root.iterdir():
+        if item.is_dir():
+            available_plugins.append(item.name)
+    
+    return available_plugins
+
+def clean_up_duplicate_plugin_entries():
+    """
+    Clean up any duplicate plugin entries that might exist from previous versions.
+    This removes entries like 'HelloWorld_intents' and 'HelloWorld_entities' if
+    a main 'HelloWorld' entry exists.
+    """
+    try:
+        plugin_state = get_plugin_state()
+        loaded_plugins = plugin_state.get_loaded_plugin_names().copy()
+        
+        # Find main plugins and their potential duplicates
+        main_plugins = set()
+        duplicate_entries = []
+        
+        for plugin_name in loaded_plugins:
+            if plugin_name.endswith('_intents') or plugin_name.endswith('_entities'):
+                # This is a potential duplicate entry
+                base_name = plugin_name.replace('_intents', '').replace('_entities', '')
+                if base_name in loaded_plugins:
+                    # Main plugin exists, mark this as a duplicate
+                    duplicate_entries.append(plugin_name)
+                else:
+                    # Main plugin doesn't exist, this might be a legitimate entry
+                    main_plugins.add(base_name)
+        
+        # Remove duplicate entries
+        for duplicate in duplicate_entries:
+            plugin_state.remove_plugin(duplicate)
+            logger.info(f"Cleaned up duplicate plugin entry: {duplicate}")
+        
+        if duplicate_entries:
+            logger.info(f"Cleaned up {len(duplicate_entries)} duplicate plugin entries")
+            
+    except Exception as e:
+        logger.error(f"Error cleaning up duplicate plugin entries: {e}")
+
+class PluginService:
+    """Service class for managing plugins with reduced boilerplate."""
+    
+    def __init__(self, plugin_dir: Path):
+        self.plugin_dir = plugin_dir
+
+    def load_all(self):
+        """Load all plugins from the plugin directory."""
+        load_plugin_actions(str(self.plugin_dir))
+
+    def load(self, name: str) -> Dict[str, Any]:
+        """Load a specific plugin by name."""
+        return load_specific_plugin(name, str(self.plugin_dir))
+
+    def unload(self, name: str) -> Dict[str, Any]:
+        """Unload a specific plugin by name."""
+        return unload_plugin(name)
+
+    def reload(self, name: Optional[str] = None) -> bool:
+        """Reload a specific plugin or all plugins if name is None."""
+        if name:
+            result = reload_plugin(name, str(self.plugin_dir))
+            return bool(result)
+        load_plugin_actions(str(self.plugin_dir))
+        return True
+
+    def state(self):
+        """Get the plugin state instance."""
+        return get_plugin_state()
+
+    def get_all_actions(self) -> List[Any]:
+        """Get all loaded actions from plugins."""
+        return self.state().get_all_actions()
+
+    def get_info(self) -> Dict[str, Any]:
+        """Get information about all loaded plugins."""
+        return get_loaded_plugins_info()
+
+    def get_details(self, name: str) -> Dict[str, Any]:
+        """Get detailed information about a specific plugin."""
+        return get_plugin_details_for_ui(name)
+
+    def list_for_ui(self) -> List[Dict[str, Any]]:
+        """Get all plugins formatted for UI display."""
+        return get_all_plugins_for_ui()
