@@ -414,7 +414,7 @@ def load_plugin_intent_patterns(plugins_dir: str = get_plugins_dir(INTENT_ACTION
                 plugin_folder, 
                 "Intent.py", 
                 "exported_patterns",
-                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                plugin_name=plugin_name if track_state else None,  
                 recursive=False
             )
             
@@ -423,7 +423,7 @@ def load_plugin_intent_patterns(plugins_dir: str = get_plugins_dir(INTENT_ACTION
                 plugin_folder, 
                 "Intent.py", 
                 "exported_entities",
-                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                plugin_name=plugin_name if track_state else None,  
                 recursive=False
             )
             
@@ -501,7 +501,7 @@ def load_specific_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(IN
                 plugin_path, 
                 "*Action.py", 
                 "exported_actions",
-                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                plugin_name=plugin_name if track_state else None,  
                 recursive=False
             )
             
@@ -535,14 +535,14 @@ def load_specific_plugin(plugin_name: str, plugins_dir: str = get_plugins_dir(IN
                 plugin_path, 
                 "Intent.py", 
                 "exported_patterns",
-                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                plugin_name=plugin_name if track_state else None,  
                 recursive=False
             )
             entity_patterns = load_exported_from_files(
                 plugin_path, 
                 "Intent.py", 
                 "exported_entities",
-                plugin_name=plugin_name if track_state else None,  # Use main plugin name
+                plugin_name=plugin_name if track_state else None,  
                 recursive=False
             )
             
@@ -690,7 +690,7 @@ def get_loaded_plugins_info() -> Dict[str, Any]:
     
     return {
         "total_plugins": len(loaded_plugins),
-        "loaded_plugins": loaded_plugins,  # Changed from "plugins" to "loaded_plugins"
+        "loaded_plugins": loaded_plugins,
         "total_actions": len(plugin_state.get_all_actions()),
         "total_intent_patterns": len(plugin_state.get_all_intent_patterns()),
         "total_entity_patterns": len(plugin_state.get_all_entity_patterns())
