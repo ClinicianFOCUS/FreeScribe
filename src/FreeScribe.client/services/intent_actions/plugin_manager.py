@@ -734,20 +734,51 @@ def get_plugin_actions_for_ui(plugin_name: str) -> List[Dict[str, Any]]:
     :param plugin_name: Name of the plugin
     :return: List of action information dictionaries
     """
-    plugin_state = get_plugin_state()
-    actions = plugin_state.get_plugin_actions(plugin_name)
-    
-    actions_info = []
-    for action in actions:
-        actions_info.append({
-            "name": action.__class__.__name__,
-            "action_id": getattr(action, 'action_id', action.__class__.__name__),
-            "display_name": getattr(action, 'display_name', action.__class__.__name__),
-            "description": getattr(action, 'description', 'No description available'),
-            "module": action.__module__
-        })
-    
-    return actions_info
+    try:
+        plugin_state = get_plugin_state()
+        actions = plugin_state.get_plugin_actions(plugin_name)
+        
+        actions_info = []
+        for action in actions:
+            try:
+                # Safely extract action attributes with error handling
+                action_name = getattr(action, '__class__', type('DefaultClass', (), {'__name__': f'Error loading... {plugin_name}'})).__name__
+                action_id = getattr(action, 'action_id', action_name)
+                display_name = getattr(action, 'display_name', action_name)
+                description = getattr(action, 'description', 'No description available')
+                module_name = getattr(action, '__module__', 'Unknown module')
+                
+                actions_info.append({
+                    "name": action_name,
+                    "action_id": action_id,
+                    "display_name": display_name,
+                    "description": description,
+                    "module": module_name
+                })
+                
+            except Exception as attr_error:
+                # If we can't access action attributes, create an error entry
+                logger.exception(f"Error accessing attributes for action in plugin {plugin_name}: {attr_error}")
+                actions_info.append({
+                    "name": f"Error loading... {plugin_name}",
+                    "action_id": f"error_{plugin_name}",
+                    "display_name": f"Error loading... {plugin_name}",
+                    "description": f"Failed to load action attributes: {str(attr_error)}",
+                    "module": "Error"
+                })
+        
+        return actions_info
+        
+    except Exception as e:
+        # If we can't even get the plugin actions, return an error entry
+        logger.exception(f"Error getting plugin actions for {plugin_name}: {e}")
+        return [{
+            "name": f"Error loading... {plugin_name}",
+            "action_id": f"error_{plugin_name}",
+            "display_name": f"Error loading... {plugin_name}",
+            "description": f"Failed to retrieve plugin actions: {str(e)}",
+            "module": "Error"
+        }]
 
 def get_plugin_details_for_ui(plugin_name: str) -> Dict[str, Any]:
     """
