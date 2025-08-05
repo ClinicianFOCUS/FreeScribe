@@ -382,6 +382,37 @@ def get_plugins_dir(subdir: Optional[str] = None) -> str:
     
     return get_resource_path(plugin_path)
 
+def is_valid_plugin_directory(directory_path: Path) -> bool:
+    """
+    Check if a directory is a valid plugin directory (not hidden or system).
+    
+    :param directory_path: Path to the directory to check
+    :return: True if directory is valid for plugin loading
+    """
+    if not directory_path.is_dir():
+        return False
+    
+    dir_name = directory_path.name
+    
+    # Skip hidden directories (starting with .)
+    if dir_name.startswith('.'):
+        return False
+    
+    # Skip Python cache directories
+    if dir_name.startswith('__') and dir_name.endswith('__'):
+        return False
+    
+    # Skip common system/temp directories (case-insensitive)
+    system_dirs = {
+        'desktop.ini', 'thumbs.db', '$recycle.bin', 
+        'system volume information', '.git', '.svn',
+        'node_modules', '.vscode', '.idea'
+    }
+    if dir_name.lower() in system_dirs:
+        return False
+    
+    return True
+
 def load_plugin_intent_patterns(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR), track_state: bool = True) -> Tuple[List, List]:
     """
     Load all intent patterns and entity patterns from plugin folders.
@@ -402,7 +433,7 @@ def load_plugin_intent_patterns(plugins_dir: str = get_plugins_dir(INTENT_ACTION
     
     # Iterate through each plugin folder
     for plugin_folder in plugins_root.iterdir():
-        if not plugin_folder.is_dir():
+        if not is_valid_plugin_directory(plugin_folder):
             continue
             
         plugin_name = plugin_folder.name
@@ -621,7 +652,7 @@ def load_plugin_actions(plugins_dir: str = get_plugins_dir(INTENT_ACTION_DIR), t
     
     # Load each plugin
     for plugin_folder in plugins_root.iterdir():
-        if not plugin_folder.is_dir():
+        if not is_valid_plugin_directory(plugin_folder):
             continue
             
         plugin_name = plugin_folder.name
