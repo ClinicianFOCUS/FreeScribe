@@ -63,7 +63,7 @@ class PrescribeMedicationAction(BaseAction):
             # Extract entities from parameters instead of directly from metadata
             parameters = metadata.get("parameters", {})
             entities = parameters.get("entities", {})
-            medication = entities.get("MEDICATION", ["unknown medication"])[0] if entities.get("MEDICATION") else "unknown medication"
+            medication = entities.get("MEDICATION", ["unknown medication"])[0]
             task = TodoTask(
                 task_type="prescription",
                 description=f"Prescribe {medication}",
@@ -159,9 +159,9 @@ class ScheduleTaskAction(BaseAction):
             # Extract entities from parameters instead of directly from metadata
             parameters = metadata.get("parameters", {})
             entities = parameters.get("entities", {})
-            specialist = entities.get("SPECIALIST", [""])[0] if entities.get("SPECIALIST") else ""
-            diagnostic_test = entities.get("DIAGNOSTIC_TEST", [""])[0] if entities.get("DIAGNOSTIC_TEST") else ""
-            lab_test = entities.get("LAB_TEST", [""])[0] if entities.get("LAB_TEST") else ""
+            specialist = entities.get("SPECIALIST", [""])[0]
+            diagnostic_test = entities.get("DIAGNOSTIC_TEST", [""])[0]
+            lab_test = entities.get("LAB_TEST", [""])[0]
             
             if specialist:
                 description = f"Refer to {specialist}"
