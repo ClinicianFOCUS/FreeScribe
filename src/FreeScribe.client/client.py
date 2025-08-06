@@ -206,6 +206,23 @@ def populate_ui_with_notes():
 
     root.after(0, action)
 
+def switch_app_mode(event, mode):
+    """
+    Switches the application mode based on the event triggered.
+
+    Args:
+        event: The event that triggered this function.
+        mode: The mode to switch to.
+    """
+    if mode == "auto-note":
+        safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+    elif mode == "query":
+        # switch  to query mode
+        safe_set_button_config(send_button, text="Send Query", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+
+root.bind("<<SetAutoNote>>", lambda e, mode="auto-note": switch_app_mode(e, mode))
+root.bind("<<SetQueryMode>>", lambda e, mode="query": switch_app_mode(e, mode))
+
 def clear_all_notes():
     """
     Clears all temporary notes from the UI and the .txt file.
