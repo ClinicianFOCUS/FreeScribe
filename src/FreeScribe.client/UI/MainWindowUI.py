@@ -329,7 +329,11 @@ class MainWindowUI:
         intent_action_menu.add_command(
             label="Plugin Manager", 
             command=self.show_plugin_manager_window
-    )
+        )
+        intent_action_menu.add_command(
+            label="Open Action Manager Window", 
+            command=self.open_action_manager_window
+        )
 
     def show_plugin_manager_window(self):
         """Show the plugin manager window."""
@@ -534,5 +538,18 @@ class MainWindowUI:
     def close_action_window(self) -> None:
         """Close the action results window."""
         self.action_window.hide()
+
+    def open_action_manager_window(self):
+        """Open the action manager window."""
+        try:
+            if hasattr(self, 'action_window') and self.action_window:
+                self.action_window.show()
+                logger.info("Action manager window opened")
+            else:
+                logger.warning("Action window not initialized")
+                messagebox.showwarning("Warning", "Action window is not available. Please ensure the Intent-Action system is initialized.")
+        except Exception as e:
+            logger.error(f"Error opening action manager window: {e}")
+            messagebox.showerror("Error", f"Failed to open action manager window: {str(e)}")
 
 
