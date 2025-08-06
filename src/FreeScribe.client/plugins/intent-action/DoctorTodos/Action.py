@@ -280,15 +280,22 @@ class DocumentMedicalAction(BaseAction):
             vital_sign = entities.get("VITAL_SIGN", [None])[0]
             symptom = entities.get("SYMPTOM", [None])[0]
 
+            description_parts = []
+            doc_types = []
+            
             if vital_sign:
-                description = f"Record {vital_sign}"
-                doc_type = "vital_signs"
-            elif symptom:
-                description = f"Document {symptom}"
-                doc_type = "symptoms"
-            elif medical_record:
-                description = f"Document {medical_record}"
-                doc_type = "medical_record"
+                description_parts.append(f"Record {vital_sign}")
+                doc_types.append("vital_signs")
+            if symptom:
+                description_parts.append(f"Document {symptom}")
+                doc_types.append("symptoms")
+            if medical_record:
+                description_parts.append(f"Document {medical_record}")
+                doc_types.append("medical_record")
+            
+            if description_parts:
+                description = " and ".join(description_parts)
+                doc_type = "_".join(doc_types)
             else:
                 # Mark task as incomplete or prompt for more information
                 description = "Insufficient information: Please specify a vital sign or symptom to document."
