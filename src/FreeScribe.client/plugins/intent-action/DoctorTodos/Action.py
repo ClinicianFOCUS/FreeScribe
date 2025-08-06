@@ -176,7 +176,7 @@ class ScheduleTaskAction(BaseAction):
                 task_subtype = "lab_order"
                 icon = "🧪"
             else:
-                description = f"Schedule follow-up appointment"
+                description = "Schedule follow-up appointment"
                 task_subtype = "appointment"
                 icon = "📅"
             
@@ -276,19 +276,23 @@ class DocumentMedicalAction(BaseAction):
             # Extract entities from parameters instead of directly from metadata
             parameters = metadata.get("parameters", {})
             entities = parameters.get("entities", {})
-            medical_record = entities.get("MEDICAL_RECORD", ["medical record"])[0] if entities.get("MEDICAL_RECORD") else "medical record"
-            vital_sign = entities.get("VITAL_SIGN", [""])[0] if entities.get("VITAL_SIGN") else ""
-            symptom = entities.get("SYMPTOM", [""])[0] if entities.get("SYMPTOM") else ""
-            
+            medical_record = entities.get("MEDICAL_RECORD", [None])[0]
+            vital_sign = entities.get("VITAL_SIGN", [None])[0]
+            symptom = entities.get("SYMPTOM", [None])[0]
+
             if vital_sign:
                 description = f"Record {vital_sign}"
                 doc_type = "vital_signs"
             elif symptom:
                 description = f"Document {symptom}"
                 doc_type = "symptoms"
-            else:
-                description = f"Update {medical_record}"
+            elif medical_record:
+                description = f"Document {medical_record}"
                 doc_type = "medical_record"
+            else:
+                # Mark task as incomplete or prompt for more information
+                description = "Insufficient information: Please specify a vital sign or symptom to document."
+                doc_type = "incomplete"
             
             task = TodoTask(
                 task_type="documentation",
