@@ -14,12 +14,11 @@ exceptiongroup==1.2.2
 Faker==30.0.0
 filelock==3.16.1
 fsspec==2024.9.0
-googlemaps==4.10.0
-h11==0.16.0
-httpcore==1.0.9
+h11==0.14.0
+httpcore==1.0.5
 httpx==0.27.2
 idna==3.10
-Jinja2==3.1.6
+Jinja2==3.1.4
 jiter==0.5.0
 joblib==1.4.2
 llvmlite==0.43.0
@@ -34,9 +33,8 @@ packaging==24.1
 pefile==2024.8.26
 phonenumbers==8.13.46
 PyAudio==0.2.14
-pydantic==2.11.3
-pydantic_ai==0.0.55
-pydantic_core==2.33.1
+pydantic==2.9.2
+pydantic_core==2.23.4
 pyinstaller==6.10.0
 pyinstaller-hooks-contrib==2024.8
 pyperclip==1.9.0
@@ -45,7 +43,7 @@ python-stdnum==1.20
 pytz==2024.2
 pywin32-ctypes==0.2.3
 regex==2024.9.11
-requests==2.32.4
+requests==2.32.3
 scikit-learn==1.5.2
 scipy==1.14.1
 scrubadub==2.0.1
@@ -57,23 +55,25 @@ sympy==1.13.3
 textblob==0.15.3
 threadpoolctl==3.5.0
 tiktoken==0.7.0
-torch==2.7.1
-torchaudio==2.7.1
+# --extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+torchaudio==2.2.2+cpu
 tqdm==4.66.5
 typing_extensions==4.12.2
 tzdata==2024.2
 tzlocal==5.2
-transformers==4.52.1
-urllib3==2.5.0
+transformers==4.49.0
+urllib3==2.2.3
 docker==7.1.0
 markdown==3.7
 tkhtmlview==0.3.1 
+llama-cpp-python==v0.2.90
 av==14.2.0
-llama-cpp-python==v0.3.8
 faster-whisper==1.1.0
 psutil==6.1.0
-Pillow==10.3.0
+Pillow==10.2.0
 python-xlib==0.33
+# en_core_web_md @ http://localhost:8080/packages/en_core_web_md-3.7.1-py3-none-any.whl#sha256=6a0f857a2b4d219c6fa17d455f82430b365bf53171a2d919b9376e5dc9be032e
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
 keyring==25.6.0
 cryptography==44.0.2
