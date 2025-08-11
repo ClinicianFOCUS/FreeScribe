@@ -128,7 +128,7 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
     Uses pattern matching and entity recognition for medical intents.
     """
     
-    def __init__(self, model_name: str = "en_core_web_md"):
+    def __init__(self, model_name: str = "en_ner_bc5cdr_md"):
         """
         Initialize the SpaCy recognizer.
         
