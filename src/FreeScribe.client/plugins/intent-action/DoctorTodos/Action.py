@@ -63,10 +63,17 @@ class PrescribeMedicationAction(BaseAction):
             # Extract entities from parameters instead of directly from metadata
             parameters = metadata.get("parameters", {})
             entities = parameters.get("entities", {})
-            medication = entities.get("MEDICATION", ["unknown medication"])[0]
+            
+            # Check for both MEDICATION and CHEMICAL entities
+            medication = entities.get("MEDICATION", [None])[0]
+            chemical = entities.get("CHEMICAL", [None])[0]
+            
+            # Use whichever entity was found, prioritizing MEDICATION
+            drug_name = medication or chemical or "unknown medication"
+            
             task = TodoTask(
                 task_type="prescription",
-                description=f"Prescribe {medication}",
+                description=f"Prescribe {drug_name}",
                 priority="high"
             )
             
@@ -74,12 +81,12 @@ class PrescribeMedicationAction(BaseAction):
             
             return ActionResult(
                 success=True,
-                message=f"Added prescription task: {medication}",
+                message=f"Added prescription task: {drug_name}",
                 data={
                     "task": asdict(task),
                     "action_type": "prescribe_medication",
-                    "medication": medication,
-                    "title": f"Prescribe {medication}",
+                    "medication": drug_name,
+                    "title": f"Prescribe {drug_name}",
                     "type": "prescription_task",
                     "has_action": False,
                     "auto_complete": True
