@@ -304,12 +304,24 @@ class SpacyIntentRecognizer(BaseIntentRecognizer):
             "additional_context": ""
         })
         
+        # Initialize entities dictionary to store all custom entities
+        entities = {}
+        
         for ent in doc.ents:
+            # Handle mapped parameters
             for key, labels in self.LABEL_MAP.items():
                 if ent.label_ in labels:
                     value = ent.text.lower() if key == "transport_mode" else ent.text
                     params[key] = value
                     break
+        
+            # Store all entities in the entities dict, grouped by label
+            if ent.label_ not in entities:
+                entities[ent.label_] = []
+            entities[ent.label_].append(ent.text)
+        
+        # Add entities to params for backward compatibility and new functionality
+        params["entities"] = entities
         
         return params
         
