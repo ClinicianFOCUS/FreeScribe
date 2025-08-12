@@ -35,6 +35,7 @@ class SettingsKeys(Enum):
     BEST_OF = "best_of"
     FACTUAL_CONSISTENCY_VERIFICATION = "Factual Consistency Verification (Experimental)"
     GOOGLE_MAPS_API_KEY = "Google Maps API Key"
+    TRANSCRIBE_ONLY_MODE = "Transcribe Only Mode"
 
 class Architectures(Enum):
     CPU = ("CPU", "cpu")

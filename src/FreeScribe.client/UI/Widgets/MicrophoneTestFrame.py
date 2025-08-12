@@ -12,7 +12,7 @@ class MicrophoneState:
     SELECTED_MICROPHONE_NAME = None
 
 class MicrophoneTestFrame:
-    def __init__(self, parent, p, app_settings, root):
+    def __init__(self, parent, p, app_settings, root, layout_mode='vertical'):
         """
         Initialize the MicrophoneTestFrame.
 
@@ -24,11 +24,14 @@ class MicrophoneTestFrame:
             The PyAudio instance for audio operations.
         app_settings : dict
             Application settings including editable settings.
+        layout_mode : str
+            Layout mode: 'vertical' (default) or 'horizontal'
         """
         self.root = root
         self.parent = parent
         self.p = p
         self.app_settings = app_settings
+        self.layout_mode = layout_mode
         self.stream = None  # Persistent audio stream
         self.is_stream_active = False  # Track if the stream is active
 
@@ -93,6 +96,20 @@ class MicrophoneTestFrame:
         """
         Create the UI elements for microphone testing.
         """
+        # Create styles for all elements
+        style = ttk.Style()
+        style.configure('Disabled.TFrame', background='lightgray')  # Gray background for disabled state 
+        style.configure('Mic.TCombobox', padding=(5, 5, 5, 5))
+
+        if self.layout_mode == 'horizontal':
+            self.create_horizontal_layout()
+        else:
+            self.create_vertical_layout()
+
+    def create_vertical_layout(self):
+        """
+        Create the original vertical layout.
+        """
         # Frame for dropdown
         dropdown_frame = ttk.Frame(self.frame)
         dropdown_frame.grid(row=0, column=0, sticky='nsew', pady=(0, 5))
@@ -105,11 +122,6 @@ class MicrophoneTestFrame:
         center_frame.grid_rowconfigure(0, weight=1)
         center_frame.grid_columnconfigure(0, weight=1)
 
-        # Create styles for all elements
-        style = ttk.Style()
-        style.configure('Disabled.TFrame', background='lightgray')  # Gray background for disabled state 
-        style.configure('Mic.TCombobox', padding=(5, 5, 5, 5))
-
         # Dropdown for microphone selection
         mic_options = [f"{name}" for _, name in self.mic_list]
         self.mic_dropdown = ttk.Combobox(
@@ -120,6 +132,7 @@ class MicrophoneTestFrame:
             style='Mic.TCombobox'
         )
         self.mic_dropdown.grid(row=0, column=0, pady=(0, 5), padx=(10, 0), sticky='nsew')
+        
         # Set the default selection
         if MicrophoneState.SELECTED_MICROPHONE_NAME:
             self.mic_dropdown.set(MicrophoneState.SELECTED_MICROPHONE_NAME)
@@ -160,6 +173,81 @@ class MicrophoneTestFrame:
         # Status label for feedback
         self.status_label = ttk.Label(self.frame, text="Microphone: Ready", foreground="green")
         self.status_label.grid(row=2, column=0, pady=(0, 0), padx=(10, 0), sticky='nsew')
+        self.on_dropdown_click(None)
+
+    def create_horizontal_layout(self):
+        """
+        Create the horizontal layout with dropdown to the left of volume meter.
+        """
+        # Main horizontal container
+        main_frame = ttk.Frame(self.frame)
+        main_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+        
+        # Configure grid weights for horizontal layout
+        main_frame.grid_columnconfigure(0, weight=0)  # Dropdown column - fixed width
+        main_frame.grid_columnconfigure(1, weight=1)  # Volume meter column - expandable
+        main_frame.grid_rowconfigure(0, weight=1)
+
+        # Dropdown frame (left side)
+        dropdown_frame = ttk.Frame(main_frame)
+        dropdown_frame.grid(row=0, column=0, sticky='nsew', padx=(0, 10))
+
+        # Dropdown for microphone selection
+        mic_options = [f"{name}" for _, name in self.mic_list]
+        self.mic_dropdown = ttk.Combobox(
+            dropdown_frame, 
+            values=mic_options, 
+            state='readonly', 
+            width=25,  # Smaller width for horizontal layout
+            style='Mic.TCombobox'
+        )
+        self.mic_dropdown.grid(row=0, column=0, sticky='ew')
+        
+        # Set the default selection
+        if MicrophoneState.SELECTED_MICROPHONE_NAME:
+            self.mic_dropdown.set(MicrophoneState.SELECTED_MICROPHONE_NAME)
+        elif self.mic_list:
+            self.mic_dropdown.current(0)
+        
+        # Bind selection change to save immediately
+        self.mic_dropdown.bind('<<ComboboxSelected>>', self.on_mic_change)
+        self.mic_dropdown.bind('<Button-1>', self.on_dropdown_click)  # Bind click event
+
+        # Volume meter frame (right side)
+        meter_frame = ttk.Frame(main_frame)
+        meter_frame.grid(row=0, column=1, sticky='nsew')
+        
+        # Configure meter frame grid
+        meter_frame.grid_columnconfigure(0, weight=0)  # Icon column
+        meter_frame.grid_columnconfigure(1, weight=1)  # Segments column
+        meter_frame.grid_rowconfigure(0, weight=1)
+
+        # Try to load mic icon
+        try:
+            mic_icon = Image.open(get_file_path('assets', 'mic_icon.png'))
+            mic_icon = mic_icon.resize((24, 24))
+            self.mic_photo = ImageTk.PhotoImage(mic_icon)
+            mic_icon_label = ttk.Label(meter_frame, image=self.mic_photo)
+            mic_icon_label.grid(row=0, column=0, padx=(5, 5), sticky='w')
+        except Exception as e:
+            logger.exception(f"Error loading microphone icon: {e}")
+
+        # Create volume meter segments
+        self.segments_frame = ttk.Frame(meter_frame)
+        self.segments_frame.grid(row=0, column=1, sticky='nsew')
+
+        # Create segments
+        self.SEGMENT_COUNT = 20
+        self.segments = []
+        for i in range(self.SEGMENT_COUNT):
+            segment = tk.Frame(self.segments_frame, width=10, height=20)
+            segment.grid(row=0, column=i, padx=1)
+            segment.grid_propagate(False)
+            self.segments.append(segment)
+
+        # Status label for feedback (below the main frame)
+        self.status_label = ttk.Label(self.frame, text="Microphone: Ready", foreground="green")
+        self.status_label.grid(row=1, column=0, pady=(5, 0), sticky='ew')
         self.on_dropdown_click(None)
 
     def initialize_selected_microphone(self):

@@ -144,6 +144,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
             # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
             SettingsKeys.BEST_OF.value: 1,
+            SettingsKeys.TRANSCRIBE_ONLY_MODE.value: False,
         }
 
     def __init__(self):
@@ -166,8 +167,8 @@ class SettingsWindow():
 
         self.general_settings = [
             "Show Welcome Message",
-            "BlankSpace",
-            "Show Scrub PHI",      
+            "Show Scrub PHI",
+            SettingsKeys.TRANSCRIBE_ONLY_MODE.value,      
         ]
 
         self.whisper_settings = [

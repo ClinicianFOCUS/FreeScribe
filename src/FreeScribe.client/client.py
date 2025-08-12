@@ -2140,14 +2140,6 @@ timestamp_listbox.grid(row=0, column=0, rowspan=3, sticky='nsew')
 timestamp_listbox.bind('<<ListboxSelect>>', show_response)
 timestamp_listbox.insert(tk.END, "Temporary Note History")
 
-warning_label = tk.Label(history_frame,
-                            text="Temporary Note History will be cleared when app closes",
-                            # fg="red",
-                            # wraplength=200,
-                            justify="left",
-                            font=tk.font.Font(size=scaled_size),
-                            )
-
 def on_click_clear_all_notes():
     """
     Callback function to clear all notes from the timestamp listbox and response display.
@@ -2426,6 +2418,115 @@ if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
     # Populate the UI with the loaded notes
     populate_ui_with_notes()
 
+def update_ui_for_transcribe_only_mode(event=None):
+    """
+    Updates the UI based on the transcribe only mode setting.
+    Hides/shows AI-related components when transcribe only mode is toggled.
+    """
+    transcribe_only = app_settings.editable_settings[SettingsKeys.TRANSCRIBE_ONLY_MODE.value]
+    print(f"Transcribe Only Mode: {transcribe_only}")
+    def update_ui():
+        if transcribe_only:
+            # Hide AI-related components
+            send_button.grid_remove()
+            response_display.grid_remove()
+            timestamp_listbox.grid_remove()
+            clear_all_notes_btn.grid_remove()
+            warning_label.grid_remove()
+            note_style_selector.grid_remove()
+            blinking_circle_canvas.grid_remove()
+            
+            # Remove the existing vertical mic test frame
+            mic_test.frame.grid_remove()
+            
+            # Create a new horizontal layout mic test frame for transcribe-only mode
+            global mic_test_horizontal
+            mic_test_horizontal = MicrophoneTestFrame(
+                parent=history_frame, 
+                p=p, 
+                app_settings=app_settings, 
+                root=root, 
+                layout_mode='horizontal'
+            )
+            
+            # Move history_frame (which contains mic test) below buttons and center it
+            history_frame.grid_remove()
+            history_frame.grid(row=2, column=2, columnspan=6, padx=5, pady=10, sticky='ew')
+            
+            # Grid the horizontal mic test frame
+            mic_test_horizontal.frame.grid(row=4, column=0, pady=10, sticky='ew')
+            
+            # Adjust button layout to fill width without gaps
+            mic_button.grid(row=1, column=1, columnspan=2, pady=5, padx=0, sticky='ew')
+            pause_button.grid(row=1, column=3, columnspan=2, pady=5, padx=0, sticky='ew')
+            clear_button.grid(row=1, column=5, columnspan=2, pady=5, padx=0, sticky='ew')
+            upload_button.grid(row=1, column=7, columnspan=2, pady=5, padx=0, sticky='ew')
+            
+            # Hide the minimize view button in transcribe-only mode
+            switch_view_button.grid_remove()
+            
+            # Update the transcription placeholder text
+            user_input.scrolled_text.delete("1.0", tk.END)
+            user_input.scrolled_text.insert("1.0", "Transcription will appear here")
+            
+            # Disable focus events for transcription box
+            user_input.scrolled_text.unbind("<FocusIn>")
+            user_input.scrolled_text.unbind("<FocusOut>")
+            
+        else:
+            # Remove the horizontal mic test frame if it exists
+            if 'mic_test_horizontal' in globals():
+                mic_test_horizontal.frame.grid_remove()
+                del mic_test_horizontal
+            
+            # Restore original button layout
+            mic_button.grid(row=1, column=1, pady=5, sticky='nsew')
+            pause_button.grid(row=1, column=2, pady=5, sticky='nsew')
+            clear_button.grid(row=1, column=4, pady=5, sticky='nsew')
+            upload_button.grid(row=1, column=5, pady=5, sticky='nsew')
+            switch_view_button.grid(row=1, column=6, pady=5, sticky='nsew')
+            
+            # Restore history_frame to original position
+            history_frame.grid_remove()
+            history_frame.grid(row=0, column=9, columnspan=2, rowspan=6, padx=5, pady=10, sticky='nsew')
+            
+            # Restore the original vertical mic test frame
+            mic_test.frame.grid(row=4, column=0, pady=10, sticky='nsew')
+            
+            # Show AI-related components
+            send_button.grid(row=1, column=3, pady=5, sticky='nsew')
+            response_display.grid(row=2, column=1, columnspan=8, padx=5, pady=15, sticky='nsew')
+            timestamp_listbox.grid(row=0, column=0, rowspan=3, sticky='nsew')
+            note_style_selector.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+            
+            # Restore notes UI based on settings
+            if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+                grid_clear_all_btn()
+            else:
+                grid_warning_label()
+
+            # Update the transcription placeholder text
+            user_input.scrolled_text.delete("1.0", tk.END)
+            user_input.scrolled_text.insert("1.0", "Transcript of Conversation")
+            
+            # Re-bind focus events for transcription box
+            user_input.scrolled_text.bind(
+                "<FocusIn>",
+                lambda event: remove_placeholder(
+                    event,
+                    user_input.scrolled_text,
+                    "Transcript of Conversation"))
+            user_input.scrolled_text.bind(
+                "<FocusOut>",
+                lambda event: add_placeholder(
+                    event,
+                    user_input.scrolled_text,
+                    "Transcript of Conversation"))
+
+    root.after(0, update_ui)
+
+root.bind("<<TranscribeOnlyModeChanged>>", update_ui_for_transcribe_only_mode)
+root.after(100, update_ui_for_transcribe_only_mode)
 
 root.mainloop()
 
