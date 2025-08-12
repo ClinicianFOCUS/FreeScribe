@@ -75,6 +75,9 @@ from UI.NoteStyleSelector import NoteStyleSelector
 from utils.network.base import NetworkConfig
 from utils.network.openai_client import OpenAIClient
 
+MODE_AUTO_NOTE = "auto-note"
+MODE_QUERY = "query"
+
 # parse command line arguments
 utils.arg_parser.parse_args()
 
@@ -214,16 +217,16 @@ def switch_app_mode(event, mode):
         event: The event that triggered this function.
         mode: The mode to switch to.
     """
-    if mode == "auto-note":
+    if mode == MODE_AUTO_NOTE:
         safe_set_button_config(send_button, text="Generate Note", bg=DEFAULT_BUTTON_COLOUR, state='normal')
-    elif mode == "query":
+    elif mode == MODE_QUERY:
         # switch  to query mode
         safe_set_button_config(send_button, text="Send Query", bg=DEFAULT_BUTTON_COLOUR, state='normal')
     else:
         logger.warning(f"Unknown mode: {mode}. No action taken.")
 
-root.bind("<<SetAutoNote>>", lambda e, mode="auto-note": switch_app_mode(e, mode))
-root.bind("<<SetQueryMode>>", lambda e, mode="query": switch_app_mode(e, mode))
+root.bind("<<SetAutoNote>>", lambda e, mode=MODE_AUTO_NOTE: switch_app_mode(e, mode))
+root.bind("<<SetQueryMode>>", lambda e, mode=MODE_QUERY: switch_app_mode(e, mode))
 
 def clear_all_notes():
     """
