@@ -58,12 +58,13 @@ class NoteStyleSelector(tk.Frame):
         _styles_file (str): Path to the JSON file storing style data.
     """
     # Static class variables
-    current_style = "SOAP Note - Default"
+    DEFAULT_TEMPLATE = "SOAP Note - Default"
+    ADD_PROMPT_TEMPLATE = "Add Prompt Template..."
+    NO_PROMPT_TEMPLATE = "No Prompt - AI Query"
+    current_style = DEFAULT_TEMPLATE
+    
     # Store style data with pre/post prompts
     style_data = {}
-    ADD_PROMPT_TEMPLATE = "Add Prompt Template..."
-    DEFAULT_TEMPLATE = "SOAP Note - Default"
-    NO_PROMPT_TEMPLATE = "No Prompt - AI Query"
     DEFAULT_STYLES = [ADD_PROMPT_TEMPLATE, DEFAULT_TEMPLATE, NO_PROMPT_TEMPLATE]
     style_options = DEFAULT_STYLES.copy()
     _styles_file = "note_styles.json"
@@ -79,11 +80,11 @@ class NoteStyleSelector(tk.Frame):
                   pre_prompt and post_prompt for each style.
         """
         return {
-            "SOAP Note - Default": {
+            DEFAULT_TEMPLATE: {
                 "pre_prompt": "AI, please transform the following conversation into a concise SOAP note. Do not assume any medical data, vital signs, or lab values. Base the note strictly on the information provided in the conversation. Ensure that the SOAP note is structured appropriately with Subjective, Objective, Assessment, and Plan sections. Strictly extract facts from the conversation. Here's the conversation:",
                 "post_prompt": "Remember, the Subjective section should reflect the patient's perspective and complaints as mentioned in the conversation. The Objective section should only include observable or measurable data from the conversation. The Assessment should be a summary of your understanding and potential diagnoses, considering the conversation's content. The Plan should outline the proposed management, strictly based on the dialogue provided. Do not add any information that did not occur and do not make assumptions. Strictly extract facts from the conversation."
             },
-            "No Prompt - AI Query": {
+            NO_PROMPT_TEMPLATE: {
                 "pre_prompt": "",
                 "post_prompt": ""
             }
@@ -109,25 +110,25 @@ class NoteStyleSelector(tk.Frame):
                 with open(cls._styles_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     cls.style_data = data.get('styles', {})
-                    cls.current_style = data.get('current_style', "SOAP Note - Default")
+                    cls.current_style = data.get('current_style', DEFAULT_TEMPLATE)
             else:
                 # Create default styles
                 cls.style_data = cls._get_default_styles()
-                cls.current_style = "SOAP Note - Default"
+                cls.current_style = DEFAULT_TEMPLATE
                 cls.save_styles()
             
             # Update style_options list - only add custom styles that aren't already in the list
             custom_styles = [style for style in cls.style_data.keys() if style not in cls.style_options]
-            cls.style_options = ["Add Prompt Template...", "SOAP Note - Default", "No Prompt - AI Query"] + custom_styles
+            cls.style_options = [ADD_PROMPT_TEMPLATE, DEFAULT_TEMPLATE, NO_PROMPT_TEMPLATE] + custom_styles
 
         except Exception as e:
             logger.exception(f"Error loading styles: {e}")
             # Fallback to defaults
             cls.style_data = cls._get_default_styles()
-            cls.current_style = "SOAP Note - Default"
+            cls.current_style = DEFAULT_TEMPLATE
             # Only add custom styles that aren't already in the list
             custom_styles = [style for style in cls.style_data.keys() if style not in cls.style_options]
-            cls.style_options = ["Add Prompt Template...", "SOAP Note - Default", "No Prompt - AI Query"] + custom_styles
+            cls.style_options = [ADD_PROMPT_TEMPLATE, DEFAULT_TEMPLATE, NO_PROMPT_TEMPLATE] + custom_styles
 
     @classmethod
     def save_styles(cls):
@@ -238,7 +239,7 @@ class NoteStyleSelector(tk.Frame):
         Handles style selection changes in the dropdown.
         
         When a user selects a different style, this method either opens
-        the add style dialog (if "Add Prompt Template..." is selected)
+        the add style dialog (if ADD_PROMPT_TEMPLATE is selected)
         or updates the current style and saves the changes.
 
         Args:
@@ -248,7 +249,7 @@ class NoteStyleSelector(tk.Frame):
             None
         """
         selected_value = self.style_var.get()
-        if selected_value == "Add Prompt Template...":
+        if selected_value == ADD_PROMPT_TEMPLATE:
             new_style_name = self.add_style()
             # Select the newly added style if it was created
             if new_style_name and new_style_name in NoteStyleSelector.style_options:
@@ -311,7 +312,7 @@ class NoteStyleSelector(tk.Frame):
             None
         """
         current_style = self.style_var.get()
-        if current_style == "Add Prompt Template...":
+        if current_style == ADD_PROMPT_TEMPLATE:
             messagebox.showwarning("Edit Template", "Cannot edit 'Add Prompt Template...' option.")
             return
         
@@ -319,7 +320,7 @@ class NoteStyleSelector(tk.Frame):
         existing_data = NoteStyleSelector.style_data.get(current_style, {'pre_prompt': '', 'post_prompt': ''})
         
         # Check if it's the default style - allow viewing but not editing
-        is_default = (current_style == "SOAP Note - Default")
+        is_default = (current_style == DEFAULT_TEMPLATE)
 
         dialog = StyleDialog(self.root, "View Template" if is_default else "Edit Template",
                            initial_name=current_style,
@@ -359,8 +360,8 @@ class NoteStyleSelector(tk.Frame):
         """
         Deletes the currently selected style after confirmation.
         
-        Prevents deletion of protected styles ("Add Prompt Template..."
-        and "SOAP Note - Default"). Shows confirmation dialog before
+        Prevents deletion of protected styles (ADD_PROMPT_TEMPLATE
+        and DEFAULT_TEMPLATE). Shows confirmation dialog before
         deletion and resets to default style after deletion.
 
         Args:
@@ -382,8 +383,8 @@ class NoteStyleSelector(tk.Frame):
                 del NoteStyleSelector.style_data[current_style]
             self.update_dropdown()
             # Set to default after deletion
-            self.style_var.set("SOAP Note - Default")
-            NoteStyleSelector.current_style = "SOAP Note - Default"
+            self.style_var.set(DEFAULT_TEMPLATE)
+            NoteStyleSelector.current_style = DEFAULT_TEMPLATE
             NoteStyleSelector.save_styles()
 
     def update_dropdown(self):
@@ -416,7 +417,7 @@ class NoteStyleSelector(tk.Frame):
             None
         """
         selected_style = self.style_var.get()
-        if selected_style != "Add Prompt Template...":
+        if selected_style != ADD_PROMPT_TEMPLATE:
             prompt_info = NoteStyleSelector.get_current_prompt_info()
             logger.info(f"Selected Note Style: {prompt_info.style_name}")
             logger.debug(f"Pre Prompt: {prompt_info.pre_prompt}")
