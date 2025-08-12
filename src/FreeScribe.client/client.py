@@ -219,6 +219,8 @@ def switch_app_mode(event, mode):
     elif mode == "query":
         # switch  to query mode
         safe_set_button_config(send_button, text="Send Query", bg=DEFAULT_BUTTON_COLOUR, state='normal')
+    else:
+        logger.warning(f"Unknown mode: {mode}. No action taken.")
 
 root.bind("<<SetAutoNote>>", lambda e, mode="auto-note": switch_app_mode(e, mode))
 root.bind("<<SetQueryMode>>", lambda e, mode="query": switch_app_mode(e, mode))
