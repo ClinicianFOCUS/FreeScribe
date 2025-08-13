@@ -214,7 +214,7 @@ class OpenAIClient(BaseNetworkClient):
             if stop_event.is_set():
                 return 'Error: Operation cancelled'
             
-            return self._parse_completion_response(response)
+            return self._parse_completion_response_data(response)
 
         except Exception as e:
             error_message = self._handle_error(e)
