@@ -54,8 +54,7 @@ class NetworkConfig:
         This method is automatically called after initialization to ensure
         the host URL is properly formatted without trailing slashes.
         """
-        if self.host.endswith('/'):
-            self.host = self.host[:-1]
+        self.host = self.host.rstrip('/')
 
 
 class BaseNetworkClient:
