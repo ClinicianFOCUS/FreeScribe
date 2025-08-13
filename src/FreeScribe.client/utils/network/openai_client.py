@@ -174,7 +174,10 @@ class OpenAIClient(BaseNetworkClient):
             return f'Error: {error_message}'
         
         finally:
-            self.stop_cancel_monitoring()
+            try:
+                self.stop_cancel_monitoring()
+            except Exception as cleanup_exc:
+                logger.exception(f"Exception during stop_cancel_monitoring: {cleanup_exc}")
             await self._close_client()
     
     async def send_completion(
