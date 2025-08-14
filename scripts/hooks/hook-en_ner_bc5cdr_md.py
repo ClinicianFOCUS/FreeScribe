@@ -1,7 +1,7 @@
 # hook-en_core_web_md.py
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 import os
-import en_core_web_md
+import en_ner_bc5cdr_md
 
 # Collect all submodules
 hiddenimports = collect_submodules('en_ner_bc5cdr_md')
