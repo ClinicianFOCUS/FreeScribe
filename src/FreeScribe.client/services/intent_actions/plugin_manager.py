@@ -379,8 +379,9 @@ def get_plugins_dir(subdir: Optional[str] = None) -> str:
 
     if subdir:
         plugin_path = plugin_path + os.sep + subdir
-    
-    return get_resource_path(plugin_path)
+
+    logger.info(f"Plugins directory resolved to: {os.path.abspath('./' + plugin_path)}")
+    return "./" + plugin_path
 
 def is_valid_plugin_directory(directory_path: Path) -> bool:
     """
