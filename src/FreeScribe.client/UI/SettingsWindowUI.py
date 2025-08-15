@@ -24,7 +24,7 @@ import logging
 import tkinter as tk
 from tkinter import ttk , messagebox
 import threading
-
+from pathlib import Path
 import UI.Helpers
 from Model import Model, ModelManager
 from services.whisper_hallucination_cleaner import load_hallucination_cleaner_model
@@ -432,18 +432,29 @@ class SettingsWindowUI:
         # 5. Models (Left Column)
         tk.Label(left_frame, text=SettingsKeys.LOCAL_LLM_MODEL.value).grid(row=left_row, column=0, padx=0, pady=5, sticky="w")
         models_drop_down_options = []
+        models_drop_down_options = self._get_local_model_options()
         self.models_drop_down = ttk.Combobox(left_frame, values=models_drop_down_options, state="readonly")
         self.models_drop_down.grid(row=left_row, column=1, padx=0, pady=5, sticky="ew")
         self.models_drop_down.bind('<<ComboboxSelected>>', self.on_model_selection_change)
+        # Create custom model entry (initially hidden) - removed fixed width and made it expandable
+        self.custom_model_entry = tk.Entry(left_frame)
+        self.custom_model_entry.insert(0, self.settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value])
+        
+        # Set current model selection
+        current_model = self.settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value]
+        if current_model in models_drop_down_options:
+            self.models_drop_down.current(models_drop_down_options.index(current_model))
+        else:
+            # If current model is not in the list, show custom entry
+            self.models_drop_down.set("Custom")
+            self._show_custom_model_entry(left_row)
+        
+        # Start background thread to update with remote models if needed
         thread = threading.Thread(target=self.settings.update_models_dropdown, args=(self.models_drop_down,))
         thread.start()
 
-        # Create custom model entry (initially hidden)
-        self.custom_model_entry = tk.Entry(left_frame, width=15)
-        self.custom_model_entry.insert(0, self.settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value])
-
         refresh_button = ttk.Button(left_frame, text="↻", 
-                                command=lambda: (self.save_settings(False), threading.Thread(target=self.settings.update_models_dropdown, args=(self.models_drop_down,)).start(), self.on_model_selection_change(None)), 
+                                command=self._refresh_models,
                                 width=4)
         refresh_button.grid(row=left_row, column=2, padx=0, pady=5, sticky="w")
 
@@ -507,40 +518,82 @@ class SettingsWindowUI:
             
         self.on_model_selection_change(None)
 
-            
-
     def on_model_selection_change(self, event):
         """
-        Handle switching between model dropdown and custom model entry.
-        
-        When "Custom" is selected, shows a text entry field and hides the dropdown.
-        When another model is selected, shows the dropdown and hides the custom entry.
-        
-        Args:
-            event: The dropdown selection change event
-            
-        Notes:
-            - Uses grid_info() to check if widgets are currently displayed
-            - Preserves the row position when swapping widgets
-            - Resets dropdown to placeholder when showing custom entry
+        Handle model selection change in the dropdown.
+        Show/hide custom entry field based on selection.
         """
-        if self.models_drop_down.get() == "Custom" and self.custom_model_entry.grid_info() == {}:
-            # Show the custom model entry below the dropdown
-            self.custom_model_entry.grid(row=self.models_drop_down.grid_info()['row'], 
-                        column=1, padx=0, pady=5, sticky="w")
-            self.models_drop_down.set("Select a Model")
-            self.models_drop_down.grid_remove()
-        elif self.models_drop_down.get() != "Custom" and self.custom_model_entry.grid_info() != {}:
-            # Hide the custom model entry
-            self.models_drop_down.grid(row=self.custom_model_entry.grid_info()['row'], 
-                        column=1, padx=0, pady=5, sticky="w")
-            self.custom_model_entry.grid_remove()
+        if hasattr(self, 'models_drop_down'):
+            selected_value = self.models_drop_down.get()
+            
+            model_row = None
+            for child in self.models_drop_down.master.grid_slaves():
+                if child == self.models_drop_down:
+                    model_row = int(child.grid_info()["row"])
+                    break
+            
+            if model_row is not None:
+                if selected_value == "Custom":
+                    self._show_custom_model_entry(model_row)
+                else:
+                    self._hide_custom_model_entry()
+
+    def _show_custom_model_entry(self, row):
+        """
+        Show the custom model entry field with auto-scaling width.
+        """
+        # Hide the dropdown and show the custom entry
+        self.models_drop_down.grid_forget()
+        
+        # Grid the custom entry with sticky="ew" to make it expand horizontally
+        self.custom_model_entry.grid(row=row, column=1, padx=0, pady=5, sticky="ew")
+        
+        # Update the settings entry reference
+        self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_MODEL.value] = self.custom_model_entry
+
+    def _hide_custom_model_entry(self):
+        """
+        Hide the custom model entry field and show the dropdown.
+        """
+        # Hide the custom entry and show the dropdown
+        self.custom_model_entry.grid_forget()
+        
+        model_row = None
+        for child in self.models_drop_down.master.grid_slaves():
+            if child == self.custom_model_entry:
+                model_row = int(child.grid_info()["row"])
+                break
+        
+        # Re-grid the dropdown
+        if model_row is not None:
+            self.models_drop_down.grid(row=model_row, column=1, padx=0, pady=5, sticky="ew")
+        else:
+            self.models_drop_down.grid(row=2, column=1, padx=0, pady=5, sticky="ew")
+            logger.warning("Could not find model row to re-grid the dropdown. Defaulting to row 2.")
+        
+        # Update the settings entry reference back to dropdown
+        self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_MODEL.value] = self.models_drop_down
 
     def get_selected_model(self):
         """Returns the selected model, either from dropdown or custom entry"""
         if self.models_drop_down.get() in ["Custom", "Select a Model"]:
             return self.custom_model_entry.get()
         return self.models_drop_down.get()
+
+    def _get_local_model_options(self):
+        root = Path.cwd() / "models"
+        exts = ["*.gguf", "*.safetensors", "*.bin"]
+        options = sorted({
+            f"./models/{p.relative_to(root)}"
+            for ext in exts
+            for p in root.rglob(ext)
+        }) if root.exists() else []
+
+        if not options:
+            options = ["No models found"]
+
+        options.append("Custom")
+        return options
 
     def create_editable_settings_col(self, left_frame, right_frame, left_row, right_row, settings_set):
         """
@@ -901,6 +954,34 @@ pady=5, sticky="w")
 
         if close_window:
             self.close_window()
+
+    def _refresh_models(self):
+        """
+        Refreshes the local model options by rescanning the models folder
+        and reverts to dropdown view. Only works when local LLM is enabled.
+        """
+        # Only allow refresh when local LLM is enabled
+        if self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM.value].get():
+            logger.info("Refreshing local model options...")
+            
+            # Rescan local models from file system
+            new_model_options = self._get_local_model_options()
+        
+            self._hide_custom_model_entry()
+             
+            # Set dropdown to first available model or "No models found"
+            if len(new_model_options) > 1:  # More than just "Custom"
+                self.models_drop_down.set(new_model_options[0])
+            else:
+                self.models_drop_down.set("No models found")
+
+            # Update the dropdown with new options
+            self.models_drop_down['values'] = new_model_options
+            
+        else:
+            self.save_settings(False)
+            threading.Thread(target=self.settings.update_models_dropdown, args=(self.models_drop_down,)).start()
+            self.on_model_selection_change(None)
 
     def __initialize_notes_history(self):
         """

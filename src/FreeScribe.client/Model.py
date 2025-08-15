@@ -226,12 +226,10 @@ class ModelManager:
             if torch.backends.mps.is_available():
                 gpu_layers = -1
 
-            model_to_use = "gemma-2-2b-it-Q8_0.gguf"
+            model_path = app_settings.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value]
 
-            if utils.system.is_macos() or is_flatpak():
-                model_path = get_resource_path(filename=f"models/{model_to_use}", shared=True)
-            else:
-                model_path = f"./models/{model_to_use}"
+            if (utils.system.is_macos() or is_flatpak()) and not os.path.isabs(model_path):
+                model_path = get_resource_path(filename=f"{model_path}", shared=True)
 
             try:
                 context_size = app_settings.editable_settings.get(
