@@ -524,6 +524,8 @@ Section "MainSection" SEC01
         File /r "..\dist\freescribe-client-nvidia\_internal"
     ${EndIf}
 
+    File /r "..\src\FreeScribe.client\plugins"
+
     ; Install version file to both nvidia and cpu directories for version checking
     SetOutPath "$INSTDIR\_internal"
     File ".\__version__"

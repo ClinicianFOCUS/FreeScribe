@@ -9,11 +9,17 @@ prescription_patterns = [
     [{"LEMMA": "prescribe"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
     [{"LEMMA": "prescribe"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
     [{"LEMMA": "write"}, {"LOWER": "prescription"}, {"LOWER": "for"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
+    [{"LEMMA": "write"}, {"LOWER": "prescription"}, {"LOWER": "for"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
     [{"LEMMA": "start"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
+    [{"LEMMA": "start"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
     [{"LEMMA": "renew"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
+    [{"LEMMA": "renew"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
     [{"LEMMA": "refill"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
+    [{"LEMMA": "refill"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
     [{"LEMMA": "discontinue"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
+    [{"LEMMA": "discontinue"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
     [{"LEMMA": "stop"}, {"OP": "*"}, {"ENT_TYPE": "MEDICATION"}],
+    [{"LEMMA": "stop"}, {"OP": "*"}, {"ENT_TYPE": "CHEMICAL"}],
 ]
 
 # Scheduling patterns
@@ -56,10 +62,16 @@ exported_patterns = [
     )
 ]
 
-# Medical entities
+# Medical entities - now includes both medication and chemical entities
 medications = [
     "metformin", "lisinopril", "atorvastatin", "amlodipine", "metoprolol",
     "omeprazole", "albuterol", "furosemide", "warfarin", "insulin"
+]
+
+# Chemical compounds that can be prescribed
+chemicals = [
+    "acetaminophen", "ibuprofen", "aspirin", "diphenhydramine", "loratadine",
+    "simvastatin", "levothyroxine", "hydrochlorothiazide", "prednisone", "amoxicillin"
 ]
 
 specialists = [
@@ -81,6 +93,10 @@ exported_entities = [
     SpacyEntityPattern(
         entity_name="MEDICATION",
         patterns=[[{"LOWER": word} for word in med.split()] for med in medications]
+    ),
+    SpacyEntityPattern(
+        entity_name="CHEMICAL",
+        patterns=[[{"LOWER": word} for word in chem.split()] for chem in chemicals]
     ),
     SpacyEntityPattern(
         entity_name="SPECIALIST",
