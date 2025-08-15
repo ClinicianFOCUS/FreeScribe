@@ -527,12 +527,19 @@ class SettingsWindowUI:
         if hasattr(self, 'models_drop_down'):
             selected_value = self.models_drop_down.get()
             
-            if selected_value == "Custom":
-                self._show_custom_model_entry()
-            else:
-                self._hide_custom_model_entry()
 
-    def _show_custom_model_entry(self):
+            for child in self.models_drop_down.master.grid_slaves():
+                if child == self.models_drop_down:
+                    model_row = int(child.grid_info()["row"])
+                    break
+            
+            if model_row is not None:
+                if selected_value == "Custom":
+                    self._show_custom_model_entry(model_row)
+                else:
+                    self._hide_custom_model_entry()
+
+    def _show_custom_model_entry(self, row):
         """
         Show the custom model entry field with auto-scaling width.
         """
@@ -540,7 +547,7 @@ class SettingsWindowUI:
         self.models_drop_down.grid_forget()
         
         # Grid the custom entry with sticky="ew" to make it expand horizontally
-        self.custom_model_entry.grid(row=2, column=1, padx=0, pady=5, sticky="ew")
+        self.custom_model_entry.grid(row=row, column=1, padx=0, pady=5, sticky="ew")
         
         # Update the settings entry reference
         self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_MODEL.value] = self.custom_model_entry
