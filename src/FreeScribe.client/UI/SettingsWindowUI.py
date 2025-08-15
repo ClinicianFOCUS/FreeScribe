@@ -559,8 +559,18 @@ class SettingsWindowUI:
         # Hide the custom entry and show the dropdown
         self.custom_model_entry.grid_forget()
         
+        model_row = None
+        for child in self.models_drop_down.master.grid_slaves():
+            if child == self.custom_model_entry:
+                model_row = int(child.grid_info()["row"])
+                break
+        
         # Re-grid the dropdown
-        self.models_drop_down.grid(row=2, column=1, padx=0, pady=5, sticky="ew")
+        if model_row is not None:
+            self.models_drop_down.grid(row=model_row, column=1, padx=0, pady=5, sticky="ew")
+        else:
+            self.models_drop_down.grid(row=2, column=1, padx=0, pady=5, sticky="ew")
+            logger.warning("Could not find model row to re-grid the dropdown. Defaulting to row 2.")
         
         # Update the settings entry reference back to dropdown
         self.settings.editable_settings_entries[SettingsKeys.LOCAL_LLM_MODEL.value] = self.models_drop_down
