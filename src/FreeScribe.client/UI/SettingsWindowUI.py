@@ -24,8 +24,7 @@ import logging
 import tkinter as tk
 from tkinter import ttk , messagebox
 import threading
-import os
-import glob
+from pathlib import Path
 import UI.Helpers
 from Model import Model, ModelManager
 from services.whisper_hallucination_cleaner import load_hallucination_cleaner_model
@@ -582,53 +581,19 @@ class SettingsWindowUI:
         return self.models_drop_down.get()
 
     def _get_local_model_options(self):
-        """
-        Scans the ./models folder for LLM model files and returns a list of options.
-        
-        Returns:
-            list: List of model file names found in ./models folder, plus "Custom" option
-        """
-        
-        models_folder = os.path.join(os.getcwd(), "models")
-        model_options = []
-        
-        # Common LLM model file extensions
-        model_extensions = [
-            "*.gguf",      # GGUF format (llama.cpp)
-            "*.safetensors", # SafeTensors format
-            "*.bin",       # PyTorch binary format
-        ]
-        
-        try:
-            if os.path.exists(models_folder):
-                # Scan for all supported model file types
-                for extension in model_extensions:
-                    pattern = os.path.join(models_folder, "**", extension)
-                    found_files = glob.glob(pattern, recursive=True)
-                    
-                    for file_path in found_files:
-                        # Get relative path from models folder
-                        rel_path = os.path.relpath(file_path, models_folder)
-                        if rel_path not in model_options:
-                            model_options.append(f"./models/{rel_path}")
+        root = Path.cwd() / "models"
+        exts = ["*.gguf", "*.safetensors", "*.bin"]
+        options = sorted({
+            f"./models/{p.relative_to(root)}"
+            for ext in exts
+            for p in root.rglob(ext)
+        }) if root.exists() else []
 
-                # Sort the model options alphabetically
-                model_options.sort()
-                
-            else:
-                logger.warning(f"Models folder not found: {models_folder}")
-                
-        except Exception as e:
-            logger.error(f"Error scanning models folder: {e}")
-        
-        # Add "Custom" option at the end
-        model_options.append("Custom")
-        
-        # If no models found, add a placeholder
-        if len(model_options) == 1:  # Only "Custom" option
-            model_options.insert(0, "No models found")
-        
-        return model_options
+        if not options:
+            options = ["No models found"]
+
+        options.append("Custom")
+        return options
 
     def create_editable_settings_col(self, left_frame, right_frame, left_row, right_row, settings_set):
         """
