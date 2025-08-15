@@ -528,8 +528,7 @@ class SettingsWindow():
         the dropdown widget in the settings window with the new list of models.
         """
         if self.editable_settings_entries[SettingsKeys.LOCAL_LLM.value].get():
-            dropdown["values"] = ["gemma-2-2b-it-Q8_0.gguf"]
-            dropdown.set("gemma-2-2b-it-Q8_0.gguf")
+            print("Using local LLM, skipping model update")
         else:
             dropdown["values"] = ["Loading models...", "Custom"]
             dropdown.set("Loading models...")
