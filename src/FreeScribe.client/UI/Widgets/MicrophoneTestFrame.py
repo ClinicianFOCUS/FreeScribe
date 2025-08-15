@@ -92,6 +92,124 @@ class MicrophoneTestFrame:
                 MicrophoneState.SELECTED_MICROPHONE_NAME = selected_name
                 MicrophoneState.SELECTED_MICROPHONE_INDEX = self.mic_mapping[selected_name]
 
+    def _create_dropdown(self, parent_frame, width=40, **grid_kwargs):
+        """
+        Create the microphone selection dropdown and grid it immediately.
+        
+        Parameters
+        ----------
+        parent_frame : tk.Widget
+            The parent frame to place the dropdown in.
+        width : int
+            The width of the dropdown.
+        **grid_kwargs : dict
+            Additional grid configuration options.
+            
+        Returns
+        -------
+        ttk.Combobox
+            The created dropdown widget.
+        """
+        # Dropdown for microphone selection
+        mic_options = [f"{name}" for _, name in self.mic_list]
+        mic_dropdown = ttk.Combobox(
+            parent_frame, 
+            values=mic_options, 
+            state='readonly', 
+            width=width,
+            style='Mic.TCombobox'
+        )
+        
+        # Set the default selection
+        if MicrophoneState.SELECTED_MICROPHONE_NAME:
+            mic_dropdown.set(MicrophoneState.SELECTED_MICROPHONE_NAME)
+        elif self.mic_list:
+            mic_dropdown.current(0)
+        
+        # Bind selection change to save immediately
+        mic_dropdown.bind('<<ComboboxSelected>>', self.on_mic_change)
+        mic_dropdown.bind('<Button-1>', self.on_dropdown_click)  # Bind click event
+        
+        # Grid the dropdown
+        mic_dropdown.grid(**grid_kwargs)
+        
+        return mic_dropdown
+
+    def _create_volume_meter(self, parent_frame, **grid_kwargs):
+        """
+        Create the volume meter with microphone icon and segments, and grid it immediately.
+        
+        Parameters
+        ----------
+        parent_frame : tk.Widget
+            The parent frame to place the volume meter in.
+        **grid_kwargs : dict
+            Additional grid configuration options.
+            
+        Returns
+        -------
+        tuple
+            A tuple containing (meter_frame, segments_frame, segments_list).
+        """
+        # Volume meter container
+        meter_frame = ttk.Frame(parent_frame)
+        
+        # Configure meter frame grid
+        meter_frame.grid_columnconfigure(0, weight=0)  # Icon column
+        meter_frame.grid_columnconfigure(1, weight=1)  # Segments column
+        meter_frame.grid_rowconfigure(0, weight=1)
+
+        # Try to load mic icon
+        try:
+            mic_icon = Image.open(get_file_path('assets', 'mic_icon.png'))
+            mic_icon = mic_icon.resize((24, 24))
+            self.mic_photo = ImageTk.PhotoImage(mic_icon)
+            mic_icon_label = ttk.Label(meter_frame, image=self.mic_photo)
+            mic_icon_label.grid(row=0, column=0, padx=(5, 5), sticky='w')
+        except Exception as e:
+            logger.exception(f"Error loading microphone icon: {e}")
+
+        # Create volume meter segments
+        segments_frame = ttk.Frame(meter_frame)
+        segments_frame.grid(row=0, column=1, sticky='nsew')
+
+        # Create segments
+        self.SEGMENT_COUNT = 20
+        segments = []
+        for i in range(self.SEGMENT_COUNT):
+            segment = tk.Frame(segments_frame, width=10, height=20)
+            segment.grid(row=0, column=i, padx=1)
+            segment.grid_propagate(False)
+            segments.append(segment)
+
+        # Grid the meter frame
+        meter_frame.grid(**grid_kwargs)
+
+        return meter_frame, segments_frame, segments
+
+    def _create_status_label(self, parent_frame, **grid_kwargs):
+        """
+        Create the status label for microphone feedback and grid it immediately.
+        
+        Parameters
+        ----------
+        parent_frame : tk.Widget
+            The parent frame to place the status label in.
+        **grid_kwargs : dict
+            Additional grid configuration options.
+            
+        Returns
+        -------
+        ttk.Label
+            The created status label widget.
+        """
+        status_label = ttk.Label(parent_frame, text="Microphone: Ready", foreground="green")
+        
+        # Grid the status label
+        status_label.grid(**grid_kwargs)
+        
+        return status_label
+
     def create_mic_test_ui(self):
         """
         Create the UI elements for microphone testing.
@@ -122,57 +240,32 @@ class MicrophoneTestFrame:
         center_frame.grid_rowconfigure(0, weight=1)
         center_frame.grid_columnconfigure(0, weight=1)
 
-        # Dropdown for microphone selection
-        mic_options = [f"{name}" for _, name in self.mic_list]
-        self.mic_dropdown = ttk.Combobox(
+        # Create and grid dropdown
+        self.mic_dropdown = self._create_dropdown(
             center_frame, 
-            values=mic_options, 
-            state='readonly', 
-            width=40,
-            style='Mic.TCombobox'
+            width=40, 
+            row=0, column=0, pady=(0, 5), padx=(10, 0), sticky='nsew'
         )
-        self.mic_dropdown.grid(row=0, column=0, pady=(0, 5), padx=(10, 0), sticky='nsew')
+
+        # Create and grid volume meter
+        meter_frame, self.segments_frame, self.segments = self._create_volume_meter(
+            self.frame, 
+            row=1, column=0, sticky='nsew', pady=(0, 0)
+        )
         
-        # Set the default selection
-        if MicrophoneState.SELECTED_MICROPHONE_NAME:
-            self.mic_dropdown.set(MicrophoneState.SELECTED_MICROPHONE_NAME)
-        elif self.mic_list:
-            self.mic_dropdown.current(0)
+        # Adjust the icon padding for vertical layout
+        if hasattr(self, 'mic_photo'):
+            for child in meter_frame.winfo_children():
+                if isinstance(child, ttk.Label) and child.cget('image'):
+                    child.grid_configure(padx=(5, 0))
+                    break
+
+        # Create and grid status label
+        self.status_label = self._create_status_label(
+            self.frame, 
+            row=2, column=0, pady=(0, 0), padx=(10, 0), sticky='nsew'
+        )
         
-        # Bind selection change to save immediately
-        self.mic_dropdown.bind('<<ComboboxSelected>>', self.on_mic_change)
-        self.mic_dropdown.bind('<Button-1>', self.on_dropdown_click)  # Bind click event
-
-        # Volume meter container
-        meter_frame = ttk.Frame(self.frame)
-        meter_frame.grid(row=1, column=0, sticky='nsew', pady=(0, 0))
-
-        # Try to load mic icon
-        try:
-            mic_icon = Image.open(get_file_path('assets', 'mic_icon.png'))
-            mic_icon = mic_icon.resize((24, 24))
-            self.mic_photo = ImageTk.PhotoImage(mic_icon)
-            mic_icon_label = ttk.Label(meter_frame, image=self.mic_photo)
-            mic_icon_label.grid(row=0, column=0, padx=(5, 0), sticky='nsew')
-        except Exception as e:
-            logger.exception(f"Error loading microphone icon: {e}")
-
-        # Create volume meter segments
-        self.segments_frame = ttk.Frame(meter_frame)
-        self.segments_frame.grid(row=0, column=1, sticky='nsew', pady=(4, 0))
-
-        # Create segments
-        self.SEGMENT_COUNT = 20
-        self.segments = []
-        for i in range(self.SEGMENT_COUNT):
-            segment = tk.Frame(self.segments_frame, width=10, height=20)
-            segment.grid(row=0, column=i, padx=1)
-            segment.grid_propagate(False)
-            self.segments.append(segment)
-
-        # Status label for feedback
-        self.status_label = ttk.Label(self.frame, text="Microphone: Ready", foreground="green")
-        self.status_label.grid(row=2, column=0, pady=(0, 0), padx=(10, 0), sticky='nsew')
         self.on_dropdown_click(None)
 
     def create_horizontal_layout(self):
@@ -192,62 +285,25 @@ class MicrophoneTestFrame:
         dropdown_frame = ttk.Frame(main_frame)
         dropdown_frame.grid(row=0, column=0, sticky='nsew', padx=(0, 10))
 
-        # Dropdown for microphone selection
-        mic_options = [f"{name}" for _, name in self.mic_list]
-        self.mic_dropdown = ttk.Combobox(
+        # Create and grid dropdown
+        self.mic_dropdown = self._create_dropdown(
             dropdown_frame, 
-            values=mic_options, 
-            state='readonly', 
-            width=25,  # Smaller width for horizontal layout
-            style='Mic.TCombobox'
+            width=25, 
+            row=0, column=0, sticky='ew'
         )
-        self.mic_dropdown.grid(row=0, column=0, sticky='ew')
+
+        # Create and grid volume meter (right side)
+        meter_frame, self.segments_frame, self.segments = self._create_volume_meter(
+            main_frame, 
+            row=0, column=1, sticky='nsew'
+        )
+
+        # Create and grid status label (below the main frame)
+        self.status_label = self._create_status_label(
+            self.frame, 
+            row=1, column=0, pady=(5, 0), sticky='ew'
+        )
         
-        # Set the default selection
-        if MicrophoneState.SELECTED_MICROPHONE_NAME:
-            self.mic_dropdown.set(MicrophoneState.SELECTED_MICROPHONE_NAME)
-        elif self.mic_list:
-            self.mic_dropdown.current(0)
-        
-        # Bind selection change to save immediately
-        self.mic_dropdown.bind('<<ComboboxSelected>>', self.on_mic_change)
-        self.mic_dropdown.bind('<Button-1>', self.on_dropdown_click)  # Bind click event
-
-        # Volume meter frame (right side)
-        meter_frame = ttk.Frame(main_frame)
-        meter_frame.grid(row=0, column=1, sticky='nsew')
-        
-        # Configure meter frame grid
-        meter_frame.grid_columnconfigure(0, weight=0)  # Icon column
-        meter_frame.grid_columnconfigure(1, weight=1)  # Segments column
-        meter_frame.grid_rowconfigure(0, weight=1)
-
-        # Try to load mic icon
-        try:
-            mic_icon = Image.open(get_file_path('assets', 'mic_icon.png'))
-            mic_icon = mic_icon.resize((24, 24))
-            self.mic_photo = ImageTk.PhotoImage(mic_icon)
-            mic_icon_label = ttk.Label(meter_frame, image=self.mic_photo)
-            mic_icon_label.grid(row=0, column=0, padx=(5, 5), sticky='w')
-        except Exception as e:
-            logger.exception(f"Error loading microphone icon: {e}")
-
-        # Create volume meter segments
-        self.segments_frame = ttk.Frame(meter_frame)
-        self.segments_frame.grid(row=0, column=1, sticky='nsew')
-
-        # Create segments
-        self.SEGMENT_COUNT = 20
-        self.segments = []
-        for i in range(self.SEGMENT_COUNT):
-            segment = tk.Frame(self.segments_frame, width=10, height=20)
-            segment.grid(row=0, column=i, padx=1)
-            segment.grid_propagate(False)
-            self.segments.append(segment)
-
-        # Status label for feedback (below the main frame)
-        self.status_label = ttk.Label(self.frame, text="Microphone: Ready", foreground="green")
-        self.status_label.grid(row=1, column=0, pady=(5, 0), sticky='ew')
         self.on_dropdown_click(None)
 
     def initialize_selected_microphone(self):
