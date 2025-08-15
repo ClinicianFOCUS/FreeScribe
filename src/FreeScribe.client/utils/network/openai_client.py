@@ -174,6 +174,10 @@ class OpenAIClient(BaseNetworkClient):
             return f'Error: {error_message}'
         
         finally:
+            try:
+                self.stop_cancel_monitoring()
+            except Exception as cleanup_exc:
+                logger.exception(f"Exception during stop_cancel_monitoring: {cleanup_exc}")
             await self._close_client()
     
     async def send_completion(
@@ -214,7 +218,7 @@ class OpenAIClient(BaseNetworkClient):
             if stop_event.is_set():
                 return 'Error: Operation cancelled'
             
-            return self._parse_completion_response(response)
+            return self._parse_completion_response_data(response)
 
         except Exception as e:
             error_message = self._handle_error(e)
@@ -445,7 +449,6 @@ class OpenAIClient(BaseNetworkClient):
         while self.checking_active and not self.monitoring_stop_event.is_set():
             try:
                 if self.threading_cancel_event is None:
-                    self.f
                     logger.info("No cancellation event provided. Continuing with the request.")
                     break
 
