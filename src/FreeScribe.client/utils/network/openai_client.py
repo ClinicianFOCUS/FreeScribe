@@ -446,7 +446,6 @@ class OpenAIClient(BaseNetworkClient):
         while self.checking_active and not self.monitoring_stop_event.is_set():
             try:
                 if self.threading_cancel_event is None:
-                    self.f
                     logger.info("No cancellation event provided. Continuing with the request.")
                     break
 
