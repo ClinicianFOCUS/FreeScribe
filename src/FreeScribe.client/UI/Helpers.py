@@ -67,3 +67,18 @@ def set_window_icon(window):
             window.iconbitmap(icon_path)
     except Exception as e:
         logger.exception(f"Failed to set window icon. This was handled gracefully using default. The error below is just the call stack: {e}")
+
+def center_window_to_parent(window, parent):
+    """
+    Center the given window to the parent window.
+    
+    :param window: The window to center
+    :type window: tk.Toplevel or tk.Tk
+    :param parent: The parent window to center to
+    :type parent: tk.Toplevel or tk.Tk
+    """
+    window.update_idletasks()  # Ensure the window has its size calculated
+    parent.update_idletasks()  # Ensure the parent window has its size calculated
+    x = parent.winfo_x() + (parent.winfo_width() // 2) - (window.winfo_width() // 2)
+    y = parent.winfo_y() + (parent.winfo_height() // 2) - (window.winfo_height() // 2)
+    window.geometry(f"+{x}+{y}")

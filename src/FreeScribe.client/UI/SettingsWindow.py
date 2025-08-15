@@ -41,9 +41,6 @@ class SettingsWindow():
     ----------
     OPENAI_API_KEY : str
         The API key for OpenAI integration.
-    AISCRIBE : str
-        Placeholder for the first AI Scribe settings.
-    AISCRIBE2 : str
         Placeholder for the second AI Scribe settings.
     # API_STYLE : str FUTURE FEATURE REVISION
     #     The API style to be used (default is 'OpenAI'). FUTURE FEATURE
@@ -61,13 +58,8 @@ class SettingsWindow():
         Loads settings from a JSON file and updates the internal state.
     save_settings_to_file():
         Saves the current settings to a JSON file.
-    save_settings(openai_api_key, aiscribe_text, aiscribe2_text, 
-                  settings_window):
+    save_settings(openai_api_key, settings_window):
         Saves the current settings, including API keys, IP addresses, and user-defined parameters.
-    load_aiscribe_from_file():
-        Loads the first AI Scribe text from a file.
-    load_aiscribe2_from_file():
-        Loads the second AI Scribe text from a file.
     clear_settings_file(settings_window):
         Clears the content of settings files and closes the settings window.
     """
@@ -126,7 +118,6 @@ class SettingsWindow():
             "Auto Shutdown Containers on Exit": True,
             "Use Docker Status Bar": False,
             "Show Welcome Message": True,
-            "Enable Scribe Template": False,
             SettingsKeys.USE_PRE_PROCESSING.value: False,
             "Use Post-Processing": FeatureToggle.POST_PROCESSING,
             "AI Server Self-Signed Certificates": False,
@@ -160,8 +151,6 @@ class SettingsWindow():
         self.OPENAI_API_KEY = "None"
         # self.API_STYLE = "OpenAI" # FUTURE FEATURE REVISION
         self.main_window = None
-        self.scribe_template_values = []
-        self.scribe_template_mapping = {}
         
         # Initialize setting types dictionary
         self.setting_types = {}
@@ -256,7 +245,6 @@ class SettingsWindow():
 
 
         self.adv_general_settings = [
-            # "Enable Scribe Template", # Uncomment if you want to implement the feature right now removed as it doesn't have a real structured implementation
             SettingsKeys.AUDIO_PROCESSING_TIMEOUT_LENGTH.value,
             SettingsKeys.STORE_RECORDINGS_LOCALLY.value,
             SettingsKeys.STORE_NOTES_LOCALLY.value,
@@ -285,41 +273,8 @@ class SettingsWindow():
         # saves newest value, but not saved to config file yet
         self.editable_settings_entries = {}
         self.load_settings_from_file()
-        self.AISCRIBE = self.load_aiscribe_from_file() or "AI, please transform the following conversation into a concise SOAP note. Do not assume any medical data, vital signs, or lab values. Base the note strictly on the information provided in the conversation. Ensure that the SOAP note is structured appropriately with Subjective, Objective, Assessment, and Plan sections. Strictly extract facts from the conversation. Here's the conversation:"
-        self.AISCRIBE2 = self.load_aiscribe2_from_file() or "Remember, the Subjective section should reflect the patient's perspective and complaints as mentioned in the conversation. The Objective section should only include observable or measurable data from the conversation. The Assessment should be a summary of your understanding and potential diagnoses, considering the conversation's content. The Plan should outline the proposed management, strictly based on the dialogue provided. Do not add any information that did not occur and do not make assumptions. Strictly extract facts from the conversation."
-        self.get_dropdown_values_and_mapping()
         self._create_settings_and_aiscribe_if_not_exist()    
         
-    def get_dropdown_values_and_mapping(self):
-        """
-        Reads the 'options.txt' file to populate dropdown values and their mappings.
-
-        This function attempts to read a file named 'options.txt' to extract templates
-        that consist of three lines: a title, aiscribe, and aiscribe2. These templates
-        are then used to populate the dropdown values and their corresponding mappings.
-        If the file is not found, default values are used instead.
-
-        :raises FileNotFoundError: If 'options.txt' is not found, a message is printed
-                                and default values are used.
-        """
-        self.scribe_template_values = []
-        self.scribe_template_mapping = {}
-        try:
-            with open('options.txt', 'r') as file:
-                content = file.read().strip()
-            templates = content.split('\n\n')
-            for template in templates:
-                lines = template.split('\n')
-                if len(lines) == 3:
-                    title, aiscribe, aiscribe2 = lines
-                    self.scribe_template_values.append(title)
-                    self.scribe_template_mapping[title] = (aiscribe, aiscribe2)
-        except FileNotFoundError:
-            logger.info("options.txt not found, using default values.")
-            # Fallback default options if file not found
-            self.scribe_template_values = ["Settings Template"]
-            self.scribe_template_mapping["Settings Template"] = (self.AISCRIBE, self.AISCRIBE2)
-
     def convert_setting_value(self, setting: str, value: Any) -> Any:
         """
         Convert a setting value to the appropriate type based on the setting name.
@@ -385,10 +340,7 @@ class SettingsWindow():
 
                 if self.editable_settings["Use Docker Status Bar"] and self.main_window is not None:
                     self.main_window.create_docker_status_bar()
-                
-                if self.editable_settings["Enable Scribe Template"] and self.main_window is not None:
-                    self.main_window.create_scribe_template()
-                
+                            
                 return self.OPENAI_API_KEY
         except FileNotFoundError:
             logger.info("Settings file not found. Using default settings.")
@@ -417,7 +369,7 @@ class SettingsWindow():
         with open(get_resource_path('settings.txt'), 'w') as file:
             json.dump(settings, file)
 
-    def save_settings(self, openai_api_key, aiscribe_text, aiscribe2_text, settings_window,
+    def save_settings(self, openai_api_key, settings_window,
                     silence_cutoff):
         """
         Save the current settings, including IP addresses, API keys, and user-defined parameters.
@@ -426,8 +378,6 @@ class SettingsWindow():
         of the Settings instance.
 
         :param str openai_api_key: The OpenAI API key for authentication.
-        :param str aiscribe_text: The text for the first AI Scribe.
-        :param str aiscribe2_text: The text for the second AI Scribe.
         :param tk.Toplevel settings_window: The settings window instance to be destroyed after saving.
         """
         # Ensure no leading/trailing spaces
@@ -451,44 +401,9 @@ class SettingsWindow():
 
         self.save_settings_to_file()
 
-        self.AISCRIBE = aiscribe_text
-        self.AISCRIBE2 = aiscribe2_text
-
         ret_value = True
-        with open(get_resource_path('aiscribe.txt'), 'w') as f:
-            ret_value = self.write_scribe_data(f, self.AISCRIBE)
-        with open(get_resource_path('aiscribe2.txt'), 'w') as f:
-            ret_value = self.write_scribe_data(f, self.AISCRIBE2)
 
         return ret_value
-
-    def load_aiscribe_from_file(self):
-        """
-        Load the AI Scribe text from a file.
-
-        :returns: The AI Scribe text, or None if the file does not exist or is empty.
-        :rtype: str or None
-        """
-        try:
-            with open(get_resource_path('aiscribe.txt'), 'r') as f:
-                return f.read()
-        except FileNotFoundError:
-            logger.info("aiscribe.txt not found, using default value.")
-            return None
-
-    def load_aiscribe2_from_file(self):
-        """
-        Load the second AI Scribe text from a file.
-
-        :returns: The second AI Scribe text, or None if the file does not exist or is empty.
-        :rtype: str or None
-        """
-        try:
-            with open(get_resource_path('aiscribe2.txt'), 'r') as f:
-                return f.read()
-        except FileNotFoundError:
-            logger.info("aiscribe2.txt not found, using default value.")
-            return None
 
     def __clear_settings_file(self):
         """
@@ -496,8 +411,6 @@ class SettingsWindow():
         """
         # Open the files and immediately close them to clear their contents.
         open(get_resource_path('settings.txt'), 'w').close()  
-        open(get_resource_path('aiscribe.txt'), 'w').close()
-        open(get_resource_path('aiscribe2.txt'), 'w').close()
         logger.info("Settings file cleared.")
 
     def __keep_network_clear_settings(self):
@@ -536,7 +449,7 @@ class SettingsWindow():
         Clears the content of settings files and closes the settings window.
 
         This method attempts to open and clear the contents of three text files:
-        `settings.txt`, `aiscribe.txt`, and `aiscribe2.txt`. After clearing the
+        `settings.txt`. After clearing the
         files, it displays a message box to notify the user that the settings
         have been reset and closes the `settings_window`. If an error occurs
         during this process, the exception will be caught and printed.
@@ -588,9 +501,12 @@ class SettingsWindow():
             logger.info("Invalid LLM Endpoint")
             return ["Invalid LLM Endpoint", "Custom"]
 
+        if endpoint.endswith("/"):
+            endpoint = endpoint[:-1]
+
         try:
             verify = not self.editable_settings["AI Server Self-Signed Certificates"]
-            response = requests.get(endpoint + "/models", headers=headers, timeout=1.0, verify=verify)
+            response = requests.get(endpoint + "/models", headers=headers, verify=verify, timeout=10.0)
             response.raise_for_status()  # Raise an error for bad responses
             models = response.json().get("data", [])  # Extract the 'data' field
             
@@ -759,16 +675,7 @@ class SettingsWindow():
         # Save updated settings to file
         self.save_settings_to_file()
         
-        # Ensure AIScribe files exist, create them if 
         ret_value = True
-        if not os.path.exists(get_resource_path('aiscribe.txt')):
-            logger.info("AIScribe file not found. Creating default AIScribe file.")
-            with open(get_resource_path('aiscribe.txt'), 'w') as f:
-                ret_value = self.write_scribe_data(f, self.AISCRIBE)
-        if not os.path.exists(get_resource_path('aiscribe2.txt')):
-            logger.info("AIScribe2 file not found. Creating default AIScribe2 file.")
-            with open(get_resource_path('aiscribe2.txt'), 'w') as f:
-                ret_value = self.write_scribe_data(f, self.AISCRIBE2)
 
         return ret_value
 
@@ -828,32 +735,3 @@ class SettingsWindow():
             bool: The value of the 'Use Low Memory Mode' setting
         """
         return self.editable_settings[SettingsKeys.USE_LOW_MEM_MODE.value]
-    
-    def write_scribe_data(self, file, text):
-        """
-        Writes the provided text to a file, handling UnicodeEncodeError gracefully.
-        This method attempts to write the given text to the specified file. If a UnicodeEncodeError occurs,
-        it will catch the exception and display an error message to the user, indicating that the text contains
-        unsupported characters. The method will return False if the write operation fails due to an unsupported character
-
-        :param file: The file object to write to.
-        :type file: file-like object
-        :param text: The text to write to the file.
-        :type text: str
-        :returns: True if the write operation is successful, False if it fails due to an
-        unsupported character.
-        :rtype: bool
-        """
-        try:
-            file.write(text)
-        except UnicodeEncodeError as e:
-            problematic_char = e.object[e.start:e.end]
-            import tkinter.messagebox as messagebox
-            messagebox.showerror(
-                "Invalid Character", 
-                f"Settings contain an unsupported character: '{problematic_char}'\n"
-                f"Please remove special symbols and save again."
-            )
-            logger.exception("Failed to write scribe data due to unsupported character")
-            return False
-        return True

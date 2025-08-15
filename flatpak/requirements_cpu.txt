@@ -75,3 +75,7 @@ Pillow==10.2.0
 python-xlib==0.33
 # en_core_web_md @ http://localhost:8080/packages/en_core_web_md-3.7.1-py3-none-any.whl#sha256=6a0f857a2b4d219c6fa17d455f82430b365bf53171a2d919b9376e5dc9be032e
 en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.7.1/en_core_web_md-3.7.1-py3-none-any.whl
+keyring==25.6.0
+cryptography==44.0.2
+librosa==0.11.0
+en_core_sci_md @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_core_sci_md-0.5.4.tar.gz
