@@ -521,12 +521,12 @@ def toggle_pause():
         is_paused = not is_paused
 
         if is_paused:
-            if current_view == "full" or current_view == "transcribe":
+            if current_view in ["full", "transcribe"]:
                 pause_button.config(text="Resume", bg="red")
             elif current_view == "minimal":
                 pause_button.config(text="▶️", bg="red")
         else:
-            if current_view == "full" or current_view == "transcribe":
+            if current_view in ["full", "transcribe"]:
                 pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
             elif current_view == "minimal":
                 pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
@@ -681,7 +681,7 @@ def check_silence_warning(silence_duration):
 
     # Check if we need to warn if silence is long than warn time
     if silence_duration >= SILENCE_WARNING_LENGTH and window.warning_bar is None and not is_paused:
-        if current_view == "full" or current_view == "transcribe":
+        if current_view in ["full", "transcribe"]:
             window.create_warning_bar(f"No audio input detected for {SILENCE_WARNING_LENGTH} seconds. Please check and ensure your microphone input device is working.", closeButton=False)
         elif current_view == "minimal":
             window.create_warning_bar(f"🔇No audio for {SILENCE_WARNING_LENGTH}s.", closeButton=False)
@@ -882,7 +882,7 @@ def toggle_recording():
         recording_thread = threading.Thread(target=record_audio)
         recording_thread.start()
 
-        if current_view == "full" or current_view == "transcribe":
+        if current_view in ["full", "transcribe"]:
             safe_set_button_config(mic_button, bg="red", text="Stop\nRecording")
         elif current_view == "minimal":
             safe_set_button_config(mic_button, bg="red", text="⏹️")
@@ -890,7 +890,7 @@ def toggle_recording():
         start_flashing()
     else:
         enable_recording_ui_elements()
-        if current_view == "full" or current_view == "transcribe":
+        if current_view in ["full", "transcribe"]:
             safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
         elif current_view == "minimal":
             safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="🎤")
