@@ -527,7 +527,7 @@ class SettingsWindowUI:
         if hasattr(self, 'models_drop_down'):
             selected_value = self.models_drop_down.get()
             
-
+            model_row = None
             for child in self.models_drop_down.master.grid_slaves():
                 if child == self.models_drop_down:
                     model_row = int(child.grid_info()["row"])
