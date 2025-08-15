@@ -528,16 +528,16 @@ class SettingsWindow():
         the dropdown widget in the settings window with the new list of models.
         """
         if self.editable_settings_entries[SettingsKeys.LOCAL_LLM.value].get():
-            print("Using local LLM, skipping model update")
+            return
+
+        dropdown["values"] = ["Loading models...", "Custom"]
+        dropdown.set("Loading models...")
+        models = self.get_available_models(endpoint=endpoint)
+        dropdown["values"] = models
+        if self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value] in models:
+            dropdown.set(self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value])
         else:
-            dropdown["values"] = ["Loading models...", "Custom"]
-            dropdown.set("Loading models...")
-            models = self.get_available_models(endpoint=endpoint)
-            dropdown["values"] = models
-            if self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value] in models:
-                dropdown.set(self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value])
-            else:
-                dropdown.set(models[0])
+            dropdown.set(models[0])
         
     def set_main_window(self, window):
         """
