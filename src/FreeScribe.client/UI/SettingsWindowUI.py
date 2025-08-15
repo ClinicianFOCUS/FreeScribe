@@ -951,6 +951,8 @@ pady=5, sticky="w")
             self.main_window.create_docker_status_bar()
         elif not self.settings.editable_settings["Use Docker Status Bar"] and self.main_window.docker_status_bar is not None:
             self.main_window.destroy_docker_status_bar()
+        
+        self.main_window.root.event_generate("<<TranscribeOnlyModeChanged>>")
 
         if close_window:
             self.close_window()

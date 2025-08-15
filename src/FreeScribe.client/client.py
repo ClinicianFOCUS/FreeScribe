@@ -521,12 +521,12 @@ def toggle_pause():
         is_paused = not is_paused
 
         if is_paused:
-            if current_view == "full":
+            if current_view in ["full", "transcribe"]:
                 pause_button.config(text="Resume", bg="red")
             elif current_view == "minimal":
                 pause_button.config(text="▶️", bg="red")
         else:
-            if current_view == "full":
+            if current_view in ["full", "transcribe"]:
                 pause_button.config(text="Pause", bg=DEFAULT_BUTTON_COLOUR)
             elif current_view == "minimal":
                 pause_button.config(text="⏸️", bg=DEFAULT_BUTTON_COLOUR)
@@ -681,7 +681,7 @@ def check_silence_warning(silence_duration):
 
     # Check if we need to warn if silence is long than warn time
     if silence_duration >= SILENCE_WARNING_LENGTH and window.warning_bar is None and not is_paused:
-        if current_view == "full":            
+        if current_view in ["full", "transcribe"]:
             window.create_warning_bar(f"No audio input detected for {SILENCE_WARNING_LENGTH} seconds. Please check and ensure your microphone input device is working.", closeButton=False)
         elif current_view == "minimal":
             window.create_warning_bar(f"🔇No audio for {SILENCE_WARNING_LENGTH}s.", closeButton=False)
@@ -833,10 +833,11 @@ def save_audio():
             wf.writeframes(b''.join(frames))
         frames = []  # Clear recorded data
 
+    is_transcribe_only_mode = app_settings.editable_settings[SettingsKeys.TRANSCRIBE_ONLY_MODE.value] or NoteStyleSelector.current_style == "No Note Generation"
     if app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value] == True and is_audio_processing_realtime_canceled.is_set(
-    ) is False:
+    ) is False and not is_transcribe_only_mode:
         send_and_receive()
-    elif app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value] == False and is_audio_processing_whole_canceled.is_set() is False:
+    elif app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value] == False and is_audio_processing_whole_canceled.is_set() is False and not is_transcribe_only_mode:
         threaded_send_audio_to_server()
 
 
@@ -868,7 +869,7 @@ def toggle_recording():
         REALTIME_TRANSCRIBE_THREAD_ID = realtime_thread.ident
         
         if not app_settings.editable_settings[SettingsKeys.WHISPER_REAL_TIME.value]:
-            safe_set_transcription_box("Recording Audio... Realtime Transcription disabled. Audio while transcribe when you press stop recording.\n")
+            safe_set_transcription_box("Recording Audio... Realtime Transcription disabled. Audio will transcribe when you press stop recording.\n")
       
         # Set the text in the transcription box, nothing for it to be empty
         safe_set_note_box("")
@@ -881,7 +882,7 @@ def toggle_recording():
         recording_thread = threading.Thread(target=record_audio)
         recording_thread.start()
 
-        if current_view == "full":
+        if current_view in ["full", "transcribe"]:
             safe_set_button_config(mic_button, bg="red", text="Stop\nRecording")
         elif current_view == "minimal":
             safe_set_button_config(mic_button, bg="red", text="⏹️")
@@ -889,7 +890,7 @@ def toggle_recording():
         start_flashing()
     else:
         enable_recording_ui_elements()
-        if current_view == "full":
+        if current_view in ["full", "transcribe"]:
             safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
         elif current_view == "minimal":
             safe_set_button_config(mic_button, bg=DEFAULT_BUTTON_COLOUR, text="🎤")
@@ -1178,7 +1179,11 @@ def send_audio_to_server():
 
             # check if canceled, if so do not update the UI
             if not is_audio_processing_whole_canceled.is_set():
-                safe_set_transcription_box(transcribed_text, send_and_receive)
+                if app_settings.editable_settings[SettingsKeys.TRANSCRIBE_ONLY_MODE.value] or NoteStyleSelector.current_style == "No Note Generation":
+                    # in transcribe only mode, we want to clear the note box and put the transcription there
+                    safe_set_transcription_box(transcribed_text)
+                else:
+                    safe_set_transcription_box(transcribed_text, send_and_receive)
         except Exception as e:
             logger.exception(f"An error occurred: {e}")
             safe_set_transcription_box(f"An error occurred: {e}")
@@ -1248,7 +1253,12 @@ def send_audio_to_server():
                         except Exception as e:
                             # ignore the error as it should not break the transcription
                             logger.exception(f"remote Error during hallucination cleaning: {str(e)}")
-                    safe_set_transcription_box(transcribed_text, send_and_receive)
+
+                    if app_settings.editable_settings[SettingsKeys.TRANSCRIBE_ONLY_MODE.value] or NoteStyleSelector.current_style == "No Note Generation":
+                        # in transcribe only mode, we want to clear the note box and put the transcription there
+                        safe_set_transcription_box(transcribed_text)
+                    else:
+                        safe_set_transcription_box(transcribed_text, send_and_receive)
             except Exception as e:
                 logger.exception(f"An error occurred: {e}")
                 # Display an error message to the user
@@ -1806,185 +1816,267 @@ last_full_position = None
 last_minimal_position = None
 
 
-def toggle_view():
+def set_view_configuration(view_mode="full"):
     """
-    Toggles the user interface between a full view and a minimal view.
-
-    Full view includes all UI components, while minimal view limits the interface
-    to essential controls, reducing screen space usage. The function also manages
-    window properties, button states, and binds/unbinds hover events for transparency.
+    Configures the application to display different view interfaces.
+    
+    Args:
+        view_mode (str): The view mode to set - "full", "minimal", or "transcribe"
     """
+    def action():
+        global current_view, last_minimal_position, last_full_position, silent_warning_duration, mic_test_horizontal
 
-    if current_view == "full":  # Transition to minimal view
-        set_minimal_view()
+        # Common cleanup
+        window.destroy_warning_bar()
+        
+        if current_view == "full":
+            last_full_position = root.geometry()
+        elif current_view == "minimal":
+            last_minimal_position = root.geometry()
 
-    else:  # Transition back to full view
-        set_full_view()
+        if view_mode == "minimal":
+            _configure_minimal_view()
+        elif view_mode == "transcribe":
+            _configure_transcribe_view()
+        else:  # full view
+            _configure_full_view()
+        
+        # Recreate silence warning bar for all views
+        check_silence_warning(silence_duration=silent_warning_duration)
 
+    root.after(0, action)
+
+def _configure_full_view():
+    """Configure the full view interface."""
+    global current_view, last_minimal_position
+    
+    # Remove any horizontal mic test frame
+    if 'mic_test_horizontal' in globals():
+        mic_test_horizontal.frame.grid_remove()
+        del globals()['mic_test_horizontal']
+    
+    # Reset button sizes and text
+    mic_button.config(width=11, height=2, text="Stop\nRecording" if is_recording else "Start\nRecording")
+    pause_button.config(width=11, height=2, text="Resume" if is_paused else "Pause")
+    switch_view_button.config(width=11, height=2, text="Minimize View")
+    
+    # Show all UI components in their original positions with proper grid parameters
+    user_input.grid(row=0, column=1, columnspan=8, padx=5, pady=15, sticky='nsew')
+    
+    # Reset buttons to original positions (remove any columnspan from transcribe view)
+    mic_button.grid(row=1, column=1, columnspan=1, pady=5, padx=0, sticky='nsew')
+    pause_button.grid(row=1, column=2, columnspan=1, pady=5, padx=0, sticky='nsew')
+    send_button.grid(row=1, column=3, columnspan=1, pady=5, sticky='nsew')
+    clear_button.grid(row=1, column=4, columnspan=1, pady=5, sticky='nsew')
+    upload_button.grid(row=1, column=5, columnspan=1, pady=5, sticky='nsew')
+    switch_view_button.grid(row=1, column=6, columnspan=1, pady=5, padx=0, sticky='nsew')
+    
+    response_display.grid(row=2, column=1, columnspan=8, padx=5, pady=15, sticky='nsew')
+    history_frame.grid(row=0, column=9, columnspan=2, rowspan=6, padx=5, pady=10, sticky='nsew')
+    blinking_circle_canvas.grid(row=1, column=7, padx=0, pady=5)
+    footer_frame.grid(row=100, column=0, columnspan=100, sticky="ew")
+    
+    # Show AI-related components
+    timestamp_listbox.grid(row=0, column=0, rowspan=3, sticky='nsew')
+    note_style_selector.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+    
+    # Restore the original vertical mic test frame and refresh its state
+    mic_test.frame.grid(row=4, column=0, pady=10, sticky='nsew')
+    # Force refresh the microphone test component using existing methods
+    mic_test.initialize_microphones()
+    mic_test.reopen_stream()
+    
+    # Restore notes UI based on settings
+    if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
+        grid_clear_all_btn()
+    else:
+        grid_warning_label()
+    
+    # Configure window properties
+    window.toggle_menu_bar(enable=True, is_recording=is_recording)
+    root.unbind('<Enter>')
+    root.unbind('<Leave>')
+    root.attributes('-alpha', 1.0)
+    root.attributes('-topmost', False)
+    root.minsize(900, 400)
+    current_view = "full"
+    
+    # Handle transcription placeholder and events properly
+    current_text = user_input.scrolled_text.get("1.0", tk.END).strip()
+    
+    # Only reset to placeholder if the text box is empty or contains the transcribe-only placeholder
+    if not current_text or current_text == "Transcription will appear here":
+        user_input.scrolled_text.delete("1.0", tk.END)
+        user_input.scrolled_text.insert("1.0", "Transcript of Conversation")
+    
+    # Re-bind the focus events for placeholder management
+    user_input.scrolled_text.bind("<FocusIn>", lambda event: remove_placeholder(event, user_input.scrolled_text, "Transcript of Conversation"))
+    user_input.scrolled_text.bind("<FocusOut>", lambda event: add_placeholder(event, user_input.scrolled_text, "Transcript of Conversation"))
+    
+    # Configure button colors
+    mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR)
+    pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR)
+    
+    # Window geometry management
+    add_min_max(root)
+    if app_settings.editable_settings["Use Docker Status Bar"]:
+        window.create_docker_status_bar()
+
+    if last_full_position:
+        root.geometry(last_full_position)
+    else:
+        root.geometry("900x400")
+                
+def _configure_minimal_view():
+    """Configure the minimal view interface."""
+    global current_view, last_full_position
+    
+    # Hide all non-essential UI components
+    user_input.grid_remove()
+    send_button.grid_remove()
+    clear_button.grid_remove()
+    upload_button.grid_remove()
+    response_display.grid_remove()
+    history_frame.grid_remove()
+    blinking_circle_canvas.grid_remove()
+    footer_frame.grid_remove()
+    
+    # Configure minimal view button sizes and placements
+    mic_button.config(width=2, height=1, text="⏹️" if is_recording else "🎤")
+    pause_button.config(width=2, height=1, text="▶️" if is_paused else "⏸️")
+    switch_view_button.config(width=2, height=1, text="⬆️")
+    
+    mic_button.grid(row=0, column=0, pady=2, padx=2)
+    pause_button.grid(row=0, column=1, pady=2, padx=2)
+    switch_view_button.grid(row=0, column=2, pady=2, padx=2)
+    blinking_circle_canvas.grid(row=0, column=3, pady=2, padx=2)
+    
+    # Configure window properties
+    window.toggle_menu_bar(enable=False)
+    root.attributes('-topmost', True)
+    root.minsize(125, 50)
+    current_view = "minimal"
+    
+    if root.wm_state() == 'zoomed':
+        root.wm_state('normal')
+    
+    # Set hover transparency events
+    def on_enter(e):
+        if e.widget == root:
+            root.attributes('-alpha', 1.0)
+    
+    def on_leave(e):
+        if e.widget == root:
+            root.attributes('-alpha', 0.70)
+    
+    root.bind('<Enter>', on_enter)
+    root.bind('<Leave>', on_leave)
+    
+    # Configure button colors
+    mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR)
+    pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR)
+    
+    # Window geometry management
+    window.destroy_docker_status_bar()
+    remove_min_max(root)
+    
+    if last_minimal_position:
+        root.geometry(last_minimal_position)
+    else:
+        root.geometry("125x50")
+
+def _configure_transcribe_view():
+    """Configure the transcribe-only view interface."""
+    global current_view, mic_test_horizontal
+    
+    # Hide AI-related components
+    send_button.grid_remove()
+    response_display.grid_remove()
+    timestamp_listbox.grid_remove()
+    clear_all_notes_btn.grid_remove()
+    warning_label.grid_remove()
+    note_style_selector.grid_remove()
+    blinking_circle_canvas.grid_remove()
+    switch_view_button.grid_remove()
+    
+    # Remove the existing vertical mic test frame
+    mic_test.frame.grid_remove()
+    
+    # Create a new horizontal layout mic test frame
+    mic_test_horizontal = MicrophoneTestFrame(
+        parent=history_frame,
+        p=p,
+        app_settings=app_settings,
+        root=root,
+        layout_mode='horizontal'
+    )
+    
+    # Move history_frame below buttons and center it
+    history_frame.grid_remove()
+    history_frame.grid(row=2, column=2, columnspan=6, padx=5, pady=10, sticky='ew')
+    mic_test_horizontal.frame.grid(row=4, column=0, pady=10, sticky='ew')
+    
+    # Adjust button layout to fill width without gaps
+    mic_button.config(width=11, height=2, text="Stop\nRecording" if is_recording else "Start\nRecording")
+    pause_button.config(width=11, height=2, text="Resume" if is_paused else "Pause")
+    clear_button.config(width=11, height=2)
+    upload_button.config(width=11, height=2)
+    
+    mic_button.grid(row=1, column=1, columnspan=2, pady=5, padx=0, sticky='ew')
+    pause_button.grid(row=1, column=3, columnspan=2, pady=5, padx=0, sticky='ew')
+    clear_button.grid(row=1, column=5, columnspan=2, pady=5, padx=0, sticky='ew')
+    upload_button.grid(row=1, column=7, columnspan=2, pady=5, padx=0, sticky='ew')
+    
+    # Show the user input box
+    user_input.grid(row=0, column=1, columnspan=8, padx=5, pady=15, sticky='nsew')
+    
+    # Update the transcription placeholder text and disable focus events
+    user_input.scrolled_text.delete("1.0", tk.END)
+    user_input.scrolled_text.insert("1.0", "Transcription will appear here")
+    user_input.scrolled_text.unbind("<FocusIn>")
+    user_input.scrolled_text.unbind("<FocusOut>")
+    
+    # Configure window properties
+    window.toggle_menu_bar(enable=True, is_recording=is_recording)
+    root.unbind('<Enter>')
+    root.unbind('<Leave>')
+    root.attributes('-alpha', 1.0)
+    root.attributes('-topmost', False)
+    root.minsize(650, 250)
+    root.geometry("850x375")
+    current_view = "transcribe"
+    
+    # Configure button colors
+    mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR)
+    pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR)
 
 def set_full_view():
-    """
-    Configures the application to display the full view interface.
-
-    Actions performed:
-    - Reconfigure button dimensions and text.
-    - Show all hidden UI components.
-    - Reset window attributes such as size, transparency, and 'always on top' behavior.
-    - Create the Docker status bar.
-    - Restore the last known full view geometry if available.
-
-    Global Variables:
-    - current_view: Tracks the current interface state ('full' or 'minimal').
-    - last_minimal_position: Saves the geometry of the window when switching from minimal view.
-    """
-    def action():
-        global current_view, last_minimal_position, silent_warning_duration
-
-        # Reset button sizes and placements for full view
-        mic_button.config(width=11, height=2)
-        pause_button.config(width=11, height=2)
-        switch_view_button.config(width=11, height=2, text="Minimize View")
-
-        # Show all UI components
-        user_input.grid()
-        send_button.grid()
-        clear_button.grid()
-        # toggle_button.grid()
-        upload_button.grid()
-        response_display.grid()
-        history_frame.grid()
-        mic_button.grid(row=1, column=1, pady=5, padx=0,sticky='nsew')
-        pause_button.grid(row=1, column=2, pady=5, padx=0,sticky='nsew')
-        switch_view_button.grid(row=1, column=6, pady=5, padx=0,sticky='nsew')
-        blinking_circle_canvas.grid(row=1, column=7, padx=0,pady=5)
-        footer_frame.grid()
-        
-        
-
-        window.toggle_menu_bar(enable=True, is_recording=is_recording)
-
-        # Reconfigure button styles and text
-        mic_button.config(bg="red" if is_recording else DEFAULT_BUTTON_COLOUR,
-                        text="Stop\nRecording" if is_recording else "Start\nRecording")
-        pause_button.config(bg="red" if is_paused else DEFAULT_BUTTON_COLOUR,
-                            text="Resume" if is_paused else "Pause")
-
-        # Unbind transparency events and reset window properties
-        root.unbind('<Enter>')  
-        root.unbind('<Leave>')
-        root.attributes('-alpha', 1.0)
-        root.attributes('-topmost', False)
-        root.minsize(900, 400)
-        current_view = "full"
-
-        #Recreates Silence Warning Bar
-        window.destroy_warning_bar()
-        check_silence_warning(silence_duration= silent_warning_duration)
-
-        # add the minimal view geometry and remove the last full view geometry
-        add_min_max(root)
-
-        # create docker_status bar if enabled
-        if app_settings.editable_settings["Use Docker Status Bar"]:
-            window.create_docker_status_bar()
-
-        # Save minimal view geometry and restore last full view geometry
-        last_minimal_position = root.geometry()
-        root.update_idletasks()
-        if last_full_position:
-            root.geometry(last_full_position)
-        else:
-            root.geometry("900x400")
-
-        # Disable to make the window an app(show taskbar icon)
-        # root.attributes('-toolwindow', False)
-
-    root.after(0, action)
+    """Configures the application to display the full view interface."""
+    set_view_configuration("full")
 
 def set_minimal_view():
-    """
-    Configures the application to display the minimal view interface.
+    """Configures the application to display the minimal view interface."""
+    set_view_configuration("minimal")
 
-    Actions performed:
-    - Reconfigure button dimensions and text.
-    - Hide non-essential UI components.
-    - Bind transparency hover events for better focus.
-    - Adjust window attributes such as size, transparency, and 'always on top' behavior.
-    - Destroy and optionally recreate specific components like the Scribe template.
+def set_transcribe_view():
+    """Configures the application to display the transcribe-only view interface."""
+    set_view_configuration("transcribe")
 
-    Global Variables:
-    - current_view: Tracks the current interface state ('full' or 'minimal').
-    - last_full_position: Saves the geometry of the window when switching from full view.
-    """
-    def action():
-        global current_view, last_full_position, silent_warning_duration
+def toggle_view():
+    """Toggles between full and minimal view."""
+    if current_view == "full":
+        set_minimal_view()
+    else:
+        set_full_view()
 
-        # Remove all non-essential UI components
-        user_input.grid_remove()
-        send_button.grid_remove()
-        clear_button.grid_remove()
-        # toggle_button.grid_remove()
-        upload_button.grid_remove()
-        response_display.grid_remove()
-        history_frame.grid_remove()
-        blinking_circle_canvas.grid_remove()
-        footer_frame.grid_remove()
-        # Configure minimal view button sizes and placements
-        mic_button.config(width=2, height=1)
-        pause_button.config(width=2, height=1)
-        switch_view_button.config(width=2, height=1)
-
-        mic_button.grid(row=0, column=0, pady=2, padx=2)
-        pause_button.grid(row=0, column=1, pady=2, padx=2)
-        switch_view_button.grid(row=0, column=2, pady=2, padx=2)
-
-        # Update button text based on recording and pause states
-        mic_button.config(text="⏹️" if is_recording else "🎤")
-        pause_button.config(text="▶️" if is_paused else "⏸️")
-        switch_view_button.config(text="⬆️")  # Minimal view indicator
-
-        blinking_circle_canvas.grid(row=0, column=3, pady=2, padx=2)
-
-        window.toggle_menu_bar(enable=False)
-
-        # Update window properties for minimal view
-        root.attributes('-topmost', True)
-        root.minsize(125, 50)  # Smaller minimum size for minimal view
-        current_view = "minimal"
-
-        if root.wm_state() == 'zoomed':  # Check if window is maximized
-            root.wm_state('normal')       # Restore the window
-
-        #Recreates Silence Warning Bar
-        window.destroy_warning_bar()
-        check_silence_warning(silence_duration= silent_warning_duration)
-
-        # Set hover transparency events
-        def on_enter(e):
-            if e.widget == root:  # Ensure the event is from the root window
-                root.attributes('-alpha', 1.0)
-
-        def on_leave(e):
-            if e.widget == root:  # Ensure the event is from the root window
-                root.attributes('-alpha', 0.70)
-
-        root.bind('<Enter>', on_enter)
-        root.bind('<Leave>', on_leave)
-
-        # Destroy and re-create components as needed
-        window.destroy_docker_status_bar()
-
-        # Remove the minimal view geometry and save the current full view geometry
-        remove_min_max(root)
-
-        # Save full view geometry and restore last minimal view geometry
-        last_full_position = root.geometry()
-        if last_minimal_position:
-            root.geometry(last_minimal_position)
-        else:
-            root.geometry("125x50")  # Set the window size to the minimal view size
-    root.after(0, action)
-
+def update_ui_for_transcribe_only_mode(event=None):
+    """Updates the UI based on the transcribe only mode setting."""
+    transcribe_only = app_settings.editable_settings[SettingsKeys.TRANSCRIBE_ONLY_MODE.value]
+    
+    if transcribe_only:
+        set_transcribe_view()
+    else:
+        set_full_view()
 
 def copy_text(widget):
     """
@@ -2139,14 +2231,6 @@ timestamp_listbox = TimestampListbox(history_frame, height=30, exportselection=F
 timestamp_listbox.grid(row=0, column=0, rowspan=3, sticky='nsew')
 timestamp_listbox.bind('<<ListboxSelect>>', show_response)
 timestamp_listbox.insert(tk.END, "Temporary Note History")
-
-warning_label = tk.Label(history_frame,
-                            text="Temporary Note History will be cleared when app closes",
-                            # fg="red",
-                            # wraplength=200,
-                            justify="left",
-                            font=tk.font.Font(size=scaled_size),
-                            )
 
 def on_click_clear_all_notes():
     """
@@ -2426,6 +2510,8 @@ if app_settings.editable_settings[SettingsKeys.STORE_NOTES_LOCALLY.value]:
     # Populate the UI with the loaded notes
     populate_ui_with_notes()
 
+root.bind("<<TranscribeOnlyModeChanged>>", update_ui_for_transcribe_only_mode)
+root.after(100, update_ui_for_transcribe_only_mode)
 
 root.mainloop()
 
