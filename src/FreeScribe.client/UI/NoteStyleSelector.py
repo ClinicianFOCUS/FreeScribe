@@ -80,6 +80,10 @@ class NoteStyleSelector(tk.Frame):
                   pre_prompt and post_prompt for each style.
         """
         return {
+            "No Note Generation": {
+                "pre_prompt": "",
+                "post_prompt": ""
+            },
             DEFAULT_TEMPLATE: {
                 "pre_prompt": "AI, please transform the following conversation into a concise SOAP note. Do not assume any medical data, vital signs, or lab values. Base the note strictly on the information provided in the conversation. Ensure that the SOAP note is structured appropriately with Subjective, Objective, Assessment, and Plan sections. Strictly extract facts from the conversation. Here's the conversation:",
                 "post_prompt": "Remember, the Subjective section should reflect the patient's perspective and complaints as mentioned in the conversation. The Objective section should only include observable or measurable data from the conversation. The Assessment should be a summary of your understanding and potential diagnoses, considering the conversation's content. The Plan should outline the proposed management, strictly based on the dialogue provided. Do not add any information that did not occur and do not make assumptions. Strictly extract facts from the conversation."
@@ -319,17 +323,17 @@ class NoteStyleSelector(tk.Frame):
         # Get existing data if available
         existing_data = NoteStyleSelector.style_data.get(current_style, {'pre_prompt': '', 'post_prompt': ''})
         
-        # Check if it's the default style - allow viewing but not editing
-        is_default = (current_style == DEFAULT_TEMPLATE)
+        # Check if it's a protected style - allow viewing but not editing
+        is_protected = (current_style in [DEFAULT_TEMPLATE, NO_PROMPT_TEMPLATE])
 
-        dialog = StyleDialog(self.root, "View Template" if is_default else "Edit Template",
+        dialog = StyleDialog(self.root, "View Template" if is_protected else "Edit Template",
                            initial_name=current_style,
                            initial_pre=existing_data['pre_prompt'],
                            initial_post=existing_data['post_prompt'],
-                           read_only=is_default,
+                           read_only=is_protected,
                            is_edit=True)
         
-        if dialog.result and not is_default:
+        if dialog.result and not is_protected:
             new_name, pre_prompt, post_prompt = dialog.result
             if new_name and new_name != current_style and new_name not in NoteStyleSelector.style_options:
                 # Replace the old style with the new one

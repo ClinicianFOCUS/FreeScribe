@@ -144,6 +144,7 @@ class SettingsWindow():
             SettingsKeys.WHISPER_INITIAL_PROMPT.value: "None",
             # Best of N (Experimental), by default we only generate 1 completion of note, if this is set to a number greater than 1, we will generate N completions and pick the best one.
             SettingsKeys.BEST_OF.value: 1,
+            SettingsKeys.TRANSCRIBE_ONLY_MODE.value: False,
         }
 
     def __init__(self):
@@ -166,8 +167,8 @@ class SettingsWindow():
 
         self.general_settings = [
             "Show Welcome Message",
-            "BlankSpace",
-            "Show Scrub PHI",      
+            "Show Scrub PHI",
+            SettingsKeys.TRANSCRIBE_ONLY_MODE.value,      
         ]
 
         self.whisper_settings = [
@@ -528,17 +529,16 @@ class SettingsWindow():
         the dropdown widget in the settings window with the new list of models.
         """
         if self.editable_settings_entries[SettingsKeys.LOCAL_LLM.value].get():
-            dropdown["values"] = ["gemma-2-2b-it-Q8_0.gguf"]
-            dropdown.set("gemma-2-2b-it-Q8_0.gguf")
+            return
+
+        dropdown["values"] = ["Loading models...", "Custom"]
+        dropdown.set("Loading models...")
+        models = self.get_available_models(endpoint=endpoint)
+        dropdown["values"] = models
+        if self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value] in models:
+            dropdown.set(self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value])
         else:
-            dropdown["values"] = ["Loading models...", "Custom"]
-            dropdown.set("Loading models...")
-            models = self.get_available_models(endpoint=endpoint)
-            dropdown["values"] = models
-            if self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value] in models:
-                dropdown.set(self.editable_settings[SettingsKeys.LOCAL_LLM_MODEL.value])
-            else:
-                dropdown.set(models[0])
+            dropdown.set(models[0])
         
     def set_main_window(self, window):
         """
