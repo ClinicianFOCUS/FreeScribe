@@ -592,8 +592,11 @@ SectionEnd
 
 # Variables for checkboxes
 Var DesktopShortcutCheckbox
+Var SandboxedDesktopShortcutCheckbox
 Var StartMenuCheckbox
 Var RunAppCheckbox
+Var RunSandboxedAppCheckbox
+Var /GLOBAL SandboxiePlusPath
 
 Function CustomizeFinishPage
     !insertmacro MUI_HEADER_TEXT "Installation Complete" "Please select your preferences and close the installer."
@@ -605,36 +608,64 @@ Function CustomizeFinishPage
         Abort
     ${EndIf}
 
-    # Run App Checkbox
-    ${NSD_CreateCheckbox} 10u 10u 100% 12u "Run FreeScribe after installation"
-    Pop $RunAppCheckbox
-    ${NSD_SetState} $RunAppCheckbox ${BST_CHECKED}
-
     # Desktop Shortcut Checkbox
-    ${NSD_CreateCheckbox} 10u 30u 100% 12u "Create Desktop Shortcut"
+    ${NSD_CreateCheckbox} 10u 10u 100% 12u "Create Desktop Shortcut"
     Pop $DesktopShortcutCheckbox
     ${NSD_SetState} $DesktopShortcutCheckbox ${BST_CHECKED}
+
+    # Desktop Shortcut Checkbox For Sandboxed Mode
+    ${NSD_CreateCheckbox} 10u 30u 100% 12u "Create Sandboxed Desktop Shortcut (Sandboxie-Plus Required)"
+    Pop $SandboxedDesktopShortcutCheckbox
+    ${NSD_SetState} $SandboxedDesktopShortcutCheckbox ${BST_UNCHECKED}
 
     # Start Menu Checkbox
     ${NSD_CreateCheckbox} 10u 50u 100% 12u "Add to Start Menu"
     Pop $StartMenuCheckbox
     ${NSD_SetState} $StartMenuCheckbox ${BST_CHECKED}
 
+    # Run App Checkbox
+    ${NSD_CreateCheckbox} 10u 70u 100% 12u "Run FreeScribe"
+    Pop $RunAppCheckbox
+    ${NSD_SetState} $RunAppCheckbox ${BST_CHECKED}
+
+    # Run App Checkbox
+    ${NSD_CreateCheckbox} 10u 90u 100% 12u "Run Sandboxed FreeScribe"
+    Pop $RunSandboxedAppCheckbox
+    ShowWindow $RunSandboxedAppCheckbox ${SW_HIDE}
+    ${NSD_SetState} $RunSandboxedAppCheckbox ${BST_UNCHECKED}
+
+    ${NSD_OnClick} $SandboxedDesktopShortcutCheckbox SandboxSelectionClicked
+
     nsDialogs::Show
 FunctionEnd
 
-Function RunApp
-    ${NSD_GetState} $RunAppCheckbox $0
+Function SandboxSelectionClicked
+    Pop $0 ; Remove callback handle from stack
+    
+    ${NSD_GetState} $SandboxedDesktopShortcutCheckbox $0
     ${If} $0 == ${BST_CHECKED}
-        Exec '"$INSTDIR\freescribe-client.exe"'
+        ShowWindow $RunSandboxedAppCheckbox ${SW_SHOW}
+    ${Else}
+        ShowWindow $RunSandboxedAppCheckbox ${SW_HIDE}
     ${EndIf}
+FunctionEnd
 
+Function RunApp
     # Check Desktop Shortcut
     ${NSD_GetState} $DesktopShortcutCheckbox $0
     StrCmp $0 ${BST_CHECKED} +2
         Goto SkipDesktopShortcut
     CreateShortcut "$DESKTOP\FreeScribe.lnk" "$INSTDIR\freescribe-client.exe"
     SkipDesktopShortcut:
+
+    # Check Sandboxed Desktop Shortcut
+    ${NSD_GetState} $SandboxedDesktopShortcutCheckbox $0
+    StrCmp $0 ${BST_CHECKED} +2
+        Goto SkipSandboxedDesktopShortcut
+    Call CheckSandboxiePlus
+    ; Create a shortcut for Sandboxed FreeScribe
+    CreateShortcut "$DESKTOP\SandboxedFreeScribe.lnk" "$SandboxiePlusPath\SandMan.exe" '/box:FreeScribeBox "$INSTDIR\freescribe-client.exe"' "$INSTDIR\freescribe-client.exe"
+    SkipSandboxedDesktopShortcut:
 
     # Check Start Menu
     ${NSD_GetState} $StartMenuCheckbox $0
@@ -643,6 +674,44 @@ Function RunApp
     CreateDirectory "$SMPROGRAMS\FreeScribe"
     CreateShortcut "$SMPROGRAMS\FreeScribe\FreeScribe.lnk" "$INSTDIR\freescribe-client.exe"
     SkipStartMenu:
+    
+    # Run the application if the checkbox is checked at the end
+    ${NSD_GetState} $RunAppCheckbox $0
+    ${If} $0 == ${BST_CHECKED}
+        Exec '"$INSTDIR\freescribe-client.exe"'
+    ${EndIf}
+
+    # Run the application in sandboxed mode if the checkbox is checked at the end
+    ${NSD_GetState} $RunSandboxedAppCheckbox $0
+    ${If} $0 == ${BST_CHECKED}
+        Exec '"$SandboxiePlusPath\SandMan.exe" /box:FreeScribeBox "$INSTDIR\freescribe-client.exe"'
+    ${EndIf}
+FunctionEnd
+
+; Function to check if Sandboxie-Plus is installed
+; If not, show a message box and exit the installer
+; If it is installed, set the path to the Sandboxie-Plus executable
+Function CheckSandboxiePlus
+    CheckSandboxie:
+        ; Check if Sandboxie-Plus is installed
+        SetRegView 64
+        ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Sandboxie-Plus_is1" "InstallLocation"
+
+        ${If} $R0 == ""
+            ; Fallback to 32-bit registry view
+            SetRegView 32
+            ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Sandboxie-Plus_is1" "InstallLocation"
+        ${EndIf}
+
+        ; No Sandboxie-Plus detected - show error message
+        ${If} $R0 == ""
+            MessageBox MB_RETRYCANCEL "Sandboxie-Plus is not installed. Please install it first and try again." IDRETRY CheckSandboxie IDCANCEL CancelCreatingBoxedShortcut
+        ${EndIf}
+
+        StrCpy $SandboxiePlusPath $R0 -1
+        Return
+    CancelCreatingBoxedShortcut:
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Skipping creation of Sandboxed FreeScribe shortcut. Please install Sandboxie-Plus to use this feature."
 FunctionEnd
 
 ; Function to execute when leaving the InstallFiles page
